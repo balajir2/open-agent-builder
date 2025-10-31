@@ -45,17 +45,50 @@ export default function UIBuilderCanvas() {
     const { active, over } = event;
 
     if (over && over.id === "dropzone") {
-      const componentType = active.id as string;
+      // Check if it's a new component from palette or existing component being moved
+      if (active.id.toString().includes("-")) {
+        // This is an existing component being moved
+        const rect = event.delta;
+        const componentId = active.id as string;
 
-      // Create new component
-      const newComponent: UIComponent = {
-        id: `${componentType}-${Date.now()}`,
-        type: componentType,
-        props: getDefaultPropsForType(componentType),
-        position: { x: Math.random() * 300, y: Math.random() * 200 },
-      };
+        setComponents((prev) => prev.map((comp) => {
+          if (comp.id === componentId) {
+            return {
+              ...comp,
+              position: {
+                x: comp.position.x + rect.x,
+                y: comp.position.y + rect.y,
+              },
+            };
+          }
+          return comp;
+        }));
+      } else {
+        // This is a new component from the palette
+        const componentType = active.id as string;
+        const dropRect = event.over?.rect;
+        const clientRect = event.activatorEvent?.target as HTMLElement;
 
-      setComponents((prev) => [...prev, newComponent]);
+        // Calculate position relative to drop zone
+        let x = 50;
+        let y = 50;
+
+        if (event.activatorEvent && dropRect) {
+          const mouseEvent = event.activatorEvent as MouseEvent;
+          x = Math.max(0, mouseEvent.clientX - dropRect.left - 50);
+          y = Math.max(0, mouseEvent.clientY - dropRect.top - 50);
+        }
+
+        // Create new component
+        const newComponent: UIComponent = {
+          id: `${componentType}-${Date.now()}`,
+          type: componentType,
+          props: getDefaultPropsForType(componentType),
+          position: { x, y },
+        };
+
+        setComponents((prev) => [...prev, newComponent]);
+      }
     }
 
     setActiveId(null);
@@ -77,6 +110,22 @@ export default function UIBuilderCanvas() {
         return { text: "Text content" };
       case "image":
         return { src: "https://via.placeholder.com/300x200", alt: "Placeholder" };
+      case "select":
+        return { label: "Select Option", placeholder: "Choose an option" };
+      case "checkbox":
+        return { label: "Check this box" };
+      case "radio":
+        return { label: "Radio option" };
+      case "divider":
+        return {};
+      case "container":
+        return { title: "Container" };
+      case "list":
+        return { items: ["Item 1", "Item 2", "Item 3"] };
+      case "link":
+        return { text: "Click here", href: "#" };
+      case "badge":
+        return { text: "New", variant: "primary" };
       default:
         return {};
     }
@@ -85,6 +134,12 @@ export default function UIBuilderCanvas() {
   const handleComponentUpdate = (id: string, props: Record<string, any>) => {
     setComponents((prev) =>
       prev.map((comp) => (comp.id === id ? { ...comp, props } : comp))
+    );
+  };
+
+  const handleComponentMove = (id: string, position: { x: number; y: number }) => {
+    setComponents((prev) =>
+      prev.map((comp) => (comp.id === id ? { ...comp, position } : comp))
     );
   };
 
@@ -210,6 +265,7 @@ export default function UIBuilderCanvas() {
             <DropZone
               components={components}
               onComponentUpdate={handleComponentUpdate}
+              onComponentMove={handleComponentMove}
               onComponentDelete={handleComponentDelete}
               onExecuteWorkflow={handleExecuteWorkflow}
               selectedWorkflowId={selectedWorkflowId}
