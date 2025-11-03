@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { DndContext, DragEndEvent, DragStartEvent, useSensor, useSensors, PointerSensor, DragOverlay } from "@dnd-kit/core";
 import ComponentPalette from "./ComponentPalette";
 import DropZone from "./DropZone";
 import WorkflowSelector from "./WorkflowSelector";
 import ResponseDisplay from "./ResponseDisplay";
 import { ResizablePane, ResizableRightPane } from "./ResizablePane";
+import { Play, Info, AlertCircle } from "lucide-react";
 
 export interface UIComponent {
   id: string;
@@ -28,6 +29,7 @@ export default function UIBuilderCanvas() {
   const [workflowResponses, setWorkflowResponses] = useState<WorkflowResponse[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
   const [activeComponentId, setActiveComponentId] = useState<string | null>(null);
+  const [showIntro, setShowIntro] = useState(true);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -94,14 +96,14 @@ export default function UIBuilderCanvas() {
     setActiveId(null);
   };
 
-  const getDefaultPropsForType = (type: string): Record<string, any> => {
+    const getDefaultPropsForType = (type: string): Record<string, any> => {
     switch (type) {
       case "button":
-        return { label: "Click Me", variant: "primary" };
+        return { label: "Execute Workflow", variant: "primary", buttonType: "workflow" };
       case "input":
-        return { placeholder: "Enter text...", label: "Input Field" };
+        return { placeholder: "Enter text...", label: "Input Field", value: "" };
       case "textarea":
-        return { placeholder: "Enter text...", label: "Text Area", rows: 4 };
+        return { placeholder: "Enter text...", label: "Text Area", rows: 4, value: "" };
       case "card":
         return { title: "Card Title", content: "Card content goes here" };
       case "heading":
@@ -147,7 +149,18 @@ export default function UIBuilderCanvas() {
     setComponents((prev) => prev.filter((comp) => comp.id !== id));
   };
 
-  const handleExecuteWorkflow = async (componentId: string, workflowId: string) => {
+    // Collect input values from UI components whenever components change
+  useEffect(() => {
+    const inputs: Record<string, any> = {};
+    components.forEach((comp) => {
+      if (comp.type === "input" || comp.type === "textarea") {
+        const key = comp.props.label?.replace(/\s+/g, "_").toLowerCase() || comp.id;
+        inputs[key] = comp.props.value || "";
+      }
+    });
+  }, [components]);
+
+    const handleExecuteWorkflow = async (componentId: string | null, workflowId: string) => {
     if (!workflowId) {
       alert("Please select a workflow first");
       return;
@@ -156,11 +169,9 @@ export default function UIBuilderCanvas() {
     setIsExecuting(true);
     setActiveComponentId(componentId);
     setWorkflowResponses([]);
+    setShowIntro(false);
 
     try {
-      const component = components.find((c) => c.id === componentId);
-      if (!component) return;
-
       // Collect input values from UI components
       const inputs: Record<string, any> = {};
       components.forEach((comp) => {
@@ -223,9 +234,12 @@ export default function UIBuilderCanvas() {
           timestamp: new Date().toISOString(),
         },
       ]);
-    } finally {
+        } finally {
       setIsExecuting(false);
-      setActiveComponentId(null);
+      // Only reset activeComponentId if it's not the global button
+      if (activeComponentId !== "global-workflow-button") {
+        setActiveComponentId(null);
+      }
     }
   };
 
@@ -253,15 +267,66 @@ export default function UIBuilderCanvas() {
         {/* Main Canvas Area */}
         <div className="flex-1 flex flex-col min-w-0 bg-white">
           {/* Top Bar - Workflow Selector */}
-          <div className="border-b-2 border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 p-4 flex-shrink-0">
-            <WorkflowSelector
-              selectedWorkflowId={selectedWorkflowId}
-              onSelectWorkflow={setSelectedWorkflowId}
-            />
+                    <div className="border-b-2 border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 p-4 flex-shrink-0">
+            <div className="flex flex-col space-y-4">
+              <WorkflowSelector
+                selectedWorkflowId={selectedWorkflowId}
+                onSelectWorkflow={setSelectedWorkflowId}
+              />
+              
+              {/* Global Workflow Execution Button */}
+              <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-3 shadow-sm">
+                <div className="flex-1">
+                  <h3 className="text-sm font-medium text-blue-800">Execute Selected Workflow</h3>
+                  <p className="text-xs text-blue-600">Run workflow with all input values</p>
+                </div>
+                <button
+                                    onClick={() => selectedWorkflowId && handleExecuteWorkflow("global-workflow-button", selectedWorkflowId)}
+                  disabled={isExecuting || !selectedWorkflowId}
+                  className={`px-16 py-8 rounded-8 font-medium transition-all active:scale-[0.98] flex items-center gap-2
+                    ${selectedWorkflowId ? 'bg-heat-100 hover:bg-heat-200 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+                >
+                  {isExecuting ? (
+                    <>
+                      <div className="w-16 h-16 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Running...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-16 h-16" />
+                      Run Workflow
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Canvas */}
-          <div className="flex-1 overflow-auto p-6 min-h-0 bg-gray-50">
+                    <div className="flex-1 overflow-auto p-6 min-h-0 bg-gray-50">
+            {/* User Help Panel - shown initially */}
+            {showIntro && components.length > 0 && (
+              <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4 shadow-sm">
+                <div className="flex items-start">
+                  <Info className="h-5 w-5 text-indigo-500 mt-1 mr-3 flex-shrink-0" />
+                  <div>
+                    <h3 className="text-sm font-medium text-indigo-800">Getting Started</h3>
+                    <p className="text-xs text-indigo-700 mt-1">
+                      1. Add UI components from the left panel<br/>
+                      2. Configure each component by clicking the settings icon<br/>
+                      3. Select a workflow above<br/>
+                      4. Click the "Run Workflow" button to execute with all input values
+                    </p>
+                    <button 
+                      onClick={() => setShowIntro(false)}
+                      className="text-xs text-indigo-600 hover:text-indigo-800 mt-2 underline"
+                    >
+                      Dismiss this message
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             <DropZone
               components={components}
               onComponentUpdate={handleComponentUpdate}
@@ -276,13 +341,23 @@ export default function UIBuilderCanvas() {
         </div>
 
         {/* Right Sidebar - Response Display (Resizable) */}
-        <ResizableRightPane
+                <ResizableRightPane
           defaultWidth={384}
           minWidth={300}
           maxWidth={600}
           className="border-l-2 border-gray-200 bg-white shadow-lg"
         >
-          <ResponseDisplay responses={workflowResponses} isExecuting={isExecuting} />
+          {workflowResponses.length === 0 && !isExecuting ? (
+            <div className="p-4 flex flex-col items-center justify-center h-full text-center">
+              <AlertCircle className="h-10 w-10 text-gray-400 mb-3" />
+              <h3 className="text-lg font-medium text-gray-700">No Workflow Results</h3>
+              <p className="text-sm text-gray-500 mt-2 max-w-xs">
+                Execute a workflow to see real-time results and node outputs here.
+              </p>
+            </div>
+          ) : (
+            <ResponseDisplay responses={workflowResponses} isExecuting={isExecuting} />
+          )}
         </ResizableRightPane>
 
         {/* Drag Overlay */}
