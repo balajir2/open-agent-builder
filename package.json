@@ -85,6 +85,7 @@
     "copy-to-clipboard": "^3.3.3",
     "framer-motion": "^11.1.7",
     "geist": "^1.4.2",
+    "html-docx-js": "^0.3.1",
     "jotai": "^2.15.0",
     "lodash-es": "^4.17.21",
     "lucide-react": "^0.539.0",

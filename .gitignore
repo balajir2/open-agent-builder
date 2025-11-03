@@ -47,3 +47,5 @@ post_migrator.py
 
 # Server
 firecrawl-responses-api/.env
+
+.clerk/

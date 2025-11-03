@@ -34,7 +34,7 @@ export default function RootLayout({
           <head>
             <title>Open Agent Builder</title>
             <meta name="description" content="Build AI agents and workflows with visual programming" />
-            <link rel="icon" href="/favicon.png" />
+            <link rel="icon" href="/favicon-bounteous.png" />
             <ColorStyles />
           </head>
           <body

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { UIComponent } from "./UIBuilderCanvas";
-import { X, Settings, Play } from "lucide-react";
+import { X, Settings, Play, Move, Copy } from "lucide-react";
 
 interface DroppedComponentProps {
   component: UIComponent;
@@ -37,15 +37,23 @@ export default function DroppedComponent({
 
   const renderComponent = () => {
     switch (component.type) {
-      case "button":
+            case "button":
         return (
           <button
             className={`
-              px-16 py-8 rounded-8 font-medium transition-all active:scale-[0.98]
-              ${component.props.variant === "primary" ? "bg-heat-100 hover:bg-heat-200 text-white" : "bg-background-elevated hover:bg-background-base border border-border-faint"}
+              px-16 py-8 rounded-8 font-medium transition-all active:scale-[0.98] shadow-sm
+              ${component.props.variant === "primary" ? "bg-heat-100 hover:bg-heat-200 text-white" : component.props.variant === "accent" ? "bg-blue-500 hover:bg-blue-600 text-white" : "bg-background-elevated hover:bg-background-base border border-border-faint"}
             `}
-            onClick={() => onExecute(component.id, selectedWorkflowId)}
-            disabled={isExecuting}
+            onClick={() => {
+              if (selectedWorkflowId && (!component.props.buttonType || component.props.buttonType === 'workflow')) {
+                onExecute(component.id, selectedWorkflowId);
+              } else if (component.props.buttonType === 'navigation') {
+                alert('Navigation feature coming soon!');
+              } else if (!selectedWorkflowId) {
+                alert('Please select a workflow first');
+              }
+            }}
+            disabled={isExecuting || (!selectedWorkflowId && (!component.props.buttonType || component.props.buttonType === 'workflow'))}
           >
             {isExecuting ? (
               <span className="flex items-center gap-8">
@@ -53,7 +61,11 @@ export default function DroppedComponent({
                 Executing...
               </span>
             ) : (
-              component.props.label
+              <span className="flex items-center gap-2">
+                {!component.props.buttonType || component.props.buttonType === 'workflow' ? 
+                  <Play className="w-12 h-12" /> : null}
+                {component.props.label}
+              </span>
             )}
           </button>
         );
@@ -270,13 +282,26 @@ export default function DroppedComponent({
   return (
     <div className="bg-background-elevated border border-border-faint rounded-12 p-16 relative group">
       {/* Controls */}
-      <div className="absolute top-8 right-8 flex gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute top-8 right-8 flex gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={() => setIsEditing(!isEditing)}
-          className="p-4 bg-background-base hover:bg-background-elevated border border-border-faint rounded-6 transition-all"
-          title="Edit"
+          className="p-4 bg-background-base hover:bg-blue-100 border border-border-faint rounded-6 transition-all"
+          title="Edit Component"
         >
           <Settings className="w-16 h-16" />
+        </button>
+        <button
+          className="p-4 bg-background-base hover:bg-indigo-100 border border-border-faint rounded-6 cursor-move transition-all"
+          title="Drag to Reposition"
+        >
+          <Move className="w-16 h-16" />
+        </button>
+        <button
+          onClick={() => console.log('Duplicate component - TODO')}
+          className="p-4 bg-background-base hover:bg-green-100 border border-border-faint rounded-6 transition-all"
+          title="Duplicate"
+        >
+          <Copy className="w-16 h-16" />
         </button>
         <button
           onClick={() => onDelete(component.id)}
@@ -288,7 +313,7 @@ export default function DroppedComponent({
       </div>
 
       {/* Component Type Badge */}
-      <div className="text-xs text-text-secondary mb-8 uppercase tracking-wider">
+            <div className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded inline-block mb-8 uppercase tracking-wider">
         {component.type}
       </div>
 
