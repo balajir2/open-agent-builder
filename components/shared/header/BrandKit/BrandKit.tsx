@@ -32,23 +32,22 @@ export default function HeaderBrandKit() {
   }, [dropdownContent]);
 
   return (
-    <div className="relative">
+    <div className="w-full flex items-center justify-start relative">
       <Link
-        className="flex items-center gap-2 relative brand-kit-menu"
+        className="flex items-center gap-6 brand-kit-menu"
         href="/"
         onContextMenu={(e) => {
           e.preventDefault();
           setOpen(!open);
-
-          if (!open) {
-            clearDropdown(true);
-          }
+          if (!open) clearDropdown(true);
         }}
       >
-        <FirecrawlIcon className="size-50 top-5 relative" />
-        <Logo />
+        <FirecrawlIcon className="size-50 top-7 relative" />
+        <span className="font-semibold font-sans text-xl tracking-tight text-gray-800 ml-4">
+          Research Workflow
+        </span>
       </Link>
-
+  
       <AnimatePresence initial={false} mode="popLayout">
         {open && <Menu setOpen={setOpen} />}
       </AnimatePresence>
