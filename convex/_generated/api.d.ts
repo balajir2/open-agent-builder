@@ -14,6 +14,7 @@ import type * as approvals from "../approvals.js";
 import type * as executions from "../executions.js";
 import type * as mcpServers from "../mcpServers.js";
 import type * as templates from "../templates.js";
+import type * as uiBuilderConfigurations from "../uiBuilderConfigurations.js";
 import type * as userLLMKeys from "../userLLMKeys.js";
 import type * as userMCPs from "../userMCPs.js";
 import type * as workflows from "../workflows.js";
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   executions: typeof executions;
   mcpServers: typeof mcpServers;
   templates: typeof templates;
+  uiBuilderConfigurations: typeof uiBuilderConfigurations;
   userLLMKeys: typeof userLLMKeys;
   userMCPs: typeof userMCPs;
   workflows: typeof workflows;
