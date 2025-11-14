@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import HeaderBrandKit from "@/components/shared/header/BrandKit/BrandKit";
 import HeaderWrapper from "@/components/shared/header/Wrapper/Wrapper";
 import HeaderDropdownWrapper from "@/components/shared/header/Dropdown/Wrapper/Wrapper";
@@ -14,7 +15,19 @@ import UIBuilderCanvas from "@/components/ui-builder/UIBuilderCanvas";
 import { HeaderProvider } from "@/components/shared/header/HeaderContext";
 
 export default function UIBuilderPage() {
+  const searchParams = useSearchParams();
+  const [workflow, setWorkflow] = useState<any>(null);
   const router = useRouter();
+  useEffect(() => {
+  const id = searchParams.get("workflow");
+  if (!id) return;
+
+  fetch(`/api/workflows/${id}`)
+    .then((res) => res.json())
+    .then(setWorkflow)
+    .catch(console.error);
+}, []);
+
 
   return (
     <HeaderProvider>

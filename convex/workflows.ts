@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 
+
 /**
  * Workflow CRUD Operations
  */
@@ -326,6 +327,48 @@ export const deleteWorkflowsWithoutUserId = mutation({
       success: true,
       count: workflows.length,
       message: `Deleted ${workflows.length} workflows without userId`,
+    };
+  },
+});
+
+
+
+export const getWorkflowDetails = query({
+  args: { customId: v.string() },
+  handler: async ({ db }, { customId }) => {
+    const workflow = await db
+      .query("workflows")
+      .withIndex("by_customId", (q) => q.eq("customId", customId))
+      .first();
+
+    if (!workflow) return null;
+
+    // ✅ Extract input variables from the "start" node
+    let requiredInputs: any[] = [];
+    try {
+      if (Array.isArray(workflow.nodes)) {
+        workflow.nodes.forEach((node: any) => {
+          // Look for node.data.inputVariables array
+          if (Array.isArray(node.data?.inputVariables)) {
+            node.data.inputVariables.forEach((inputVar: any) => {
+              requiredInputs.push({
+                name: inputVar.name,
+                description: inputVar.description || "Enter value",
+                type: inputVar.type || "text",
+                required: inputVar.required ?? true,
+                defaultValue: inputVar.defaultValue || "",
+              });
+            });
+          }
+        });
+      }
+    } catch (err) {
+      // console.error("Error parsing workflow inputs:", err);
+    }
+
+    return {
+      ...workflow,
+      requiredInputs,
     };
   },
 });
