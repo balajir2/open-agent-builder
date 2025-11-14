@@ -49,17 +49,9 @@ export default function UIBuilderCanvas() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>("");
   const router = useRouter();
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [workflowName, setWorkflowName] = useState("");
 
-
-// When new variable is added (from Insert Variable button)
-// const handleAddVariable = (variableName: string) => {
-//   if (!variableName.trim()) return;
-//   setInputVariables((prev) => [
-//     ...prev,
-//     { name: variableName.trim(), type: "string", defaultValue: "" },
-//   ]);
-// };
-  // Fetch workflow details (via /api/workflows/[id]) and load nodes into the canvas
 
 useEffect(() => {
   if (!selectedWorkflowId) return;
@@ -762,7 +754,7 @@ const removeCustomVariable = (index: number) => {
 const saveWorkflow = useMutation(api.workflows.saveWorkflow);
 
   // Ensure canvas has input components for all workflow inputs and create bindings
-  const handleSaveWorkflow = async () => {
+  const handleSaveWorkflow = async (userWorkflowName: string) => {
   if (!selectedWorkflowId) {
     alert("Please select or create a workflow first!");
     return;
@@ -848,7 +840,7 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
     //  Build final workflow payload
     const payload = {
       customId: `workflow_${Date.now()}`,
-      name: `Copy of ${originalWorkflow?.workflow?.name || originalWorkflow?.name || "Workflow"}_${Date.now()}`,
+      name: `Copy of ${originalWorkflow?.workflow?.name || originalWorkflow?.name || "Workflow"}_${Date.now()}_${userWorkflowName}`,
       description: "Saved workflow from UI Builder Canvas",
       nodes: mergedNodes,
       edges: originalEdges,
@@ -1046,386 +1038,7 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
     });
   };
 
-  // Fetch workflow input metadata when selectedWorkflowId changes
-  // useEffect(() => {
-  //   if (!selectedWorkflowId) {
-  //     setWorkflowInputs([]);
-  //     setWorkflowInputBindings({});
-  //     return;
-  //   }
-    
-  //   // If we're not loading a saved configuration, clear the components
-  //   if (!isLoading && !savedConfig) {
-  //     setComponents([]);
-  //   }
-
-  //   const parseInputsFromJson = (json: any) => {
-  //     if (!json) return [];
-      
-  //     console.log("Parsing workflow inputs from:", json);
-      
-  //     // Extract actual workflow input variables (highest priority)
-  //     // Look for workflow-specific structures
-  //     if (json.workflow?.inputs) {
-  //       console.log("Found workflow.inputs structure");
-  //       return json.workflow.inputs.map((i: any) => ({
-  //         name: typeof i === "string" ? i : i.name,
-  //         label: typeof i === "string" ? i : (i.label ?? i.title ?? i.name),
-  //         type: typeof i === "string" ? "string" : (i.type ?? "string"),
-  //         default: typeof i === "string" ? "" : (i.default ?? i.example ?? ""),
-  //       }));
-  //     }
-      
-  //     // Look for start node with input definitions
-  //     if (json.nodes) {
-  //       const startNode = json.nodes.find((n: any) => 
-  //         n.type === "start" || 
-  //         n.id === "start" || 
-  //         n.name === "start" ||
-  //         n.nodeType === "start"
-  //       );
-        
-  //       if (startNode) {
-  //         console.log("Found start node:", startNode);
-  //         // Extract input definitions from start node
-  //         const inputVars = [];
-          
-  //         // Check for outputs field which often defines the workflow inputs
-  //         if (startNode.outputs) {
-  //           console.log("Start node has outputs:", startNode.outputs);
-  //           // Handle outputs as array
-  //           if (Array.isArray(startNode.outputs)) {
-  //             return startNode.outputs.map((output: any) => ({
-  //               name: typeof output === "string" ? output : output.name,
-  //               label: typeof output === "string" ? output : (output.label ?? output.title ?? output.name),
-  //               type: typeof output === "string" ? "string" : (output.type ?? "string"),
-  //               default: typeof output === "string" ? "" : (output.default ?? ""),
-  //             }));
-  //           }
-  //           // Handle outputs as object
-  //           else if (typeof startNode.outputs === "object") {
-  //             return Object.entries(startNode.outputs).map(([key, value]: [string, any]) => ({
-  //               name: key,
-  //               label: typeof value === "object" && value.label ? value.label : key,
-  //               type: typeof value === "object" && value.type ? value.type : "string",
-  //               default: typeof value === "object" && value.default !== undefined ? value.default : "",
-  //             }));
-  //           }
-  //         }
-          
-  //         // Check for data field which may contain input definitions
-  //         if (startNode.data && startNode.data.inputs) {
-  //           console.log("Start node has data.inputs:", startNode.data.inputs);
-  //           return startNode.data.inputs.map((input: any) => ({
-  //             name: typeof input === "string" ? input : input.name,
-  //             label: typeof input === "string" ? input : (input.label ?? input.title ?? input.name),
-  //             type: typeof input === "string" ? "string" : (input.type ?? "string"),
-  //             default: typeof input === "string" ? "" : (input.default ?? ""),
-  //           }));
-  //         }
-  //       }
-  //     }
-      
-  //     // Check for workflow input definitions directly at root
-  //     if (json.inputs) {
-  //       console.log("Found root level inputs:", json.inputs);
-  //       if (Array.isArray(json.inputs)) {
-  //         return json.inputs.map((i: any) => ({
-  //           name: typeof i === "string" ? i : i.name,
-  //           label: typeof i === "string" ? i : (i.label ?? i.title ?? i.name),
-  //           type: typeof i === "string" ? "string" : (i.type ?? i.schema?.type ?? "string"),
-  //           default: typeof i === "string" ? "" : (i.default ?? i.example ?? ""),
-  //         }));
-  //       }
-  //       // Handle inputs as object
-  //       else if (typeof json.inputs === "object" && !Array.isArray(json.inputs)) {
-  //         return Object.entries(json.inputs).map(([key, value]: [string, any]) => ({
-  //           name: key,
-  //           label: typeof value === "object" && value.label ? value.label : key,
-  //           type: typeof value === "object" && value.type ? value.type : "string",
-  //           default: typeof value === "object" && value.default !== undefined ? value.default : "",
-  //         }));
-  //       }
-  //     }
-
-  //     // Check for variables field which may contain input definitions
-  //     if (json.variables) {
-  //       console.log("Found variables field:", json.variables);
-  //       if (Array.isArray(json.variables)) {
-  //         return json.variables.map((v: any) => ({
-  //           name: typeof v === "string" ? v : v.name,
-  //           label: typeof v === "string" ? v : (v.label ?? v.name),
-  //           type: typeof v === "string" ? "string" : (v.type ?? "string"),
-  //           default: typeof v === "string" ? "" : (v.default ?? v.value ?? ""),
-  //         }));
-  //       }
-  //       // Handle variables as object
-  //       else if (typeof json.variables === "object") {
-  //         return Object.entries(json.variables).map(([key, value]: [string, any]) => ({
-  //           name: key,
-  //           label: typeof value === "object" && value.label ? value.label : key,
-  //           type: typeof value === "object" && value.type ? value.type : "string",
-  //           default: typeof value === "object" && value.default !== undefined ? value.default : "",
-  //         }));
-  //       }
-  //     }
-      
-  //     // Fallback to previous detection methods
-      
-  //     // Common API shapes
-  //     if (Array.isArray(json.parameters)) {
-  //       console.log("Found parameters array:", json.parameters);
-  //       return json.parameters.map((p: any) => ({
-  //         name: p.name,
-  //         label: p.title ?? p.name,
-  //         type: p.type ?? p.schema?.type ?? "string",
-  //         default: p.default ?? p.example ?? "",
-  //       }));
-  //     }
-
-  //     // JSON Schema style: properties object
-  //     if (json.properties && typeof json.properties === "object") {
-  //       console.log("Found JSON Schema properties:", json.properties);
-  //       return Object.entries(json.properties).map(([key, schema]: any) => ({
-  //         name: key,
-  //         label: (schema && (schema.title || schema.label)) ?? key,
-  //         type: schema?.type ?? "string",
-  //         default: schema?.default ?? "",
-  //       }));
-  //     }
-
-  //     // JSON Schema root with $id/title => single object input
-  //     if (json.$id && json.title) {
-  //       return [{
-  //         name: json.$id,
-  //         label: json.title,
-  //         type: json.type ?? "object",
-  //         default: json.default ?? {},
-  //       }];
-  //     }
-
-  //     // Examine nodes to extract potential input variables from edge connections
-  //     if (json.nodes && json.edges && Array.isArray(json.nodes) && Array.isArray(json.edges)) {
-  //       console.log("Analyzing nodes and edges to determine input variables");
-        
-  //       // Find the start node (if not already found)
-  //       const startNodeId = json.nodes.find((n: any) => 
-  //         n.type === "start" || n.id === "start" || n.name === "start"
-  //       )?.id;
-        
-  //       if (startNodeId) {
-  //         // Find edges coming from the start node
-  //         const startEdges = json.edges.filter((e: any) => 
-  //           e.source === startNodeId || e.from === startNodeId
-  //         );
-          
-  //         // Extract variable names from edges (often in sourceHandle or data)
-  //         const inputVars = startEdges.map((edge: any) => {
-  //           // Try to extract a clean variable name
-  //           let varName = edge.sourceHandle || edge.label || edge.id;
-            
-  //           // Clean up edge names (remove prefixes like xy-edge__node_2output-)
-  //           if (varName && typeof varName === "string") {
-  //             // If it contains "output" and "input", extract the middle part
-  //             if (varName.includes("output") && varName.includes("input")) {
-  //               const parts = varName.split(/\-|__/);
-  //               // Find parts that aren't system names
-  //               const cleanParts = parts.filter(p => 
-  //                 !p.includes("edge") && 
-  //                 !p.includes("node") && 
-  //                 !p.startsWith("xy")
-  //               );
-  //               if (cleanParts.length > 0) {
-  //                 varName = cleanParts[0].replace(/output|input/g, "");
-  //               }
-  //             }
-              
-  //             // Further clean up the name
-  //             varName = varName
-  //               .replace(/^xy\-edge__/, "")
-  //               .replace(/^node_\d+output\-/, "")
-  //               .replace(/\-node_\d+input$/, "")
-  //               .replace(/^output\-/, "")
-  //               .replace(/\-input$/, "");
-  //           }
-            
-  //           return {
-  //             name: varName,
-  //             label: varName,
-  //             type: "string",
-  //             default: ""
-  //           };
-  //         });
-          
-  //         if (inputVars.length > 0) {
-  //           console.log("Extracted input variables from edges:", inputVars);
-  //           return inputVars;
-  //         }
-  //       }
-  //     }
-
-  //     // recursive search for input-like arrays (fallback)
-  //     const seen = new Set<any>();
-  //     const queue: any[] = [json];
-  //     while (queue.length) {
-  //       const node = queue.shift();
-  //       if (!node || typeof node !== "object" || seen.has(node)) continue;
-  //       seen.add(node);
-
-  //       if (Array.isArray(node) && node.length > 0 && typeof node[0] === "object") {
-  //         const item = node[0];
-  //         if ("name" in item || "title" in item || "label" in item || "id" in item) {
-  //           // parse array as inputs
-  //           const result = node.map((it: any) => ({
-  //             name: it.name ?? it.id ?? it.title ?? "",
-  //             label: it.label ?? it.title ?? it.name ?? it.id ?? "",
-  //             type: it.type ?? it.schema?.type ?? "string",
-  //             default: it.default ?? it.example ?? it.value ?? "",
-  //           })).filter((i: any) => i.name);
-            
-  //           if (result.length > 0) {
-  //             console.log("Found input-like array through deep search:", result);
-  //             return result;
-  //           }
-  //         }
-  //       }
-
-  //       // push children
-  //       for (const key of Object.keys(node)) {
-  //         try {
-  //           queue.push(node[key]);
-  //         } catch {}
-  //       }
-  //     }
-
-  //     // last resort: if object is flat, treat keys as inputs
-  //     if (typeof json === "object") {
-  //       const result = Object.keys(json).map((key) => ({
-  //         name: key,
-  //         label: key,
-  //         type: "string",
-  //         default: json[key],
-  //       }));
-        
-  //       console.log("Using last resort - treating object keys as inputs:", result);
-  //       return result;
-  //     }
-
-  //     console.warn("Could not detect any inputs from workflow definition");
-  //     return [];
-  //   };
-
-  //   const tryEndpoints = [
-  //     // Try our dedicated variables endpoint first (most accurate)
-  //     (id: string) => `/api/workflows/${id}/variables`,
-  //     // Then try other endpoints that might contain input information
-  //     (id: string) => `/api/workflows/${id}/inputs`,
-  //     (id: string) => `/api/workflows/${id}/metadata`,
-  //     (id: string) => `/api/workflows/${id}`,
-  //     (id: string) => `/api/workflows/${id}/definition`,
-  //     (id: string) => `/api/workflows/${id}/spec`,
-  //   ];
-
-  //   const fetchInputs = async () => {
-  //     const id = selectedWorkflowId;
-      
-  //     // Try to get variables from our new specialized endpoint first
-  //     try {
-  //       const url = `/api/workflows/${id}/variables`;
-  //       console.debug("Attempting to fetch workflow variables from specialized endpoint", url);
-  //       const res = await fetch(url);
-  //       if (res.ok) {
-  //         const variables = await res.json();
-  //         console.debug("Received workflow variables from specialized endpoint:", variables);
-          
-  //         if (variables && variables.length > 0) {
-  //           // If we got variables from our specialized endpoint, look for true variables first
-  //           const trueVars = variables.filter((v: any) => v.trueVariable === true);
-            
-  //           // Highest priority: use true variables if available
-  //           if (trueVars.length > 0) {
-  //             console.log("Using TRUE workflow variables (highest priority):", trueVars);
-  //             await ensureInputComponentsForWorkflow(trueVars);
-  //             return;
-  //           }
-            
-  //           // Second priority: internal variables
-  //           const internalVars = variables.filter((v: any) => v.internal === true);
-  //           if (internalVars.length > 0) {
-  //             console.log("Using internal workflow variables:", internalVars);
-  //             await ensureInputComponentsForWorkflow(internalVars);
-  //             return;
-  //           }
-            
-  //           // Last resort: use all variables
-  //           console.log("Using all detected workflow variables:", variables);
-  //           await ensureInputComponentsForWorkflow(variables);
-  //           return;
-  //         }
-  //       }
-  //     } catch (err) {
-  //       console.error("Error fetching from specialized endpoint:", err);
-  //     }
-      
-  //     // Fall back to trying other endpoints
-  //     for (const makeUrl of tryEndpoints) {
-  //       // Skip the variables endpoint since we already tried it
-  //       if (makeUrl(id).includes('/variables')) continue;
-        
-  //       const url = makeUrl(id);
-  //       try {
-  //         console.debug("Attempting to fetch workflow inputs from", url);
-  //         const res = await fetch(url);
-          
-  //         if (!res.ok) {
-  //           console.debug(`Endpoint returned ${res.status} (${res.statusText}):`, url);
-  //           // If this is a 404, the endpoint doesn't exist - just try the next one
-  //           // If it's another error, check the error response
-  //           if (res.status !== 404) {
-  //             try {
-  //               const errorData = await res.json();
-  //               console.debug("Error response:", errorData);
-  //             } catch (parseErr) {
-  //               // Ignore parse errors from error responses
-  //             }
-  //           }
-  //           continue;
-  //         }
-          
-  //         const json = await res.json();
-  //         console.debug("Workflow data from", url, json);
-          
-  //         const parsed = parseInputsFromJson(json);
-  //         if (parsed && parsed.length > 0) {
-  //           console.debug("Successfully parsed inputs:", parsed);
-  //           await ensureInputComponentsForWorkflow(parsed);
-  //           return;
-  //         } else {
-  //           console.debug("No inputs could be parsed from response", url);
-  //         }
-  //       } catch (err) {
-  //         console.error("Fetch error for", url, err);
-  //         // try next endpoint
-  //       }
-  //     }
-
-  //     // If none of the endpoints yielded inputs, show a default input
-  //     console.warn("No workflow inputs discovered for", selectedWorkflowId);
-      
-  //     // Create a single generic input as a fallback
-  //     await ensureInputComponentsForWorkflow([{
-  //       name: "input",
-  //       label: "Workflow Input",
-  //       type: "string",
-  //       description: "No specific input variables were detected for this workflow. Use this generic input.",
-  //       default: ""
-  //     }]);
-  //   };
-
-  //   fetchInputs();
-  //   // eslint-disable-next-line react-hooks/exhaustive-deps
-  // }, [selectedWorkflowId]);
-
+  
   return (
     <div className="flex h-[calc(100vh-160px)] bg-gray-50">
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -1523,7 +1136,7 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
               </div>
 
               {/* Workflow Execution Button - Full Width */}
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 shadow-sm mt-3">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 shadow-sm mt-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-medium text-blue-800">Create UI for the Selected Workflow</h3>
@@ -1559,7 +1172,12 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
 
                       <button
                       // onClick={() => selectedWorkflowId && handleExecuteWorkflow("global-workflow-button", selectedWorkflowId)}
-                      onClick={()=>handleSaveWorkflow()}
+                      // onClick={()=>handleSaveWorkflow()}
+                      onClick={() => {
+                        if (!selectedWorkflowId) return;
+                        setWorkflowName(""); 
+                        setShowNameModal(true);   // <-- open modal
+                      }}
                       disabled={isExecuting || !selectedWorkflowId}
                       className={`px-12 py-6 rounded-8 font-medium transition-all active:scale-[0.98] flex items-center gap-2
                         ${selectedWorkflowId ? 'bg-heat-100 hover:bg-heat-200 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
@@ -1647,6 +1265,46 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
                 </div>
               )}
             </div>
+            {showNameModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-[99999]">
+          <div className="bg-white p-6 rounded-xl shadow-xl w-[380px]">
+            <h2 className="text-lg font-semibold mb-4 text-gray-800">
+              Enter Workflow Name
+            </h2>
+
+            <input
+              type="text"
+              className="w-full border rounded-md p-2 text-sm"
+              placeholder="My Custom Workflow"
+              value={workflowName}
+              onChange={(e) => setWorkflowName(e.target.value)}
+            />
+
+            <div className="flex justify-end mt-5 gap-3">
+              <button
+                onClick={() => setShowNameModal(false)}
+                className="px-4 py-2 text-sm bg-gray-200 rounded-md"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (!workflowName.trim()) {
+                    alert("Please enter a workflow name.");
+                    return;
+                  }
+                  setShowNameModal(false);
+                  handleSaveWorkflow(workflowName);  // <-- pass user name
+                }}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md"
+              >
+                Save
+              </button>
+      </div>
+    </div>
+  </div>
+)}
+
           </div>
 
           {/* Canvas */}
