@@ -1732,11 +1732,13 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
           />
         ) : (selectedNode?.data as any)?.nodeType === 'extract' ? (
           <ExtractNodePanel
-            node={selectedNode}
-            nodes={nodes}
-            onClose={() => setSelectedNode(null)}
-            onDelete={handleDeleteNode}
-            onUpdate={handleUpdateNodeData}
+            {...({
+              node: selectedNode,
+              nodes: nodes,
+              onClose: () => setSelectedNode(null),
+              onDelete: handleDeleteNode,
+              onUpdate: handleUpdateNodeData,
+            } as any)}
           />
         ) : (selectedNode?.data as any)?.nodeType === 'http' ? (
           <HTTPNodePanel

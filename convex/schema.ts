@@ -184,6 +184,18 @@ export default defineSchema({
     .index("by_userProvider", ["userId", "provider"])
     .index("by_active", ["isActive"]),
 
+      // UI Builder configurations - Stores UI components for workflows
+  uiBuilderConfigurations: defineTable({
+    userId: v.string(), // Clerk user ID who owns this configuration
+    workflowId: v.string(), // ID of the workflow this configuration is for
+    components: v.array(v.any()), // UI components with their configurations
+    workflowInputBindings: v.optional(v.any()), // Maps workflow input name to component ID (flexible shape)
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_workflow_user", ["workflowId", "userId"])
+    .index("by_userId", ["userId"]),
+
   // Approval records - Human-in-the-loop workflow pauses
   approvals: defineTable({
     approvalId: v.string(),
