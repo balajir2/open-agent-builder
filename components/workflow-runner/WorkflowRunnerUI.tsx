@@ -4,6 +4,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Document, Packer, Paragraph } from "docx";
+import { saveAs } from "file-saver";
 import {
   Search, X, Save, Check, Download, ChevronDown,
   FileText, FileDown, Loader, CheckCircle,
@@ -133,6 +135,27 @@ export default function WorkflowRunnerUI() {
 
     fetchWorkflowDetails();
   }, [selectedWorkflowId]);
+
+  async function handleDownloadResult(content: string) {
+  try {
+    const doc = new Document({
+      sections: [
+        {
+          children: [
+            new Paragraph(content),
+          ],
+        },
+      ],
+    });
+
+    const blob = await Packer.toBlob(doc);
+    saveAs(blob, "workflow-output.docx");
+  } catch (err) {
+    console.error("Error downloading DOCX:", err);
+  }
+}
+
+
 
   // Handle input change with validation
   const handleInputChange = (field: string, value: string) => {
@@ -423,7 +446,7 @@ export default function WorkflowRunnerUI() {
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     let extension = format === 'docx' ? 'docx' : format === 'ppt' ? 'pptx' : 'html';
-    const filename = `workflow-results-${workflowId}-${timestamp}.${extension}`;
+    const filename = `workflow-results-${workflowName}.${extension}`;
 
     try {
       setDownloadedFormat(format === 'docx' ? 'Word document' : format === 'ppt' ? 'PowerPoint presentation' : 'HTML document');
@@ -498,9 +521,9 @@ export default function WorkflowRunnerUI() {
               {/* HEADER */}
               <div className="p-6 border-b border-gray-200 
                               bg-gradient-to-r from-indigo-100 via-purple-100 to-indigo-200
-                              flex items-center justify-between rounded-t-lg shadow-sm">
+                              flex items-center justify-between rounded-t-lg shadow-sm px-13 py-13">
                 <h2 className="text-xl font-semibold tracking-tight text-slate-800 flex items-center drop-shadow-sm">
-                  <Play className="w-6 h-6 mr-3 text-indigo-600" />
+                  {/* <Play className="w-15 h-15 mr-3 text-indigo-600" /> */}
                   <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 bg-clip-text text-transparent">
                     Flow Executor
                   </span>
@@ -511,8 +534,8 @@ export default function WorkflowRunnerUI() {
               <div className="p-6">
                 <div className="mb-6">
                   <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                    <Play className="w-5 h-5 text-indigo-600" />
-                    {workflowDetails?.name || selectedWorkflowId}
+                    {/* <Play className="w-5 h-5 text-indigo-600" /> */}
+                    {workflowDetails?.name.split("_").pop() || selectedWorkflowId}
                   </h3>
                   <p className="mt-1 text-sm text-gray-500">
                     Provide the required inputs below and click{" "}
@@ -525,11 +548,11 @@ export default function WorkflowRunnerUI() {
                   <div className="mb-6 bg-white/90 rounded-lg border border-gray-200 p-4 shadow-sm">
                     <h3 className="text-md font-medium mb-4 text-gray-700 flex items-center">
                       <span className="mr-2">Required Inputs</span>
-                      {workflowDetails.name && (
+                      {/* {workflowDetails.name && (
                         <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded">
                           {workflowDetails.name}
                         </span>
-                      )}
+                      )} */}
                     </h3>
 
                     {isLoading ? (
@@ -550,6 +573,7 @@ export default function WorkflowRunnerUI() {
                               <label className="block text-sm font-medium text-gray-700">
                                 {input.name}{" "}
                                 {input.required && <span className="text-red-500">*</span>}
+                                
                               </label>
                               {inputValidation[input.name] &&
                                 !inputValidation[input.name].isValid && (
@@ -557,7 +581,11 @@ export default function WorkflowRunnerUI() {
                                     {inputValidation[input.name].message}
                                   </span>
                                 )}
+                                
                             </div>
+                            {/* <label className="block text-[10px] text-gray-700">
+                                {input.description}
+                            </label> */}
 
                             {input.type === "select" && input.options ? (
                               <select
@@ -643,7 +671,7 @@ export default function WorkflowRunnerUI() {
                 <button
                   onClick={handleRunWorkflow}
                   disabled={isExecuting || !selectedWorkflowId}
-                  className={`w-full py-3 px-4 rounded-xl font-semibold tracking-wide transition-all text-center flex items-center justify-center gap-2 duration-300
+                  className={`mt-16 w-full py-6 px-8 rounded-lg font-semibold tracking-wide transition-all text-center flex items-center justify-center gap-2 duration-300
                     ${selectedWorkflowId
                       ? 'bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 text-white shadow-[0_4px_20px_rgba(99,102,241,0.4)] hover:shadow-[0_6px_25px_rgba(139,92,246,0.5)] hover:brightness-110 active:scale-95'
                       : 'bg-gray-200 text-gray-500 cursor-not-allowed'}
@@ -651,12 +679,12 @@ export default function WorkflowRunnerUI() {
                 >
                   {isExecuting ? (
                     <>
-                      <Loader className="w-5 h-5 animate-spin" />
+                      <Loader className="w-15 h-15 animate-spin" />
                       <span>Running Workflow...</span>
                     </>
                   ) : (
                     <>
-                      <Play className="w-5 h-5" />
+                      <Play className="w-15 h-15" />
                       <span>Run Workflow</span>
                     </>
                   )}
@@ -681,31 +709,31 @@ export default function WorkflowRunnerUI() {
                               bg-gradient-to-r from-indigo-100 via-purple-100 to-indigo-200
                               flex items-center justify-between rounded-t-lg shadow-sm">
                 <h2 className="text-xl font-semibold tracking-tight text-slate-800 flex items-center drop-shadow-sm">
-                  <CheckCircle className="w-6 h-6 mr-3 text-indigo-600" />
+                  <CheckCircle className="w-15 h-15 mr-3 text-indigo-600" />
                   <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 bg-clip-text text-transparent">
                     Results
                   </span>
                 </h2>
 
                 {/* DOWNLOAD BUTTON (top-right of Results header) */}
-                <div className="flex items-center gap-2">
+                <div className=" flex items-center gap-2 px-5 py-5">
                   <button
                     onClick={() => handleDownloadResults('docx')}
                     disabled={workflowResponses.length === 0 || isDownloading}
                     title={workflowResponses.length === 0 ? "No results to download" : "Download results as .docx"}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all focus:outline-none
+                    className={`flex items-center gap-2 px-5 py-5 rounded-md text-sm font-medium transition-all focus:outline-none
                       ${workflowResponses.length > 0 && !isDownloading
                         ? 'bg-indigo-700 text-white shadow-sm hover:brightness-105 active:scale-95'
                         : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                   >
                     {isDownloading ? (
                       <>
-                        <Loader className="w-4 h-4 animate-spin" />
+                        <Loader className="w-15 h-15 animate-spin" />
                         <span>Downloading...</span>
                       </>
                     ) : (
                       <>
-                        <FileDown className="w-4 h-4" />
+                        <FileDown className="w-15 h-15" />
                         <span>Download</span>
                       </>
                     )}
@@ -717,13 +745,13 @@ export default function WorkflowRunnerUI() {
                 {/* Download Success Message */}
                 {showDownloadSuccess && (
                   <div className="flex items-start gap-2 p-3 mb-4 bg-green-50 rounded-md border border-green-200">
-                    <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
+                    {/* <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" /> */}
                     <div>
                       <p className="text-sm font-medium text-green-800">
                         {downloadedFormat} downloaded successfully!
                       </p>
                       <p className="text-xs text-green-700 mt-1">
-                        File saved to your {downloadLocation}
+                        {/* File saved to your {downloadLocation} */}
                       </p>
                     </div>
                   </div>
@@ -768,12 +796,12 @@ export default function WorkflowRunnerUI() {
       </div>
 
       {/* File Location Modal */}
-      <FileLocationModal
+      {/* <FileLocationModal
         isOpen={showLocationModal}
         onClose={() => setShowLocationModal(false)}
         fileType={downloadedFormat}
         location={downloadLocation}
-      />
+      /> */}
     </div>
   );
 }
@@ -1014,7 +1042,7 @@ const formatOutput = (output: any) => {
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 to-slate-100 p-6 flex flex-col gap-6">
       <div className="flex items-start gap-3">
-        <CheckCircle className="w-6 h-6 text-blue-500 mt-1" />
+        {/* <CheckCircle className="w-6 h-6 text-blue-500 mt-1" /> */}
         <div className="flex-1">
           <div className="bg-white p-5 rounded-md border border-blue-100 h-[calc(100vh-80px)] overflow-y-auto">
             <div

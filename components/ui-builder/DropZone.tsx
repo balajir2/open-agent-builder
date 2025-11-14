@@ -109,7 +109,7 @@ export default function DropZone({
                   Drop components here to build your UI
                 </p>
                 <p className="text-sm">
-                  Drag components from the palette or move existing ones
+                  Select a workflow to edit its components
                 </p>
               </div>
             </div>

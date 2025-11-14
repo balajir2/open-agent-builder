@@ -2,7 +2,7 @@
  * Utility functions for exporting workflow results to document format
  */
 import htmlDocx from 'html-docx-js/dist/html-docx';
-
+import { marked } from "marked";
 /**
  * Creates HTML content from workflow execution results
  * 
@@ -18,122 +18,41 @@ function createResultsHtml(
   nodeResults: Record<string, any>,
   variables: Record<string, any>
 ): string {
+const finalOutput = Object.values(nodeResults).find(n => n.nodeName === "End")?.output.finalOutput || "";
+
+const finalOutputHTML = marked(finalOutput);
 
   // Create HTML content for the document
   const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>Workflow Execution Results - ${workflowName}</title>
-      <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        h1 { color: #2563eb; }
-        h2 { color: #4b5563; margin-top: 20px; }
-        .section { margin-bottom: 25px; }
-        .node-result { 
-          margin-bottom: 15px; 
-          padding: 10px; 
-          border: 1px solid #e5e7eb; 
-          border-radius: 5px;
-        }
-        .completed { background-color: #ecfdf5; }
-        .failed { background-color: #fef2f2; }
-        .node-name { 
-          font-weight: bold; 
-          margin-bottom: 5px;
-        }
-        .node-status { 
-          display: inline-block;
-          padding: 2px 6px;
-          border-radius: 3px;
-          font-size: 0.8em;
-          margin-left: 5px;
-        }
-        .status-completed { background-color: #d1fae5; color: #065f46; }
-        .status-failed { background-color: #fee2e2; color: #b91c1c; }
-        .output-label { font-weight: bold; margin-top: 10px; }
-        .output-content { 
-          background-color: #f9fafb; 
-          padding: 8px; 
-          border-radius: 3px;
-          white-space: pre-wrap;
-          font-family: monospace;
-          font-size: 0.9em;
-          overflow-x: auto;
-        }
-        .error-message {
-          background-color: #fee2e2;
-          color: #b91c1c;
-          padding: 8px;
-          border-radius: 3px;
-          margin-top: 10px;
-        }
-        .timing-info {
-          font-size: 0.8em;
-          color: #6b7280;
-          margin-top: 10px;
-        }
-        .variables-section {
-          background-color: #f3f4f6;
-          padding: 10px;
-          border-radius: 5px;
-        }
-      </style>
-    </head>
-    <body>
-      <h1>Workflow Execution Results</h1>
-      <div class="section">
-        <p><strong>Workflow:</strong> ${workflowName} (${workflowId})</p>
-        <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
-      </div>
+   <!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${workflowName.split('_').pop()} - Results</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h3 { color: #2563eb; margin-bottom: 20px; }
+    .output-box {
+      white-space: pre-wrap;
+      font-family: nunito-sans;
       
-      <h2>Execution Results</h2>
-      <div class="section">
-        ${Object.entries(nodeResults)
-          .map(([nodeId, result]) => {
-            const status = result.status;
-            const className = status === 'completed' ? 'completed' : 
-                            status === 'failed' ? 'failed' : '';
-            
-            return `
-              <div class="node-result ${className}">
-                <div class="node-name">
-                  ${result.nodeName || nodeId}
-                  <span class="node-status status-${status}">${status}</span>
-                </div>
-                
-                ${result.output ? `
-                  <div class="output-label">Output:</div>
-                  <div class="output-content">${
-                    typeof result.output === 'string' 
-                      ? result.output 
-                      : JSON.stringify(result.output, null, 2)
-                  }</div>
-                ` : ''}
-                
-                ${result.error ? `
-                  <div class="error-message">${result.error}</div>
-                ` : ''}
-                
-                <div class="timing-info">
-                  ${result.startedAt ? `Started: ${new Date(result.startedAt).toLocaleString()}` : ''}
-                  ${result.startedAt && result.completedAt ? ' | ' : ''}
-                  ${result.completedAt ? `Completed: ${new Date(result.completedAt).toLocaleString()}` : ''}
-                </div>
-              </div>
-            `;
-          })
-          .join('')}
-      </div>
-      
-      <h2>Workflow Variables</h2>
-      <div class="variables-section">
-        <pre>${JSON.stringify(variables, null, 2)}</pre>
-      </div>
-    </body>
-    </html>
-  `;
+      padding: 15px;
+      font-size: 1em;
+    }
+  </style>
+</head>
+
+<body>
+  <h3>${workflowName}</h3>
+
+  <div class="output-box">
+  Results:
+    ${finalOutputHTML}
+  </div>
+</body>
+</html>
+
+`
 
   return htmlContent;
 }
@@ -571,7 +490,8 @@ export function getDocumentSaveLocation(): string {
   const isEdge = navigator.userAgent.indexOf('Edg') !== -1;
   
   if (isChrome || isEdge) {
-    return 'Downloads folder (unless you changed the default download location in your browser settings)';
+    // return 'Downloads folder (unless you changed the default download location in your browser settings)';
+    return ''
   } else if (isFirefox) {
     return 'Downloads folder (you may be prompted to select a location)';
   } else if (isSafari) {
