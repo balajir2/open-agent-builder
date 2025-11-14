@@ -37,6 +37,10 @@ export default function HeaderNav() {
 
 export const NAV_ITEMS = [
   {
+    label: "Workflow Runner",
+    href: "/workflow-runner",
+  },
+  {
     label: "Products",
     href: "#",
     dropdown: (

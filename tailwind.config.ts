@@ -64,10 +64,10 @@ const themeConfig: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["SuisseIntl", ...defaultTheme.fontFamily.sans],
+        sans: ["Nunito Sans", ...defaultTheme.fontFamily.sans],
         mono: ["var(--font-geist-mono)", ...defaultTheme.fontFamily.mono],
-        ascii: ["var(--font-roboto-mono)", ...defaultTheme.fontFamily.mono]
-      },
+        ascii: ["Nunito Sans", ...defaultTheme.fontFamily.mono],
+      },             
       fontSize: {
         "title-h1": [
           "60px",
