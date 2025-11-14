@@ -1,13 +1,35 @@
 "use client";
+import React, { useState, useEffect, useMemo } from "react";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { motion, AnimatePresence } from "framer-motion";
+import { Id } from "@/convex/_generated/dataModel";
+import { useRouter } from "next/navigation";
 
-import { useState, useEffect } from "react";
+// Try to import the toast from UI components, but provide a fallback implementation
+let toast: (args: { title: string; description?: string; variant?: string }) => void;
+try {
+  const toastModule = require("@/components/ui/shadcn/use-toast");
+  toast = toastModule.toast;
+} catch (e) {
+  // Fallback toast implementation if the import fails
+  toast = (args: { title: string; description?: string; variant?: string }) => {
+    console.log(`Toast: ${args.title} - ${args.description || ''}`);
+    if (args.variant === "destructive" && typeof window !== "undefined") {
+      try { alert(`${args.title}\n${args.description || ''}`); } catch {}
+    }
+  };
+}
+
+import { Save, FileQuestion, AlertCircle, Play, Info, Plus } from "lucide-react";
 import { DndContext, DragEndEvent, DragStartEvent, useSensor, useSensors, PointerSensor, DragOverlay } from "@dnd-kit/core";
 import ComponentPalette from "./ComponentPalette";
 import DropZone from "./DropZone";
 import WorkflowSelector from "./WorkflowSelector";
 import ResponseDisplay from "./ResponseDisplay";
 import { ResizablePane, ResizableRightPane } from "./ResizablePane";
-import { Play, Info, AlertCircle } from "lucide-react";
+import { useWorkflow } from "@/hooks/useWorkflow";
+import VariableReferencePicker from "../app/(home)/sections/workflow-builder/VariableReferencePicker";
 
 export interface UIComponent {
   id: string;
@@ -26,10 +48,221 @@ export default function UIBuilderCanvas() {
   const [components, setComponents] = useState<UIComponent[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>("");
+  const router = useRouter();
+
+
+// When new variable is added (from Insert Variable button)
+// const handleAddVariable = (variableName: string) => {
+//   if (!variableName.trim()) return;
+//   setInputVariables((prev) => [
+//     ...prev,
+//     { name: variableName.trim(), type: "string", defaultValue: "" },
+//   ]);
+// };
+  // Fetch workflow details (via /api/workflows/[id]) and load nodes into the canvas
+
+useEffect(() => {
+  if (!selectedWorkflowId) return;
+
+  let isMounted = true;
+
+  const sanitizeValue = (value: any): any => {
+    if (value == null) return "";
+    if (["string", "number", "boolean"].includes(typeof value)) return value;
+
+    if (typeof value === "object") {
+      // Prevent React elements from crashing render
+      if (value._owner || value._store || value.type || value.props) return "[ReactElement]";
+      if (Array.isArray(value)) return value.map(sanitizeValue);
+      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, sanitizeValue(v)]));
+    }
+
+    return String(value);
+  };
+
+const fetchWorkflowDetails = async () => {
+  try {
+    const res = await fetch(`/api/workflows/${selectedWorkflowId}`);
+    if (!res.ok)
+      throw new Error(`Failed to fetch workflow details (${res.status})`);
+
+    const workflowData = await res.json();
+    console.log("Fetched workflow details:", workflowData);
+
+    const nodes = workflowData?.workflow?.nodes || workflowData?.nodes || [];
+    if (!isMounted || !nodes?.length) {
+      console.warn("⚠️ No nodes found in workflow data:", workflowData);
+      return;
+    }
+
+    // 🧩 Backend node type → UI component type mapping
+    const typeMap: Record<string, string> = {
+      start: "input",
+      agent: "textarea",
+      input: "input",
+      text: "text",
+      button: "button",
+      decision: "textarea",
+      process: "textarea",
+      task: "textarea",
+      transform:"textarea",
+      note:"textarea",
+      end: "button",
+
+    };
+
+const nodeComponents = nodes.map((node: any, index: number) => {
+  const backendType =
+    node.data?.nodeType?.toLowerCase?.() || node.type?.toLowerCase?.() || "textarea";
+
+  const mappedType = typeMap[backendType] || "textarea";
+  const safeData = node.data ? JSON.parse(JSON.stringify(node.data)) : {};
+      // 🧠 Build props dynamically based on node type
+      const baseProps = {
+        nodeId: node.id,
+        label: sanitizeValue(
+          safeData.nodeName ||
+            safeData.label ||
+            node.name ||
+            backendType.charAt(0).toUpperCase() + backendType.slice(1)
+        ),
+        title: sanitizeValue(safeData.nodeName || safeData.title || "Untitled Node"),
+        content: sanitizeValue(safeData.description || ""),
+        placeholder: sanitizeValue(safeData.placeholder || ""),
+        variant: "primary",
+        _inputName: sanitizeValue(
+          safeData.inputVariables?.[0]?.name || safeData._inputName || undefined
+        ),
+        trueVariable: sanitizeValue(safeData.trueVariable || false),
+      };
+
+      let textValue = "";
+      let instructionsValue = "";
+
+      // 🧩 Customize behavior per node type
+      if (backendType === "agent") {
+        textValue = sanitizeValue(
+          safeData.instructions || safeData.text || "Write agent instructions..."
+        );
+        instructionsValue = textValue;
+      } else if (backendType === "input" || backendType === "start") {
+        textValue = sanitizeValue(
+          safeData.text || safeData.placeholder || "Enter input"
+        );
+      } else if (backendType === "end" || backendType === "button") {
+        textValue = sanitizeValue(safeData.text || "End");
+      } else {
+        textValue = sanitizeValue(safeData.text || node.name || "");
+      }
+
+      return {
+        id: node.id || `node-${index}`,
+        type: mappedType,
+        props: {
+          ...baseProps,
+          // text: textValue,
+          label: sanitizeValue(
+        safeData.nodeName ||
+          safeData.label ||
+          node.name ||
+          backendType.charAt(0).toUpperCase() + backendType.slice(1)
+      ),
+            text: sanitizeValue(safeData.instructions || safeData.text || ""),
+      title: sanitizeValue(safeData.nodeName || safeData.title || "Untitled Node"),
+      content: sanitizeValue(safeData.description || ""),
+      placeholder: sanitizeValue(safeData.placeholder || ""),
+      variant: "primary",
+      _inputName: sanitizeValue(
+        safeData.inputVariables?.[0]?.name || safeData._inputName || undefined
+      ),
+      trueVariable: sanitizeValue(safeData.trueVariable || false),
+          // value: textValue,
+          // instructions: instructionsValue,
+               inputVariables: safeData.inputVariables || [],
+      instructions: sanitizeValue(safeData.instructions || ""),
+      value: sanitizeValue(safeData.text || safeData.instructions || ""),
+        },
+        position:
+          node.position || { x: 100 + index * 150, y: 100 + index * 60 },
+      };
+    });
+
+    setComponents(nodeComponents);
+  } catch (err) {
+    console.error("Error fetching workflow details:", err);
+  }
+};
+
+
+  // 🚀 Small delay to avoid clash with savedConfig loader
+  const delay = setTimeout(fetchWorkflowDetails, 600);
+
+  return () => {
+    isMounted = false;
+    clearTimeout(delay);
+  };
+}, [selectedWorkflowId]);
+
+
+
+
+
+
+
   const [workflowResponses, setWorkflowResponses] = useState<WorkflowResponse[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
   const [activeComponentId, setActiveComponentId] = useState<string | null>(null);
+  const [showVariableEditor, setShowVariableEditor] = useState(false);
+  // const { workflow, convexId, saveWorkflow, saveWorkflowImmediate } = useWorkflow(selectedWorkflowId || undefined);
+  const buttonRef = React.useRef<HTMLButtonElement>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [buttonPosition, setButtonPosition] = useState({ top: 0, right: 0 });
+  const [instructions, setInstructions] = useState("");
   const [showIntro, setShowIntro] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showVariablePanel, setShowVariablePanel] = useState(false);
+  const [showInstructionsPanel, setShowInstructionsPanel] = useState(false);
+
+// 🧠 Derived list of all available input variables
+const derivedInputVariables = useMemo(() => {
+  return components
+    .filter(c => c.type === "input")
+    .map(c => ({
+      name: c.props._inputName || c.props.label || "unnamed_input",
+      type: "string",
+    }));
+}, [components]);
+
+
+  const handleOpen = () => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setButtonPosition({
+        top: rect.bottom + 8,
+        right: window.innerWidth - rect.right,
+      });
+    }
+    setIsOpen(!isOpen);
+  };
+
+  const onSelect = item => {
+    setInstructions(prev => prev + ` {{input.${item.name}}} `);
+  }
+
+  // Convex mutations and queries
+  const saveConfig = useMutation(api.uiBuilderConfigurations.saveConfig);
+  const savedConfig = useQuery(
+    api.uiBuilderConfigurations.getConfigForWorkflow, 
+    selectedWorkflowId ? { workflowId: selectedWorkflowId } : "skip"
+  );
+
+  // Store workflow-declared inputs and bindings to UI components
+  const [workflowInputs, setWorkflowInputs] = useState<
+    { name: string; label?: string; type?: string; default?: any; description?: string; required?: boolean; _originalName?: string; internal?: boolean; trueVariable?: boolean }[]
+  >([]);
+  // maps workflow input name -> componentId
+  const [workflowInputBindings, setWorkflowInputBindings] = useState<Record<string, string>>({});
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -132,6 +365,66 @@ export default function UIBuilderCanvas() {
         return {};
     }
   };
+  const [customVariables, setCustomVariables] = useState<
+  { name: string; type: string; required: boolean; defaultValue?: string; description?: string }[]
+>([]);
+  const addCustomVariable = () => {
+  const newVar = {
+    name: `input${customVariables.length + 1}`,
+    type: "string",
+    required: false,
+    defaultValue: "",
+    description: "",
+  };
+  console.log("Custom Variables = ",customVariables);
+  setCustomVariables([...customVariables, newVar]);
+
+  // instantly add as input component on canvas
+  ensureInputComponentsForWorkflow([...customVariables, newVar]);
+};
+
+const addInstructions = () => {
+  const newVar = {
+    name: `instructions`,
+    type: "textarea",
+    required: false,
+    default: instructions,
+    description: "",
+  };
+
+  // instantly add as input component on canvas
+  ensureInputComponentsForWorkflow([...customVariables, newVar]);
+}
+
+const updateCustomVariable = (index: number, updates: Partial<typeof customVariables[0]>) => {
+  setCustomVariables(customVariables.map((v, i) => (i === index ? { ...v, ...updates } : v)));
+  ensureInputComponentsForWorkflow(customVariables.map((v, i) => (i === index ? { ...v, ...updates } : v)));
+  // Reflect updates on existing components
+  const variable = { ...customVariables[index], ...updates };
+  setComponents((prev) =>
+    prev.map((c) =>
+      c.props?._inputName === variable.name
+        ? {
+            ...c,
+            props: {
+              ...c.props,
+              label: variable.name,
+              placeholder: variable.defaultValue ?? "",
+              required: variable.required,
+            },
+          }
+        : c
+    )
+  );
+};
+
+const removeCustomVariable = (index: number) => {
+  const removed = customVariables[index];
+  setCustomVariables(customVariables.filter((_, i) => i !== index));
+  // Remove linked component
+  setComponents((prev) => prev.filter((c) => c.props?._inputName !== removed.name));
+  ensureInputComponentsForWorkflow(customVariables.filter((_, i) => i !== index));
+};
 
   const handleComponentUpdate = (id: string, props: Record<string, any>) => {
     setComponents((prev) =>
@@ -160,7 +453,154 @@ export default function UIBuilderCanvas() {
     });
   }, [components]);
 
-    const handleExecuteWorkflow = async (componentId: string | null, workflowId: string) => {
+        // Reset UI configuration to defaults based on workflow inputs
+  const handleResetConfiguration = async () => {
+    if (!selectedWorkflowId) {
+      toast({
+        title: "No workflow selected",
+        description: "Please select a workflow before resetting configuration",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Confirm with the user before resetting
+    if (typeof window !== 'undefined' && !window.confirm('This will reset all UI components to default. Any unsaved changes will be lost. Continue?')) {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Clear components and bindings
+      setComponents([]);
+      setWorkflowInputBindings({});
+
+      // Re-fetch workflow inputs to rebuild the UI
+      const url = `/api/workflows/${selectedWorkflowId}/variables`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const variables = await res.json();
+        
+        if (variables && variables.length > 0) {
+          // Prioritize true variables
+          const trueVars = variables.filter((v: any) => v.trueVariable === true);
+          
+          if (trueVars.length > 0) {
+            console.log("Resetting with TRUE workflow variables:", trueVars);
+            await ensureInputComponentsForWorkflow(trueVars);
+          } else {
+            // Fall back to all variables
+            console.log("Resetting with all detected workflow variables:", variables);
+            await ensureInputComponentsForWorkflow(variables);
+          }
+        }
+      }
+
+      toast({
+        title: "UI configuration reset",
+        description: "UI components have been reset to default"
+      });
+    } catch (error) {
+      console.error("Error resetting configuration:", error);
+      toast({
+        title: "Error resetting configuration",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  
+  // Save current configuration to Convex
+  const handleSaveConfiguration = async () => {
+    if (!selectedWorkflowId) {
+      toast({
+        title: "No workflow selected",
+        description: "Please select a workflow before saving configuration",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Convert Record<string, string> to Map<string, string> for Convex
+      const bindingsMap = new Map<string, string>();
+      Object.entries(workflowInputBindings).forEach(([key, value]) => {
+        bindingsMap.set(key, value);
+      });
+      
+      await saveConfig({
+        workflowId: selectedWorkflowId,
+        components: components,
+        workflowInputBindings: bindingsMap
+      });
+
+      toast({
+        title: "Configuration saved",
+        description: "Your UI components and bindings have been saved",
+      });
+    } catch (error) {
+      console.error("Error saving configuration:", error);
+      toast({
+        title: "Error saving configuration",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Load saved configuration when workflow changes or when saved config is fetched
+  // useEffect(() => {
+  //   if (savedConfig && selectedWorkflowId) {
+  //     setIsLoading(true);
+  //     try {
+  //       // Load components from saved configuration
+  //       if (savedConfig.components && Array.isArray(savedConfig.components)) {
+  //         setComponents(savedConfig.components as UIComponent[]);
+  //       }
+
+  //       // Load input bindings - convert from Map to Record
+  //       if (savedConfig.workflowInputBindings) {
+  //         // Handle both Map and Record formats for backward compatibility
+  //         const bindings: Record<string, string> = {};
+  //         if (savedConfig.workflowInputBindings instanceof Map) {
+  //           // Handle Map from Convex - cast to a typed Map so entries() yields [key, value] tuples
+  //           const mapBindings = savedConfig.workflowInputBindings as Map<any, any>;
+  //           Array.from(mapBindings.entries()).forEach(([key, value]) => {
+  //             bindings[String(key)] = String(value);
+  //           });
+  //         } else if (typeof savedConfig.workflowInputBindings === 'object') {
+  //           // Handle plain object
+  //           Object.entries(savedConfig.workflowInputBindings as Record<string, any>).forEach(([key, value]) => {
+  //             bindings[key] = value as string;
+  //           });
+  //         }
+  //         setWorkflowInputBindings(bindings);
+  //       }
+
+  //       toast({
+  //         title: "Configuration loaded",
+  //         description: "Saved UI layout restored",
+  //       });
+  //     } catch (error) {
+  //       console.error("Error loading saved configuration:", error);
+  //       toast({
+  //         title: "Error loading configuration",
+  //         description: "Failed to restore saved layout",
+  //         variant: "destructive"
+  //       });
+  //     } finally {
+  //       setIsLoading(false);
+  //     }
+  //   }
+  // }, [savedConfig, selectedWorkflowId]);
+
+  const handleExecuteWorkflow = async (componentId: string | null, workflowId: string) => {
     if (!workflowId) {
       alert("Please select a workflow first");
       return;
@@ -171,15 +611,90 @@ export default function UIBuilderCanvas() {
     setWorkflowResponses([]);
     setShowIntro(false);
 
-    try {
-      // Collect input values from UI components
+        try {
+      // Build payload based on workflow-declared inputs and component bindings
       const inputs: Record<string, any> = {};
+      
+      // Include the raw components in debug
+      console.debug("Components at execution time:", components);
+      console.debug("Workflow input bindings:", workflowInputBindings);
+      console.debug("Workflow inputs:", workflowInputs);
+      
+      if (workflowInputs && workflowInputs.length > 0) {
+        // First pass: handle workflow-declared inputs
+        for (const wi of workflowInputs) {
+          const boundId = workflowInputBindings[wi.name];
+          const boundComp = components.find((c) => c.id === boundId);
+          
+          if (boundComp) {
+            // Get the correct input name for the workflow with updated priorities
+            // Priority: 1) True variable (if flagged), 2) _originalName, 3) _inputName, 4) name from workflowInputs
+            const inputName = wi.trueVariable ? wi.name : 
+                             (boundComp.props._originalName || boundComp.props._inputName || wi.name); 
+            inputs[inputName] = boundComp.props.value ?? boundComp.props.placeholder ?? wi.default ?? "";
+            console.debug(`Setting workflow input '${inputName}' to:`, inputs[inputName]);
+            
+            // Also include it with the cleaned name if it differs (for compatibility)
+            if (inputName !== wi.name && !inputs[wi.name]) {
+              inputs[wi.name] = inputs[inputName];
+              console.debug(`Also setting cleaned name '${wi.name}' to same value`);
+            }
+            
+            // If we have a very complex original name, also include a simplified version
+            if (boundComp.props._originalName && boundComp.props._originalName !== inputName) {
+              // Try to extract a clean part from the original name
+              const simplifiedName = boundComp.props._originalName
+                .split(/\-|\_\_/)
+                .find(part => !part.includes('node') && !part.includes('edge') && !part.includes('xy'));
+              
+              if (simplifiedName && !inputs[simplifiedName]) {
+                inputs[simplifiedName] = inputs[inputName];
+                console.debug(`Also including simplified name '${simplifiedName}' from complex original`);
+              }
+            }
+          } else {
+            // Fall back to default declared by workflow with exact name
+            inputs[wi.name] = wi.default ?? "";
+            console.debug(`Using default for workflow input '${wi.name}':`, inputs[wi.name]);
+          }
+        }
+      }
+
+      // Second pass: include all input/textarea components (for maximum compatibility)
       components.forEach((comp) => {
         if (comp.type === "input" || comp.type === "textarea") {
-          const key = comp.props.label?.replace(/\s+/g, "_").toLowerCase() || comp.id;
-          inputs[key] = comp.props.value || comp.props.placeholder || "";
+          // Already processed through workflow inputs? Skip to avoid duplication
+          const inputName = comp.props._inputName || comp.props._originalName;
+          if (inputName && inputs[inputName] !== undefined) {
+            return; // Already included this input
+          }
+          
+          // Try different naming strategies for maximum compatibility
+          const possibleNames = [
+            // Original name from the backend
+            comp.props._originalName,
+            // Our mapped input name
+            comp.props._inputName,
+            // Try to get a name from the component ID
+            comp.id.split("-")[1],
+            // Use the label (with spaces replaced by underscores)
+            comp.props.label?.replace(/\s+/g, "_").replace(/\*$/, ""),  // Remove trailing *
+            // Last resort: use the component ID
+            comp.id
+          ];
+          
+          // Use the first valid name
+          const key = possibleNames.find(name => name && name.length > 0) || comp.id;
+          
+          // Add this input if we don't already have it
+          if (inputs[key] === undefined) {
+            inputs[key] = comp.props.value || comp.props.placeholder || "";
+            console.debug(`Adding additional input '${key}' to:`, inputs[key]);
+          }
         }
       });
+      
+      console.debug("Final workflow inputs:", inputs);
 
       // Call the streaming API
       const response = await fetch(`/api/workflows/${workflowId}/execute-stream`, {
@@ -243,11 +758,679 @@ export default function UIBuilderCanvas() {
     }
   };
 
+// Inside your component:
+const saveWorkflow = useMutation(api.workflows.saveWorkflow);
+
+  // Ensure canvas has input components for all workflow inputs and create bindings
+  const handleSaveWorkflow = async () => {
+  if (!selectedWorkflowId) {
+    alert("Please select or create a workflow first!");
+    return;
+  }
+
+  try {
+    // 1️ Fetch original Firecrawl workflow
+    const res = await fetch(`/api/workflows/${selectedWorkflowId}`);
+    if (!res.ok) throw new Error(`Failed to fetch workflow details (${res.status})`);
+
+    const originalWorkflow = await res.json();
+    const originalNodes = originalWorkflow?.workflow?.nodes || originalWorkflow?.nodes || [];
+    const originalEdges = originalWorkflow?.workflow?.edges || originalWorkflow?.edges || [];
+
+    //  Prepare updates from UI builder
+    const updates = Object.fromEntries(
+      components.map((comp) => [
+        comp.id,
+        {
+          newText:
+            comp.props.value?.trim() ||
+            comp.props.text?.trim() ||
+            comp.props.instructions?.trim() ||
+            "",
+          newLabel: comp.props.label,
+          newTitle: comp.props.title,
+          newNodeType: comp.props.nodeType || comp.type,
+          newInputs: comp.props.inputVariables || [],
+        },
+      ])
+    );
+
+    // Merge into Firecrawl-style nodes
+    const mergedNodes = originalNodes.map((oldNode) => {
+      const update = updates[oldNode.id];
+      if (!update) return oldNode;
+
+      const mergedData = { ...oldNode.data };
+
+      //  Update instructions & text if edited in UI
+      if (update.newText && update.newText !== mergedData.instructions) {
+        mergedData.instructions = update.newText;
+        mergedData.text = update.newText;
+      }
+
+      //Update labels and titles
+      if (update.newLabel) mergedData.label = update.newLabel;
+      if (update.newTitle) mergedData.title = update.newTitle;
+
+      // Merge input variables (for Start/Input nodes)
+      if (
+        ["start", "input"].includes(
+          (mergedData.nodeType || oldNode.type || "").toLowerCase()
+        )
+      ) {
+        mergedData.inputVariables = Array.isArray(update.newInputs)
+          ? update.newInputs
+          : mergedData.inputVariables || [];
+      }
+
+      mergedData.nodeType = mergedData.nodeType || oldNode.type;
+
+      return {
+        ...oldNode,
+        data: mergedData,
+        type: mergedData.nodeType,
+      };
+    });
+
+    //  Derive requiredInputs from Start/Input node
+    const startNode = mergedNodes.find((n) =>
+      ["start", "input"].includes((n.data?.nodeType || "").toLowerCase())
+    );
+
+    const requiredInputs = startNode?.data?.inputVariables?.map((v: any) => ({
+      name: v.name,
+      description: v.description || "Enter value",
+      type: v.type || "string",
+      required: !!v.required,
+      defaultValue: v.defaultValue || "",
+    })) || [];
+
+    //  Build final workflow payload
+    const payload = {
+      customId: `workflow_${Date.now()}`,
+      name: `Copy of ${originalWorkflow?.workflow?.name || originalWorkflow?.name || "Workflow"}_${Date.now()}`,
+      description: "Saved workflow from UI Builder Canvas",
+      nodes: mergedNodes,
+      edges: originalEdges,
+      category: "Custom",
+      tags: [],
+      version: "1.0.0",
+      // requiredInputs,
+    };
+
+    console.log("🧩 Final workflow JSON before saving:", payload);
+
+    // Save to backend
+    await saveWorkflow(payload);
+    alert("✅ Workflow saved successfully!");
+
+    // Optional: open in new tab for verification
+    // const url = `${window.location.origin}/api/workflows/${payload.customId}/getWorkflowDetails`;
+    const url = `${window.location.origin}/workflow-runner?workflowid=${payload.customId}`;
+    
+    window.open(url, "_blank");
+  } catch (err) {
+    console.error("❌ Error saving workflow:", err);
+    alert("Failed to save workflow.");
+  }
+};
+
+
+  const ensureInputComponentsForWorkflow = async (
+    inputs: { name: string; label?: string; type?: string; default?: any; description?: string; required?: boolean; _originalName?: string; internal?: boolean; trueVariable?: boolean }[]
+  ) => {
+    // Log what variables we've detected
+    console.log("Working with workflow input variables:", inputs);
+    
+    // Prioritize internal variables from template analysis
+    console.log("inputs = ",inputs);
+    const internalInputs = inputs.filter(input => input.internal === true);
+    
+    // If we have internal variables, use only those as they are the true workflow variables
+    const workingSet = internalInputs.length > 0 ? internalInputs : inputs;
+    console.log(internalInputs.length > 0 ? 
+      "Using internal workflow variables:" : 
+      "No internal variables found, using all detected variables:", 
+      workingSet);
+    
+    // Filter out system variables or edge IDs
+    const cleanedInputs = workingSet.filter(input => {
+      const name = input.name;
+      // Exclude items that look like edge IDs
+      if (
+        name.startsWith('xy-') || 
+        name.includes('node_') || 
+        name.includes('-input') ||
+        name.includes('-output') ||
+        name.includes('__')
+      ) {
+        console.log(`Filtering out likely system variable: ${name}`);
+        return false;
+      }
+      return true;
+    });
+
+    // If we filtered out a lot, warn in console
+    if (cleanedInputs.length < inputs.length) {
+      console.warn(`Filtered out ${inputs.length - cleanedInputs.length} likely system variables`);
+    }
+
+    // If no valid inputs found, try to extract from labels/descriptions
+    // if (cleanedInputs.length === 0 && inputs.length > 0) {
+    //   console.log("No clean input variables found, attempting to extract from labels/descriptions");
+    //   // Try to clean up the variable names
+    //   cleanedInputs.push(...inputs.map(input => {
+    //     // Try to extract a better name from the variable
+    //     let cleanName = input.name;
+        
+    //     // Remove common prefixes and suffixes
+    //     cleanName = cleanName
+    //       .replace(/^xy\-edge__/, "")
+    //       .replace(/^node_\d+output\-/, "")
+    //       .replace(/\-node_\d+input$/, "")
+    //       .replace(/^output\-/, "")
+    //       .replace(/\-input$/, "")
+    //       .replace(/^input\-/, "");
+          
+    //     // If it still looks messy, use the label if available
+    //     if (
+    //       (cleanName.includes('node_') || cleanName.includes('__')) && 
+    //       input.label && 
+    //       !input.label.includes('node_')
+    //     ) {
+    //       cleanName = input.label;
+    //     }
+        
+    //     return {
+    //       ...input,
+    //       name: cleanName,
+    //       _originalName: input.name, // Keep track of the original name for mapping
+    //     };
+    //   }));
+    // }
+
+    // Update state with the cleaned inputs
+    setWorkflowInputs(cleanedInputs);
+
+    // Clear existing components if loading new workflow inputs
+    // (only if there are no saved configurations being loaded)
+   if (!isLoading && !savedConfig && components.length === 0) {
+  setComponents([]);
+}
+
+    // Use current components snapshot and return a deterministic update
+    const prevComponents = components;
+    const updated = isLoading || savedConfig ? [...prevComponents] : [];
+    const newBindings: Record<string, string> = { ...workflowInputBindings };
+
+    // Create input components with proper spacing
+    let yOffset = 40;
+    
+    cleanedInputs.forEach((input, index) => {
+      // Keep the original input name exactly as it comes from the backend
+      const inputName = input.name;
+      const desiredLabel = input.label || input.name;
+      const description = input.description || ""; 
+      
+      // Check if we already have a component for this input
+      const found = updated.find(
+        (c) =>
+          (c.type === "input" || c.type === "textarea") &&
+          (c.props?._inputName === inputName || // Match by our special tracking property
+           c.id.includes(`input-${inputName}-`)) // Or by ID pattern
+      );
+
+      if (found) {
+        // Update the binding but keep the existing component
+        newBindings[inputName] = found.id;
+        
+        // Optionally update the component with any new metadata
+        if (!found.props._inputName) {
+          found.props._inputName = inputName;
+        }
+        
+        return;
+      }
+
+      // Determine if this should be a textarea based on the input type or expected length
+      const useTextarea = 
+        input.type === "textarea" || 
+        input.type === "text" || 
+        (typeof input.default === "string" && input.default.length > 100);
+
+      // Create new component with exact input name matching backend
+      const newComp: UIComponent = {
+        id: `input-${inputName}-${Date.now()}`,
+        type: useTextarea ? "textarea" : "input",
+        props: {
+          label: desiredLabel + (input.required ? " *" : ""),
+          placeholder: input.default ?? "",
+          value: input.default ?? "",
+          _inputName: inputName, // Store the exact backend input name
+          description: description, // Store description for tooltips
+        },
+        position: { x: 40, y: yOffset },
+      };
+
+      // Add additional metadata to the component
+      if (input.required) {
+        newComp.props.required = true;
+      }
+      
+      if (input._originalName) {
+        newComp.props._originalName = input._originalName;
+      }
+
+      yOffset += useTextarea ? 120 : 80; // Space components vertically, more for textareas
+      updated.push(newComp);
+      newBindings[inputName] = newComp.id;
+    });
+
+    // If we're not loading a saved config, replace all components
+    if (!isLoading && !savedConfig) {
+      setComponents(updated);
+    } else {
+      // Otherwise just add any missing components
+      const existingIds = new Set(prevComponents.map(c => c.id));
+      const newComponents = updated.filter(c => !existingIds.has(c.id));
+      setComponents([...prevComponents, ...newComponents]);
+    }
+    
+    // Update bindings
+    setWorkflowInputBindings((prev) => ({ ...prev, ...newBindings }));
+
+    console.debug("ensureInputComponentsForWorkflow:", { 
+      inputs: cleanedInputs, 
+      addedBindings: newBindings, 
+      componentsAfter: updated 
+    });
+  };
+
+  // Fetch workflow input metadata when selectedWorkflowId changes
+  // useEffect(() => {
+  //   if (!selectedWorkflowId) {
+  //     setWorkflowInputs([]);
+  //     setWorkflowInputBindings({});
+  //     return;
+  //   }
+    
+  //   // If we're not loading a saved configuration, clear the components
+  //   if (!isLoading && !savedConfig) {
+  //     setComponents([]);
+  //   }
+
+  //   const parseInputsFromJson = (json: any) => {
+  //     if (!json) return [];
+      
+  //     console.log("Parsing workflow inputs from:", json);
+      
+  //     // Extract actual workflow input variables (highest priority)
+  //     // Look for workflow-specific structures
+  //     if (json.workflow?.inputs) {
+  //       console.log("Found workflow.inputs structure");
+  //       return json.workflow.inputs.map((i: any) => ({
+  //         name: typeof i === "string" ? i : i.name,
+  //         label: typeof i === "string" ? i : (i.label ?? i.title ?? i.name),
+  //         type: typeof i === "string" ? "string" : (i.type ?? "string"),
+  //         default: typeof i === "string" ? "" : (i.default ?? i.example ?? ""),
+  //       }));
+  //     }
+      
+  //     // Look for start node with input definitions
+  //     if (json.nodes) {
+  //       const startNode = json.nodes.find((n: any) => 
+  //         n.type === "start" || 
+  //         n.id === "start" || 
+  //         n.name === "start" ||
+  //         n.nodeType === "start"
+  //       );
+        
+  //       if (startNode) {
+  //         console.log("Found start node:", startNode);
+  //         // Extract input definitions from start node
+  //         const inputVars = [];
+          
+  //         // Check for outputs field which often defines the workflow inputs
+  //         if (startNode.outputs) {
+  //           console.log("Start node has outputs:", startNode.outputs);
+  //           // Handle outputs as array
+  //           if (Array.isArray(startNode.outputs)) {
+  //             return startNode.outputs.map((output: any) => ({
+  //               name: typeof output === "string" ? output : output.name,
+  //               label: typeof output === "string" ? output : (output.label ?? output.title ?? output.name),
+  //               type: typeof output === "string" ? "string" : (output.type ?? "string"),
+  //               default: typeof output === "string" ? "" : (output.default ?? ""),
+  //             }));
+  //           }
+  //           // Handle outputs as object
+  //           else if (typeof startNode.outputs === "object") {
+  //             return Object.entries(startNode.outputs).map(([key, value]: [string, any]) => ({
+  //               name: key,
+  //               label: typeof value === "object" && value.label ? value.label : key,
+  //               type: typeof value === "object" && value.type ? value.type : "string",
+  //               default: typeof value === "object" && value.default !== undefined ? value.default : "",
+  //             }));
+  //           }
+  //         }
+          
+  //         // Check for data field which may contain input definitions
+  //         if (startNode.data && startNode.data.inputs) {
+  //           console.log("Start node has data.inputs:", startNode.data.inputs);
+  //           return startNode.data.inputs.map((input: any) => ({
+  //             name: typeof input === "string" ? input : input.name,
+  //             label: typeof input === "string" ? input : (input.label ?? input.title ?? input.name),
+  //             type: typeof input === "string" ? "string" : (input.type ?? "string"),
+  //             default: typeof input === "string" ? "" : (input.default ?? ""),
+  //           }));
+  //         }
+  //       }
+  //     }
+      
+  //     // Check for workflow input definitions directly at root
+  //     if (json.inputs) {
+  //       console.log("Found root level inputs:", json.inputs);
+  //       if (Array.isArray(json.inputs)) {
+  //         return json.inputs.map((i: any) => ({
+  //           name: typeof i === "string" ? i : i.name,
+  //           label: typeof i === "string" ? i : (i.label ?? i.title ?? i.name),
+  //           type: typeof i === "string" ? "string" : (i.type ?? i.schema?.type ?? "string"),
+  //           default: typeof i === "string" ? "" : (i.default ?? i.example ?? ""),
+  //         }));
+  //       }
+  //       // Handle inputs as object
+  //       else if (typeof json.inputs === "object" && !Array.isArray(json.inputs)) {
+  //         return Object.entries(json.inputs).map(([key, value]: [string, any]) => ({
+  //           name: key,
+  //           label: typeof value === "object" && value.label ? value.label : key,
+  //           type: typeof value === "object" && value.type ? value.type : "string",
+  //           default: typeof value === "object" && value.default !== undefined ? value.default : "",
+  //         }));
+  //       }
+  //     }
+
+  //     // Check for variables field which may contain input definitions
+  //     if (json.variables) {
+  //       console.log("Found variables field:", json.variables);
+  //       if (Array.isArray(json.variables)) {
+  //         return json.variables.map((v: any) => ({
+  //           name: typeof v === "string" ? v : v.name,
+  //           label: typeof v === "string" ? v : (v.label ?? v.name),
+  //           type: typeof v === "string" ? "string" : (v.type ?? "string"),
+  //           default: typeof v === "string" ? "" : (v.default ?? v.value ?? ""),
+  //         }));
+  //       }
+  //       // Handle variables as object
+  //       else if (typeof json.variables === "object") {
+  //         return Object.entries(json.variables).map(([key, value]: [string, any]) => ({
+  //           name: key,
+  //           label: typeof value === "object" && value.label ? value.label : key,
+  //           type: typeof value === "object" && value.type ? value.type : "string",
+  //           default: typeof value === "object" && value.default !== undefined ? value.default : "",
+  //         }));
+  //       }
+  //     }
+      
+  //     // Fallback to previous detection methods
+      
+  //     // Common API shapes
+  //     if (Array.isArray(json.parameters)) {
+  //       console.log("Found parameters array:", json.parameters);
+  //       return json.parameters.map((p: any) => ({
+  //         name: p.name,
+  //         label: p.title ?? p.name,
+  //         type: p.type ?? p.schema?.type ?? "string",
+  //         default: p.default ?? p.example ?? "",
+  //       }));
+  //     }
+
+  //     // JSON Schema style: properties object
+  //     if (json.properties && typeof json.properties === "object") {
+  //       console.log("Found JSON Schema properties:", json.properties);
+  //       return Object.entries(json.properties).map(([key, schema]: any) => ({
+  //         name: key,
+  //         label: (schema && (schema.title || schema.label)) ?? key,
+  //         type: schema?.type ?? "string",
+  //         default: schema?.default ?? "",
+  //       }));
+  //     }
+
+  //     // JSON Schema root with $id/title => single object input
+  //     if (json.$id && json.title) {
+  //       return [{
+  //         name: json.$id,
+  //         label: json.title,
+  //         type: json.type ?? "object",
+  //         default: json.default ?? {},
+  //       }];
+  //     }
+
+  //     // Examine nodes to extract potential input variables from edge connections
+  //     if (json.nodes && json.edges && Array.isArray(json.nodes) && Array.isArray(json.edges)) {
+  //       console.log("Analyzing nodes and edges to determine input variables");
+        
+  //       // Find the start node (if not already found)
+  //       const startNodeId = json.nodes.find((n: any) => 
+  //         n.type === "start" || n.id === "start" || n.name === "start"
+  //       )?.id;
+        
+  //       if (startNodeId) {
+  //         // Find edges coming from the start node
+  //         const startEdges = json.edges.filter((e: any) => 
+  //           e.source === startNodeId || e.from === startNodeId
+  //         );
+          
+  //         // Extract variable names from edges (often in sourceHandle or data)
+  //         const inputVars = startEdges.map((edge: any) => {
+  //           // Try to extract a clean variable name
+  //           let varName = edge.sourceHandle || edge.label || edge.id;
+            
+  //           // Clean up edge names (remove prefixes like xy-edge__node_2output-)
+  //           if (varName && typeof varName === "string") {
+  //             // If it contains "output" and "input", extract the middle part
+  //             if (varName.includes("output") && varName.includes("input")) {
+  //               const parts = varName.split(/\-|__/);
+  //               // Find parts that aren't system names
+  //               const cleanParts = parts.filter(p => 
+  //                 !p.includes("edge") && 
+  //                 !p.includes("node") && 
+  //                 !p.startsWith("xy")
+  //               );
+  //               if (cleanParts.length > 0) {
+  //                 varName = cleanParts[0].replace(/output|input/g, "");
+  //               }
+  //             }
+              
+  //             // Further clean up the name
+  //             varName = varName
+  //               .replace(/^xy\-edge__/, "")
+  //               .replace(/^node_\d+output\-/, "")
+  //               .replace(/\-node_\d+input$/, "")
+  //               .replace(/^output\-/, "")
+  //               .replace(/\-input$/, "");
+  //           }
+            
+  //           return {
+  //             name: varName,
+  //             label: varName,
+  //             type: "string",
+  //             default: ""
+  //           };
+  //         });
+          
+  //         if (inputVars.length > 0) {
+  //           console.log("Extracted input variables from edges:", inputVars);
+  //           return inputVars;
+  //         }
+  //       }
+  //     }
+
+  //     // recursive search for input-like arrays (fallback)
+  //     const seen = new Set<any>();
+  //     const queue: any[] = [json];
+  //     while (queue.length) {
+  //       const node = queue.shift();
+  //       if (!node || typeof node !== "object" || seen.has(node)) continue;
+  //       seen.add(node);
+
+  //       if (Array.isArray(node) && node.length > 0 && typeof node[0] === "object") {
+  //         const item = node[0];
+  //         if ("name" in item || "title" in item || "label" in item || "id" in item) {
+  //           // parse array as inputs
+  //           const result = node.map((it: any) => ({
+  //             name: it.name ?? it.id ?? it.title ?? "",
+  //             label: it.label ?? it.title ?? it.name ?? it.id ?? "",
+  //             type: it.type ?? it.schema?.type ?? "string",
+  //             default: it.default ?? it.example ?? it.value ?? "",
+  //           })).filter((i: any) => i.name);
+            
+  //           if (result.length > 0) {
+  //             console.log("Found input-like array through deep search:", result);
+  //             return result;
+  //           }
+  //         }
+  //       }
+
+  //       // push children
+  //       for (const key of Object.keys(node)) {
+  //         try {
+  //           queue.push(node[key]);
+  //         } catch {}
+  //       }
+  //     }
+
+  //     // last resort: if object is flat, treat keys as inputs
+  //     if (typeof json === "object") {
+  //       const result = Object.keys(json).map((key) => ({
+  //         name: key,
+  //         label: key,
+  //         type: "string",
+  //         default: json[key],
+  //       }));
+        
+  //       console.log("Using last resort - treating object keys as inputs:", result);
+  //       return result;
+  //     }
+
+  //     console.warn("Could not detect any inputs from workflow definition");
+  //     return [];
+  //   };
+
+  //   const tryEndpoints = [
+  //     // Try our dedicated variables endpoint first (most accurate)
+  //     (id: string) => `/api/workflows/${id}/variables`,
+  //     // Then try other endpoints that might contain input information
+  //     (id: string) => `/api/workflows/${id}/inputs`,
+  //     (id: string) => `/api/workflows/${id}/metadata`,
+  //     (id: string) => `/api/workflows/${id}`,
+  //     (id: string) => `/api/workflows/${id}/definition`,
+  //     (id: string) => `/api/workflows/${id}/spec`,
+  //   ];
+
+  //   const fetchInputs = async () => {
+  //     const id = selectedWorkflowId;
+      
+  //     // Try to get variables from our new specialized endpoint first
+  //     try {
+  //       const url = `/api/workflows/${id}/variables`;
+  //       console.debug("Attempting to fetch workflow variables from specialized endpoint", url);
+  //       const res = await fetch(url);
+  //       if (res.ok) {
+  //         const variables = await res.json();
+  //         console.debug("Received workflow variables from specialized endpoint:", variables);
+          
+  //         if (variables && variables.length > 0) {
+  //           // If we got variables from our specialized endpoint, look for true variables first
+  //           const trueVars = variables.filter((v: any) => v.trueVariable === true);
+            
+  //           // Highest priority: use true variables if available
+  //           if (trueVars.length > 0) {
+  //             console.log("Using TRUE workflow variables (highest priority):", trueVars);
+  //             await ensureInputComponentsForWorkflow(trueVars);
+  //             return;
+  //           }
+            
+  //           // Second priority: internal variables
+  //           const internalVars = variables.filter((v: any) => v.internal === true);
+  //           if (internalVars.length > 0) {
+  //             console.log("Using internal workflow variables:", internalVars);
+  //             await ensureInputComponentsForWorkflow(internalVars);
+  //             return;
+  //           }
+            
+  //           // Last resort: use all variables
+  //           console.log("Using all detected workflow variables:", variables);
+  //           await ensureInputComponentsForWorkflow(variables);
+  //           return;
+  //         }
+  //       }
+  //     } catch (err) {
+  //       console.error("Error fetching from specialized endpoint:", err);
+  //     }
+      
+  //     // Fall back to trying other endpoints
+  //     for (const makeUrl of tryEndpoints) {
+  //       // Skip the variables endpoint since we already tried it
+  //       if (makeUrl(id).includes('/variables')) continue;
+        
+  //       const url = makeUrl(id);
+  //       try {
+  //         console.debug("Attempting to fetch workflow inputs from", url);
+  //         const res = await fetch(url);
+          
+  //         if (!res.ok) {
+  //           console.debug(`Endpoint returned ${res.status} (${res.statusText}):`, url);
+  //           // If this is a 404, the endpoint doesn't exist - just try the next one
+  //           // If it's another error, check the error response
+  //           if (res.status !== 404) {
+  //             try {
+  //               const errorData = await res.json();
+  //               console.debug("Error response:", errorData);
+  //             } catch (parseErr) {
+  //               // Ignore parse errors from error responses
+  //             }
+  //           }
+  //           continue;
+  //         }
+          
+  //         const json = await res.json();
+  //         console.debug("Workflow data from", url, json);
+          
+  //         const parsed = parseInputsFromJson(json);
+  //         if (parsed && parsed.length > 0) {
+  //           console.debug("Successfully parsed inputs:", parsed);
+  //           await ensureInputComponentsForWorkflow(parsed);
+  //           return;
+  //         } else {
+  //           console.debug("No inputs could be parsed from response", url);
+  //         }
+  //       } catch (err) {
+  //         console.error("Fetch error for", url, err);
+  //         // try next endpoint
+  //       }
+  //     }
+
+  //     // If none of the endpoints yielded inputs, show a default input
+  //     console.warn("No workflow inputs discovered for", selectedWorkflowId);
+      
+  //     // Create a single generic input as a fallback
+  //     await ensureInputComponentsForWorkflow([{
+  //       name: "input",
+  //       label: "Workflow Input",
+  //       type: "string",
+  //       description: "No specific input variables were detected for this workflow. Use this generic input.",
+  //       default: ""
+  //     }]);
+  //   };
+
+  //   fetchInputs();
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [selectedWorkflowId]);
+
   return (
     <div className="flex h-[calc(100vh-160px)] bg-gray-50">
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         {/* Left Sidebar - Component Palette (Resizable) */}
-        <ResizablePane
+        {/* <ResizablePane
           defaultWidth={288}
           minWidth={200}
           maxWidth={400}
@@ -259,77 +1442,241 @@ export default function UIBuilderCanvas() {
               Drag components onto the canvas
             </p>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-            <ComponentPalette />
-          </div>
-        </ResizablePane>
-
-        {/* Main Canvas Area */}
-        <div className="flex-1 flex flex-col min-w-0 bg-white">
-          {/* Top Bar - Workflow Selector */}
-                    <div className="border-b-2 border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 p-4 flex-shrink-0">
-            <div className="flex flex-col space-y-4">
-              <WorkflowSelector
-                selectedWorkflowId={selectedWorkflowId}
-                onSelectWorkflow={setSelectedWorkflowId}
-              />
-              
-              {/* Global Workflow Execution Button */}
-              <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-3 shadow-sm">
-                <div className="flex-1">
-                  <h3 className="text-sm font-medium text-blue-800">Execute Selected Workflow</h3>
-                  <p className="text-xs text-blue-600">Run workflow with all input values</p>
-                </div>
-                <button
-                                    onClick={() => selectedWorkflowId && handleExecuteWorkflow("global-workflow-button", selectedWorkflowId)}
-                  disabled={isExecuting || !selectedWorkflowId}
-                  className={`px-16 py-8 rounded-8 font-medium transition-all active:scale-[0.98] flex items-center gap-2
-                    ${selectedWorkflowId ? 'bg-heat-100 hover:bg-heat-200 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
-                >
-                  {isExecuting ? (
-                    <>
-                      <div className="w-16 h-16 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Running...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-16 h-16" />
-                      Run Workflow
-                    </>
-                  )}
-                </button>
-              </div>
+                    <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+            
+            <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <h4 className="text-sm font-bold text-blue-800 mb-2">How to Use</h4>
+              <ul className="text-xs text-blue-700 space-y-1 list-disc pl-4">
+                <li>Drag components from above onto the canvas</li>
+                <li>Select a workflow to automatically create input fields</li>
+                <li>Input fields will bind to workflow variables</li>
+                <li>Use the Save button to store your UI for later use</li>
+              </ul>
             </div>
           </div>
+        </ResizablePane> */}
 
-          {/* Canvas */}
-                    <div className="flex-1 overflow-auto p-6 min-h-0 bg-gray-50">
-            {/* User Help Panel - shown initially */}
-            {showIntro && components.length > 0 && (
-              <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4 shadow-sm">
-                <div className="flex items-start">
-                  <Info className="h-5 w-5 text-indigo-500 mt-1 mr-3 flex-shrink-0" />
-                  <div>
-                    <h3 className="text-sm font-medium text-indigo-800">Getting Started</h3>
-                    <p className="text-xs text-indigo-700 mt-1">
-                      1. Add UI components from the left panel<br/>
-                      2. Configure each component by clicking the settings icon<br/>
-                      3. Select a workflow above<br/>
-                      4. Click the "Run Workflow" button to execute with all input values
-                    </p>
-                    <button 
-                      onClick={() => setShowIntro(false)}
-                      className="text-xs text-indigo-600 hover:text-indigo-800 mt-2 underline"
+        {/* Main Canvas Area */}
+        <div className="flex-1 flex flex-col min-w-0 bg-white px-8 sm:px-12 lg:px-20">
+          {/* Top Bar - Workflow Selector */}
+                              <div className="border-b-2 border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 p-4 flex-shrink-0">
+            <div className="flex flex-col space-y-4">
+              {isLoading ? (
+                <div className="flex items-center justify-center p-3">
+                  <div className="w-16 h-16 border-2 border-gray-400 border-t-heat-100 rounded-full animate-spin mr-2" />
+                  <span className="text-sm">Loading saved configuration...</span>
+                </div>
+              ) : (
+                <WorkflowSelector
+                  selectedWorkflowId={selectedWorkflowId}
+                  onSelectWorkflow={setSelectedWorkflowId}
+                />
+              )}
+              
+                            {/* Save UI Configuration Section - Full Width & Prominent */}
+              <div className="">
+                <div className="flex flex-col space-y-3">
+                  {/* <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-base font-bold text-emerald-800">UI Configuration</h3>
+                      <p className="text-sm text-emerald-700 mt-1">Save the current UI layout and component bindings to Convex. Your saved configuration will be loaded automatically when you select this workflow again.</p>
+                    </div>
+                  </div> */}
+                  
+                  <div className="flex gap-3 justify-end">
+                    
+                    {/* <button
+                      onClick={handleResetConfiguration}
+                      disabled={isLoading || !selectedWorkflowId}
+                      className={`px-8 py-8 rounded-8 font-medium transition-all active:scale-[0.98] flex items-center gap-2 shadow-sm
+                        ${(!isLoading && selectedWorkflowId) ? 'bg-gray-500 hover:bg-gray-600 text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                      title="Reset UI to default components based on workflow inputs"
                     >
-                      Dismiss this message
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-16 h-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M3 12a9 9 0 1 1 9 9" />
+                        <path d="M9 18l-3-3 3-3" />
+                      </svg>
+                      Reset UI
+                    </button> */}
+                    
+                    
+                    {/* <button
+                      onClick={handleSaveConfiguration}
+                      disabled={isSaving || !selectedWorkflowId || components.length === 0}
+                      className={`px-16 py-8 rounded-8 font-medium text-base transition-all active:scale-[0.98] flex items-center gap-3 shadow-sm
+                        ${(!isSaving && selectedWorkflowId && components.length > 0) ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+                    >
+                      {isSaving ? (
+                        <>
+                          <div className="w-16 h-16 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Saving Configuration...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-16 h-16" />
+                          Save UI Configuration
+                        </>
+                      )}
+                    </button> */}
+                  </div>
+                </div>
+              </div>
+
+              {/* Workflow Execution Button - Full Width */}
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 shadow-sm mt-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-medium text-blue-800">Create UI for the Selected Workflow</h3>
+                    <p className="text-xs text-blue-600">Customise this workflow according to your requirement</p>
+                  </div>
+                  <div className="flex gap-2">
+                    {/* <button
+                      onClick={() => setShowVariablePanel(true)}
+                      disabled={!selectedWorkflowId}
+                      className={`px-10 py-6 rounded-8 font-medium transition-all active:scale-[0.98] flex items-center gap-2
+                        ${selectedWorkflowId ? 'bg-indigo-500 hover:bg-indigo-600 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+                    >
+                      <Plus className="w-14 h-14" />
+                      Variables
+                    </button> */}
+                    
+                      {/* <button
+                        onClick={() => setShowInstructionsPanel(true)}
+                        disabled={!selectedWorkflowId || components.length === 0}
+                        className={`px-10 py-6 rounded-8 font-medium transition-all active:scale-[0.98] flex items-center gap-2
+                          ${selectedWorkflowId ? 'bg-indigo-500 hover:bg-indigo-600 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+                      >
+                        <Plus className="w-14 h-14" />
+                        Instructions
+                      </button> */}
+
+                      {/* <button
+                          onClick={()=>handleSaveWorkflow()}
+                          className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-md"
+                        >
+                          💾 Save Workflow
+                      </button> */}
+
+                      <button
+                      // onClick={() => selectedWorkflowId && handleExecuteWorkflow("global-workflow-button", selectedWorkflowId)}
+                      onClick={()=>handleSaveWorkflow()}
+                      disabled={isExecuting || !selectedWorkflowId}
+                      className={`px-12 py-6 rounded-8 font-medium transition-all active:scale-[0.98] flex items-center gap-2
+                        ${selectedWorkflowId ? 'bg-heat-100 hover:bg-heat-200 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+                    >
+                      {isExecuting ? (
+                        <>
+                          <div className="w-14 h-14 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Running...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-14 h-14" />
+                          Create UI
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
               </div>
-            )}
+
+              {/* Workflow Input Components Information */}
+              {workflowInputs && workflowInputs.length > 0 && (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 shadow-sm">
+                  <div className="flex items-start">
+                    {/* <FileQuestion className="h-20 w-20 text-indigo-500 mt-1 mr-3 flex-shrink-0" /> */}
+                    {/* <div className="flex-1"> */}
+                      {/* <h3 className="text-sm font-semibold text-indigo-800">Workflow Input Variables</h3> */}
+                      {/* <p className="text-xs text-indigo-700 mt-1 mb-2">
+                        Found {workflowInputs.length} input variables for this workflow. 
+                        {components.length === 0 ? " Input components will be automatically created for you." : " Input components are mapped to these variables."}
+                        {workflowInputs.some(input => input.trueVariable) && 
+                         " Using TRUE variables directly extracted from workflow code."}
+                      </p> */}
+                      
+                      {/* <div className="mt-3 overflow-x-auto">
+                        <table className="min-w-full border border-indigo-200 text-xs">
+                          <thead className="bg-indigo-100">
+                            <tr>
+                              <th className="py-1 px-2 text-left border-b border-indigo-200">Variable Name</th>
+                              <th className="py-1 px-2 text-left border-b border-indigo-200">Label</th>
+                              <th className="py-1 px-2 text-left border-b border-indigo-200">Type</th>
+                              <th className="py-1 px-2 text-left border-b border-indigo-200">Source</th>
+                              <th className="py-1 px-2 text-left border-b border-indigo-200">Default Value</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {workflowInputs.map((input, index) => (
+                              <tr key={input.name} className={index % 2 === 0 ? 'bg-white' : 'bg-indigo-50'}>
+                                <td className="py-1 px-2 border-b border-indigo-100 font-medium">
+                                  {input.name}{input.required && " *"}
+                                </td>
+                                <td className="py-1 px-2 border-b border-indigo-100">{input.label || '-'}</td>
+                                <td className="py-1 px-2 border-b border-indigo-100">{input.type || 'string'}</td>
+                                <td className="py-1 px-2 border-b border-indigo-100">
+                                  {input.trueVariable ? 
+                                    <span className="bg-green-100 text-green-800 py-0 px-1 rounded text-xs font-bold">TRUE</span> : 
+                                    (input.internal ? 
+                                      <span className="bg-blue-100 text-blue-800 py-0 px-1 rounded text-xs">Internal</span> : 
+                                      <span className="text-gray-400">Standard</span>)}
+                                </td>
+                                <td className="py-1 px-2 border-b border-indigo-100 truncate max-w-[150px]">
+                                  {input.default !== undefined ? 
+                                    (typeof input.default === 'object' ? 
+                                      JSON.stringify(input.default).substring(0, 20) + '...' : 
+                                      String(input.default)) : 
+                                    '-'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div> */}
+                      
+                      {/* Variable explanation */}
+                      {/* <div className="mt-3 text-xs text-indigo-700">
+                        <p className="font-semibold">Variable Source Types:</p>
+                        <ul className="list-disc pl-4 mt-1">
+                          <li><span className="bg-green-100 text-green-800 py-0 px-1 rounded text-xs font-bold inline-block w-10 text-center">TRUE</span> - Extracted directly from workflow code (highest accuracy)</li>
+                          <li><span className="bg-blue-100 text-blue-800 py-0 px-1 rounded text-xs inline-block w-10 text-center">Internal</span> - Detected from workflow structure analysis</li>
+                          <li><span className="text-gray-400 inline-block w-10 text-center">Standard</span> - Basic workflow metadata</li>
+                        </ul>
+                      </div> */}
+                    {/* </div> */}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Canvas */}
+            <div className="flex-1 overflow-auto p-6 min-h-0 bg-gray-50">
+           
+            {/* {showIntro && components.length > 0 && (
+              // <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4 shadow-sm">
+              //   <div className="flex items-start">
+              //     <Info className="h-5 w-5 text-indigo-500 mt-1 mr-3 flex-shrink-0" />
+              //     <div>
+              //       <h3 className="text-sm font-medium text-indigo-800">Getting Started</h3>
+              //       <p className="text-xs text-indigo-700 mt-1">
+              //         1. Add UI components from the left panel<br/>
+              //         2. Configure each component by clicking the settings icon<br/>
+              //         3. Select a workflow above<br/>
+              //         4. Click the "Run Workflow" button to execute with all input values
+              //       </p>
+              //       <button 
+              //         onClick={() => setShowIntro(false)}
+              //         className="text-xs text-indigo-600 hover:text-indigo-800 mt-2 underline"
+              //       >
+              //         Dismiss this message
+              //       </button>
+              //     </div>
+              //   </div>
+              // </div>
+            )} */}
             <DropZone
               components={components}
-              onComponentUpdate={handleComponentUpdate}
+              onComponentUpdate={handleComponentUpdate}              
               onComponentMove={handleComponentMove}
               onComponentDelete={handleComponentDelete}
               onExecuteWorkflow={handleExecuteWorkflow}
@@ -337,11 +1684,14 @@ export default function UIBuilderCanvas() {
               isExecuting={isExecuting}
               activeComponentId={activeComponentId}
             />
+
+
+
           </div>
         </div>
 
         {/* Right Sidebar - Response Display (Resizable) */}
-                <ResizableRightPane
+                {/* <ResizableRightPane
           defaultWidth={384}
           minWidth={300}
           maxWidth={600}
@@ -358,7 +1708,7 @@ export default function UIBuilderCanvas() {
           ) : (
             <ResponseDisplay responses={workflowResponses} isExecuting={isExecuting} />
           )}
-        </ResizableRightPane>
+        </ResizableRightPane> */}
 
         {/* Drag Overlay */}
         <DragOverlay>
@@ -369,6 +1719,202 @@ export default function UIBuilderCanvas() {
           ) : null}
         </DragOverlay>
       </DndContext>
+              {/* 🆕 Custom Variable Editor Panel */}
+      <AnimatePresence>
+        {showVariablePanel && (
+          <motion.div
+            initial={{ x: 400, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 400, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed right-10 top-20 h-[calc(100vh-120px)] w-[420px] bg-white border border-gray-200 rounded-lg shadow-lg overflow-y-auto z-[9999] p-6"
+>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-800">Custom Variables</h2>
+              <button onClick={() => setShowVariablePanel(false)} className="text-gray-600 hover:text-gray-900">
+                ✕
+              </button>
+            </div>
+
+            <div className="flex justify-end mb-4">
+              <button
+                onClick={()=>addCustomVariable()}
+                className="px-3 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center gap-1"
+              >
+                <Plus className="w-4 h-4" /> Add Variable
+              </button>
+            </div>
+
+            {customVariables.length === 0 ? (
+              <p className="text-sm text-gray-500">No variables defined yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {customVariables.map((v, i) => (
+                  <div key={i} className="border p-3 rounded-md space-y-2 bg-gray-50">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Variable Name</label>
+                      <input
+                        type="text"
+                        className="w-full text-sm border rounded p-1"
+                        value={v.name}
+                        onChange={(e) => updateCustomVariable(i, { name: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Type</label>
+                      <select
+                        className="w-full text-sm border rounded p-1"
+                        value={v.type}
+                        onChange={(e) => updateCustomVariable(i, { type: e.target.value })}
+                      >
+                        <option value="string">String</option>
+                        <option value="number">Number</option>
+                        <option value="boolean">Boolean</option>
+                        <option value="url">URL</option>
+                        <option value="object">Object</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Description</label>
+                      <input
+                        type="text"
+                        className="w-full text-sm border rounded p-1"
+                        value={v.description || ""}
+                        onChange={(e) => updateCustomVariable(i, { description: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Default Value</label>
+                      <input
+                        type="text"
+                        className="w-full text-sm border rounded p-1"
+                        value={v.defaultValue || ""}
+                        onChange={(e) => updateCustomVariable(i, { defaultValue: e.target.value })}
+                      />
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <label className="flex items-center gap-2 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={v.required}
+                          onChange={(e) => updateCustomVariable(i, { required: e.target.checked })}
+                        />
+                        Required
+                      </label>
+                      <button
+                        onClick={() => removeCustomVariable(i)}
+                        className="text-xs text-red-600 hover:text-red-800"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showInstructionsPanel && (
+          <motion.div
+            initial={{ x: 400, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 400, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed right-10 top-20 h-[calc(100vh-120px)] w-[420px] bg-white border border-gray-200 rounded-lg shadow-lg overflow-y-auto z-[9999] p-6"
+>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-800">Custom Variables</h2>
+              <button onClick={() => {addInstructions(); setShowInstructionsPanel(false)}} className="text-gray-600 hover:text-gray-900">
+                ✕
+              </button>
+            </div>
+            <textarea
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value)}
+                placeholder="Enter agent instructions..."
+                rows={8}
+                className="w-full px-14 py-10 bg-background-base border border-border-faint rounded-10 text-sm text-accent-black placeholder-black-alpha-32 focus:outline-none focus:border-heat-100 transition-colors resize-y"
+              />
+            <div className="absolute right-8 top-1/2 -translate-y-1/2">
+              <button
+                ref={buttonRef}
+                onClick={handleOpen}
+                className="px-12 py-6 bg-heat-4 hover:bg-heat-8 border border-heat-100 rounded-6 text-body-small text-heat-100 transition-colors flex items-center gap-6"
+              >
+                <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                </svg>
+                Insert Variable
+              </button>
+             
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+              {isOpen && (
+                <>
+                  {/* Backdrop to close on click outside */}
+                  <div
+                    className="fixed inset-0 z-[9998]"
+                    onClick={() => setIsOpen(false)}
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="fixed w-400 max-w-[calc(100vw-40px)] bg-accent-white border border-border-faint rounded-12 shadow-2xl z-[9999] overflow-hidden"
+                    style={{
+                      top: `${buttonPosition.top}px`,
+                      right: `${buttonPosition.right}px`,
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="p-12 border-b border-border-faint">
+                      <h4 className="text-label-small text-accent-black">Available Variables</h4>
+                    </div>
+      
+                  <div className="max-h-320 overflow-y-auto">
+                    {customVariables.map((item: any, itemIndex) => (
+                        <button
+                          key={itemIndex}
+                          onClick={() => {
+                            onSelect(item);
+                            setIsOpen(false);
+                          }}
+                          className={`w-full px-12 py-10 text-left hover:bg-heat-4 transition-colors border-b border-border-faint last:border-0 ${
+                            item.isField ? 'pl-24 bg-background-base' : ''
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-8">
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-body-small font-medium break-all ${
+                                item.isField || item.isInputVariable || item.isNested ? 'text-heat-100' : 'text-accent-black'
+                              }`}>
+                                {item.name}
+                              </p>
+                              {item.description && (
+                                <p className="text-body-small text-black-alpha-48 mt-4 truncate">
+                                  {item.description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                  </div>
+      
+                    <div className="p-12 bg-background-base border-t border-border-faint">
+                      <p className="text-body-small text-black-alpha-48">
+                        Click a variable to insert its reference
+                      </p>
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
     </div>
   );
 }

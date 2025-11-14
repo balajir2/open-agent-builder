@@ -126,7 +126,6 @@ export default function VariableReferencePicker({ nodes, currentNodeId, onSelect
   return (
     <div className="relative">
       <button
-        ref={buttonRef}
         onClick={handleOpen}
         className="px-12 py-6 bg-heat-4 hover:bg-heat-8 border border-heat-100 rounded-6 text-body-small text-heat-100 transition-colors flex items-center gap-6"
       >
