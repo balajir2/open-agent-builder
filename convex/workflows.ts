@@ -32,6 +32,27 @@ export const list = query({
   },
 });
 
+// Get all workflows for the team (no user filter)
+export const listAll = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    // Must be authenticated to see team workflows
+    if (identity) {
+      const workflows = await ctx.db
+        .query("workflows")
+        .filter((q) => q.neq(q.field("isTemplate"), true)) // Exclude templates
+        .order("desc")
+        .collect();
+      return workflows;
+    }
+
+    // If not authenticated, return empty array
+    return [];
+  },
+});
+
 // Alias for backwards compatibility
 export const listWorkflows = list;
 
