@@ -20,11 +20,11 @@ interface Workflow {
 
 export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWorkflow, onLoadTemplate }: Step2PlaceholderProps) {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
-  const [activeTab, setActiveTab] = useState<"workflows" | "templates">("templates");
+  const [teamWorkflows, setTeamWorkflows] = useState<Workflow[]>([]);
+  const [activeTab, setActiveTab] = useState<"workflows" | "templates" | "team">("templates");
   const templates = listTemplates();
 
   useEffect(() => {
-    // Load workflows from API
     const loadWorkflows = async () => {
       try {
         const response = await fetch('/api/workflows');
@@ -43,8 +43,62 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
       }
     };
 
+    const loadTeamWorkflows = async () => {
+      try {
+        const response = await fetch('/api/team-workflows');
+        const data = await response.json();
+
+        if (data.workflows && Array.isArray(data.workflows)) {
+          setTeamWorkflows(data.workflows.map((w: any) => ({
+            id: w.id,
+            title: w.name,
+            description: w.description,
+            createdAt: new Date(w.updatedAt || w.createdAt).toLocaleDateString(),
+          })));
+        }
+      } catch (error) {
+        console.error('Error loading team workflows:', error);
+      }
+    };
+
     loadWorkflows();
+    loadTeamWorkflows();
   }, []);
+
+  const renderWorkflows = (items: Workflow[]) => {
+    if (items.length > 0) {
+      return items.map((workflow, index) => (
+        <motion.div
+          key={workflow.id}
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{
+            duration: 0.5,
+            delay: (index + 1) * 0.1,
+            ease: "easeOut"
+          }}
+          className="relative cursor-pointer"
+          onClick={() => onLoadWorkflow?.(workflow.id)}
+        >
+          <div className="bg-accent-white rounded-12 p-24 border border-border-faint hover:border-heat-100 hover:shadow-sm transition-all h-full min-h-[160px] group">
+            <div className="absolute inset-0 rounded-12 bg-gradient-to-br from-heat-4 to-transparent opacity-0 group-hover:opacity-10 transition-opacity" />
+            <div className="relative">
+              <h3 className="text-label-large text-accent-black font-medium mb-8">{workflow.title}</h3>
+              {workflow.description && (
+                <p className="text-body-small text-black-alpha-48 mb-12 line-clamp-2">{workflow.description}</p>
+              )}
+              <p className="text-body-small text-black-alpha-32">Updated {workflow.createdAt}</p>
+            </div>
+          </div>
+        </motion.div>
+      ));
+    }
+    return (
+      <div className="col-span-1 lg:col-span-3 flex items-center justify-center min-h-[160px]">
+        <p className="text-body-medium text-black-alpha-48">No saved workflows yet</p>
+      </div>
+    );
+  };
 
   return (
     <div className="max-w-[900px] mx-auto w-full">
@@ -72,6 +126,16 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
           }`}
         >
           Your Workflows ({workflows.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("team")}
+          className={`px-20 py-10 rounded-8 text-body-medium transition-all ${
+            activeTab === "team"
+              ? "bg-heat-100 text-white"
+              : "bg-background-base text-accent-black hover:bg-black-alpha-4 border border-border-faint"
+          }`}
+        >
+          Team Workflows ({teamWorkflows.length})
         </button>
         <button
           onClick={() => setActiveTab("templates")}
@@ -112,39 +176,9 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
         </motion.div>
 
         {/* Show Workflows or Templates based on tab */}
-        {activeTab === "workflows" ? (
-          workflows.length > 0 ? (
-            workflows.map((workflow, index) => (
-              <motion.div
-                key={workflow.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{
-                  duration: 0.5,
-                  delay: (index + 1) * 0.1,
-                  ease: "easeOut"
-                }}
-                className="relative cursor-pointer"
-                onClick={() => onLoadWorkflow?.(workflow.id)}
-              >
-                <div className="bg-accent-white rounded-12 p-24 border border-border-faint hover:border-heat-100 hover:shadow-sm transition-all h-full min-h-[160px] group">
-                  <div className="absolute inset-0 rounded-12 bg-gradient-to-br from-heat-4 to-transparent opacity-0 group-hover:opacity-10 transition-opacity" />
-                  <div className="relative">
-                    <h3 className="text-label-large text-accent-black font-medium mb-8">{workflow.title}</h3>
-                    {workflow.description && (
-                      <p className="text-body-small text-black-alpha-48 mb-12 line-clamp-2">{workflow.description}</p>
-                    )}
-                    <p className="text-body-small text-black-alpha-32">Updated {workflow.createdAt}</p>
-                  </div>
-                </div>
-              </motion.div>
-            ))
-          ) : (
-            <div className="col-span-1 lg:col-span-3 flex items-center justify-center min-h-[160px]">
-              <p className="text-body-medium text-black-alpha-48">No saved workflows yet</p>
-            </div>
-          )
-        ) : (
+        {activeTab === "workflows" && renderWorkflows(workflows)}
+        {activeTab === "team" && renderWorkflows(teamWorkflows)}
+        {activeTab === "templates" && (
           templates.map((template, index) => (
             <motion.div
               key={template.id}
