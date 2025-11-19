@@ -358,7 +358,38 @@ GROQ_API_KEY=gsk_...
 
 # Optional: HTTP Domain Whitelist (security)
 # ALLOWED_HTTP_DOMAINS=api.example.com,*.trusted.com
+
+# Optional: LangSmith Tracing (for monitoring and debugging workflows)
+# Sign up at https://smith.langchain.com/ to get your API key
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=lsv2_pt_...
+LANGCHAIN_PROJECT=open-agent-builder
+LANGCHAIN_ENDPOINT=https://api.smith.langchain.com
 ```
+
+### LangSmith Monitoring Setup
+
+To monitor workflow execution in LangSmith:
+
+1. **Sign up** for LangSmith at [https://smith.langchain.com/](https://smith.langchain.com/)
+2. **Get your API key** from the LangSmith dashboard (Settings → API Keys)
+3. **Add to `.env.local`**:
+   ```bash
+   LANGCHAIN_TRACING_V2=true
+   LANGCHAIN_API_KEY=lsv2_pt_your_api_key_here
+   LANGCHAIN_PROJECT=open-agent-builder
+   LANGCHAIN_ENDPOINT=https://api.smith.langchain.com
+   ```
+4. **Restart your dev server** with `npm run dev:all`
+5. **Execute a workflow** - traces will appear in LangSmith dashboard
+
+**What you'll see in LangSmith:**
+- Full workflow execution traces with timing
+- LLM calls with prompts and responses
+- Agent reasoning steps and tool usage
+- MCP server interactions
+- State transitions between nodes
+- Error details and stack traces
 
 ### Clerk + Convex Setup
 
