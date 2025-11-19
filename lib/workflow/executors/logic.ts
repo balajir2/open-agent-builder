@@ -48,7 +48,7 @@ async function executeIfElse(data: any, state: WorkflowState): Promise<any> {
   try {
     // Get input from previous node, but prefer original classification data for conditions
     let input = state.variables['lastOutput'] || state.variables['input'] || {};
-    
+
     // For classification-based conditions, use the original classification data
     if (conditionExpr.includes('classification') && state.variables.originalClassification) {
       input = state.variables.originalClassification;
@@ -58,50 +58,20 @@ async function executeIfElse(data: any, state: WorkflowState): Promise<any> {
     console.log('Evaluating If/Else condition:', conditionExpr);
     console.log('Available input:', input);
 
-    // Create evaluation function with input, state, and lastOutput context
-    const lastOutput = state.variables['lastOutput'];
-    
-    // Enhanced evaluation with better error handling and debugging
-    let result;
-    try {
-      const evalFunction = new Function('input', 'state', 'lastOutput', `return ${conditionExpr}`);
-      result = evalFunction(input, state, lastOutput);
-    } catch (evalError) {
-      console.error('Condition evaluation error:', evalError);
+    // Import safe evaluator
+    const { safeEvaluate } = await import('../safe-expression-evaluator');
 
-      // Try alternative evaluation with better type coercion
-      if (conditionExpr.includes('==')) {
-        const parts = conditionExpr.split('==');
-        if (parts.length === 2) {
-          const left = parts[0].trim();
-          const right = parts[1].trim().replace(/['"]/g, '');
+    // Create evaluation context with input, state, and lastOutput
+    const context = {
+      input,
+      state: state.variables,
+      lastOutput: state.variables['lastOutput'],
+      // Also expose individual state variables for convenience
+      ...state.variables,
+    };
 
-          try {
-            const leftEval = new Function('input', 'state', 'lastOutput', `return ${left}`);
-            const leftValue = leftEval(input, state, lastOutput);
-
-            // Try both strict and loose equality
-            const strictMatch = leftValue === right;
-            const looseMatch = String(leftValue).toLowerCase().trim() === String(right).toLowerCase().trim();
-
-            console.log('🔍 Condition fallback evaluation:', {
-              leftExpr: left,
-              leftValue,
-              rightValue: right,
-              strictMatch,
-              looseMatch,
-            });
-
-            result = strictMatch || looseMatch;
-          } catch (e) {
-            console.error('Fallback evaluation also failed:', e);
-            result = false;
-          }
-        }
-      } else {
-        result = false;
-      }
-    }
+    // Use safe evaluator (no Function constructor, no eval)
+    const result = safeEvaluate(conditionExpr, context);
 
     console.log('Condition result:', result);
 

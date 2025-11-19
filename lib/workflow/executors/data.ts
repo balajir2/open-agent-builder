@@ -58,7 +58,7 @@ export async function executeDataNode(
 }
 
 /**
- * Execute transform using E2B sandbox or fallback to Function constructor
+ * Execute transform using E2B sandbox (REQUIRED FOR SECURITY)
  */
 async function executeTransform(data: any, state: WorkflowState): Promise<any> {
   // Get the transform script from node data
@@ -71,20 +71,16 @@ async function executeTransform(data: any, state: WorkflowState): Promise<any> {
     return state.variables.lastOutput || {};
   }
 
-  // Try E2B execution first (secure sandbox)
-  const useE2B = typeof process !== 'undefined' && process.env?.E2B_API_KEY;
-
-  if (useE2B) {
-    try {
-      return await executeTransformE2B(transformScript, state);
-    } catch (error) {
-      console.error('❌ E2B execution failed, falling back to Function:', error);
-      // Fall through to fallback execution
-    }
+  // E2B sandbox is REQUIRED for security
+  if (!process.env?.E2B_API_KEY) {
+    throw new Error(
+      'E2B_API_KEY is required for secure code execution. ' +
+      'Get your key at https://e2b.dev and set it in your environment variables. ' +
+      'Transform nodes execute user-provided code and must run in a secure sandbox.'
+    );
   }
 
-  // Fallback to Function constructor (with security patterns)
-  return await executeTransformFallback(transformScript, state);
+  return await executeTransformE2B(transformScript, state);
 }
 
 /**
@@ -151,90 +147,20 @@ console.log(JSON.stringify(result));
 }
 
 /**
- * Fallback execution using Function constructor (LESS SECURE)
+ * REMOVED: Insecure fallback execution using Function constructor
+ *
+ * This function has been removed for security reasons. It used the Function constructor
+ * to execute user code, which is inherently unsafe even with regex-based filtering.
+ *
+ * Regex patterns can be bypassed using:
+ * - String concatenation: 'req' + 'uire'
+ * - Array/object access: global['process']
+ * - Unicode escapes: \u0072equire
+ * - Computed property access: this[String.fromCharCode(112,114,111,99,101,115,115)]
+ *
+ * All code execution now REQUIRES E2B sandbox for security.
+ * See executeTransformE2B() for the secure implementation.
  */
-async function executeTransformFallback(transformScript: string, state: WorkflowState): Promise<any> {
-  console.log('⚠️ Using fallback Function execution (not recommended for production)');
-
-  // Enhanced security patterns to prevent malicious code execution
-  const dangerousPatterns = [
-    /require\s*\(/gi,
-    /import\s+/gi,
-    /eval\s*\(/gi,
-    /Function\s*\(/gi,
-    /setTimeout\s*\(/gi,
-    /setInterval\s*\(/gi,
-    /setImmediate\s*\(/gi,
-    /process\./gi,
-    /__dirname/gi,
-    /__filename/gi,
-    /global\./gi,
-    /globalThis\./gi,
-    /window\./gi,
-    /document\./gi,
-    /fetch\s*\(/gi,
-    /XMLHttpRequest/gi,
-    /fs\./gi,
-    /child_process/gi,
-    /exec\s*\(/gi,
-    /spawn\s*\(/gi,
-  ];
-
-  for (const pattern of dangerousPatterns) {
-    if (pattern.test(transformScript)) {
-      throw new Error(`Security violation: Script contains forbidden pattern: ${pattern.source}`);
-    }
-  }
-
-  // Script length limit
-  const MAX_SCRIPT_LENGTH = 5000;
-  if (transformScript.length > MAX_SCRIPT_LENGTH) {
-    throw new Error(`Script too long (max ${MAX_SCRIPT_LENGTH} characters)`);
-  }
-
-  try {
-    // Create restricted context with deep clones to prevent mutation
-    const sandboxedInput = JSON.parse(JSON.stringify(state.variables.lastOutput || {}));
-    const sandboxedState = {
-      variables: JSON.parse(JSON.stringify(state.variables))
-    };
-
-    // Debug: Log the state structure
-    console.log('🔍 Transform Debug - state.variables.input:', JSON.stringify(state.variables.input, null, 2));
-    console.log('🔍 Transform Debug - input (lastOutput):', JSON.stringify(sandboxedInput, null, 2));
-    console.log('🔍 Transform Debug - ALL state.variables keys:', Object.keys(state.variables));
-
-    // Use strict mode to prevent certain unsafe operations
-    const strictScript = `"use strict";\n${transformScript}\n//# sourceURL=transform-script.js`;
-    const transformFunction = new Function('input', 'lastOutput', 'state', strictScript);
-
-    // Execute with timeout protection
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Transform timeout (3s limit)')), 3000)
-    );
-
-    const executionPromise = Promise.resolve(
-      transformFunction(sandboxedInput, sandboxedInput, sandboxedState)
-    );
-
-    const result = await Promise.race([executionPromise, timeoutPromise]);
-
-    // Validate output isn't suspiciously large (1MB limit)
-    const resultString = JSON.stringify(result);
-    if (resultString.length > 1000000) {
-      throw new Error('Transform output too large (>1MB)');
-    }
-
-    console.log('🔍 Transform Debug - result:', JSON.stringify(result, null, 2));
-
-    // Update state with the result
-    state.variables['lastOutput'] = result;
-
-    return result;
-  } catch (error) {
-    throw new Error(`Transform failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-}
 
 async function executeSetState(data: any, state: WorkflowState): Promise<any> {
   const key = data.stateKey || 'variable';
@@ -285,14 +211,20 @@ async function executeSetState(data: any, state: WorkflowState): Promise<any> {
         break;
 
       case 'expression':
-        // Evaluate JavaScript expression
+        // Evaluate JavaScript expression using safe evaluator
         try {
-          const evalFunction = new Function('input', 'lastOutput', 'state', `return ${rawValue}`);
-          finalValue = evalFunction(
-            state.variables.input,
-            state.variables.lastOutput,
-            state
-          );
+          const { safeEvaluate } = await import('../safe-expression-evaluator');
+
+          // Create evaluation context
+          const context = {
+            input: state.variables.input,
+            lastOutput: state.variables.lastOutput,
+            state: state.variables,
+            // Also expose individual state variables
+            ...state.variables,
+          };
+
+          finalValue = safeEvaluate(rawValue, context);
         } catch (e) {
           throw new Error(`Expression evaluation failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
         }

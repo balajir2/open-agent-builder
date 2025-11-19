@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LangGraphExecutor } from '@/lib/workflow/langgraph';
 import { validateApiKey, createUnauthorizedResponse } from '@/lib/api/auth';
+import { rateLimitMiddleware, getRateLimitIdentifier, RATE_LIMITS } from '@/lib/api/rate-limiter';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +13,14 @@ export async function POST(
   const authResult = await validateApiKey(request);
   if (!authResult.authenticated) {
     return createUnauthorizedResponse(authResult.error || 'Authentication required');
+  }
+
+  // Rate limiting - workflow execution is resource-intensive
+  const rateLimitId = getRateLimitIdentifier(request, authResult.userId);
+  const rateLimitResponse = rateLimitMiddleware(rateLimitId, RATE_LIMITS.WORKFLOW_EXECUTION);
+
+  if (rateLimitResponse) {
+    return rateLimitResponse;
   }
 
   try {

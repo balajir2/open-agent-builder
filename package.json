@@ -84,6 +84,7 @@
     "convex-helpers": "^0.1.104",
     "copy-to-clipboard": "^3.3.3",
     "docx": "^9.5.1",
+    "expr-eval": "^2.0.2",
     "file-saver": "^2.0.5",
     "framer-motion": "^11.1.7",
     "geist": "^1.4.2",

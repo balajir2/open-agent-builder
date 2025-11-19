@@ -1,6 +1,15 @@
 import { WorkflowState } from './types';
 
 /**
+ * Check if a property name is a prototype pollution vector
+ * Blocks: __proto__, constructor, prototype
+ */
+function isPrototypePollutionKey(key: string): boolean {
+  const dangerousKeys = ['__proto__', 'constructor', 'prototype'];
+  return dangerousKeys.includes(key.toLowerCase());
+}
+
+/**
  * Replace variable references like {{state.variables.node_1.price}} with actual values
  */
 export function substituteVariables(text: string, state: WorkflowState): string {
@@ -36,6 +45,7 @@ export function substituteVariables(text: string, state: WorkflowState): string 
 
 /**
  * Safely evaluate expression like "state.variables.node_1.price" or simpler "node_1.price"
+ * WITH PROTOTYPE POLLUTION PROTECTION
  */
 function evaluateExpression(expression: string, state: WorkflowState): any {
   // Support both patterns:
@@ -69,13 +79,36 @@ function evaluateExpression(expression: string, state: WorkflowState): any {
       return undefined;
     }
 
+    // SECURITY: Prevent prototype pollution attacks
+    // Block access to __proto__, constructor, prototype
+    if (isPrototypePollutionKey(part)) {
+      console.warn(`Blocked prototype pollution attempt: ${part}`);
+      return undefined;
+    }
+
     // Handle array indexing like items[0]
     const arrayMatch = part.match(/^(\w+)\[(\d+)\]$/);
     if (arrayMatch) {
       const [, arrayName, index] = arrayMatch;
+
+      // Validate array name doesn't contain prototype pollution
+      if (isPrototypePollutionKey(arrayName)) {
+        console.warn(`Blocked prototype pollution attempt in array: ${arrayName}`);
+        return undefined;
+      }
+
       current = current[arrayName]?.[parseInt(index)];
     } else {
-      current = current[part];
+      // Use hasOwnProperty check for additional safety
+      if (typeof current === 'object' && current !== null) {
+        if (Object.prototype.hasOwnProperty.call(current, part)) {
+          current = current[part];
+        } else {
+          return undefined;
+        }
+      } else {
+        return undefined;
+      }
     }
   }
 

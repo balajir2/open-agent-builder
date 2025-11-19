@@ -18,7 +18,7 @@ export async function GET() {
     return NextResponse.json({
       workflows: workflows.map((w: any) => ({
         ...w,
-        id: w.customId || w._id.toString(),
+        id: (w.customId && w.customId.trim() !== '') ? w.customId : w._id.toString(),
       })),
     });
   } catch (error: any) {
