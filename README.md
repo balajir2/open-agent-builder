@@ -11,7 +11,7 @@
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
 [![Firecrawl](https://img.shields.io/badge/Powered%20by-Firecrawl-orange)](https://firecrawl.dev)
 
-[Documentation](#documentation) • [Examples](#example-workflows)
+[Documentation](#-documentation) • [Examples](#example-workflows)
 
 </div>
 
@@ -37,7 +37,7 @@ Open Agent Builder is a visual workflow builder for creating AI agent pipelines 
 ### Visual Workflow Builder
 - **Drag-and-drop interface** for building agent workflows
 - **Real-time execution** with streaming updates
-- **8 core node types**: Start, Agent, MCP Tools, Transform, If/Else, While Loop, User Approval, End
+- **10 core node types**: Start, Agent, MCP Tools, Transform, Extract, HTTP, If/Else, While Loop, User Approval, End
 - **Template library** with pre-built workflows
 - **MCP protocol support** for extensible tool integration
 
@@ -66,8 +66,8 @@ Open Agent Builder is a visual workflow builder for creating AI agent pipelines 
 | **[Tailwind CSS](https://tailwindcss.com/)** | Utility-first CSS framework for responsive UI |
 | **[React Flow](https://reactflow.dev/)** | Visual workflow builder canvas with drag-and-drop nodes |
 | **[Anthropic](https://www.anthropic.com/)** | Claude AI integration with native MCP support (Claude Haiku 4.5 & Sonnet 4.5) |
-| **[OpenAI](https://platform.openai.com/)** | gpt-5 integration (MCP support coming soon) |
-| **[Groq](https://groq.com/)** | Fast inference for open models (MCP support coming soon) |
+| **[OpenAI](https://platform.openai.com/)** | GPT-4o integration (MCP support in development) |
+| **[Groq](https://groq.com/)** | Fast inference for open models (MCP support in development) |
 | **[E2B](https://e2b.dev)** | Sandboxed code execution for secure transform nodes |
 | **[Vercel](https://vercel.com)** | Deployment platform with edge functions |
 
@@ -173,7 +173,33 @@ FIRECRAWL_API_KEY=fc-...
 
 > **Note:** Users can also add their own Firecrawl keys in Settings → API Keys, but having a default key in `.env.local` enables the template workflows.
 
-### 6. Optional: Configure Default LLM Provider
+### 6. Set Up Security (Required for Production)
+
+**Critical security configurations required before deployment:**
+
+```bash
+# Generate encryption key (32 bytes for AES-256-GCM)
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+
+# Add to .env.local
+ENCRYPTION_KEY=<generated-key>
+
+# E2B Sandbox (REQUIRED for Transform nodes)
+E2B_API_KEY=e2b_...
+```
+
+Get your E2B key at [e2b.dev](https://e2b.dev)
+
+> **Security Note:** Transform nodes execute user-provided code and **require** E2B sandbox for security. Without `E2B_API_KEY`, transform nodes will fail with an error message.
+
+**Verify security setup:**
+```bash
+node scripts/verify-security-setup.js
+```
+
+For complete security documentation, see [SECURITY.md](./SECURITY.md)
+
+### 7. Optional: Configure Default LLM Provider
 
 While users can add their own LLM API keys through the UI (Settings → API Keys), you can optionally set a default provider in `.env.local`:
 
@@ -183,25 +209,25 @@ While users can add their own LLM API keys through the UI (Settings → API Keys
 # Anthropic Claude (Recommended - Native MCP support with Haiku 4.5 & Sonnet 4.5)
 ANTHROPIC_API_KEY=sk-ant-...
 
-# OpenAI GPT-5 (MCP support coming soon)
+# OpenAI GPT-4o (MCP support in development)
 OPENAI_API_KEY=sk-...
 
-# Groq (MCP support coming soon)
+# Groq (MCP support in development)
 GROQ_API_KEY=gsk_...
 ```
 
-> **Important:** For workflows using MCP tools (like Firecrawl integration), Anthropic Claude is currently the recommended provider as it has native MCP support. OpenAI and Groq MCP support is coming soon.
+> **Important:** For workflows using MCP tools (like Firecrawl integration), Anthropic Claude is currently the recommended provider as it has native MCP support. OpenAI and Groq MCP support is in development.
 
-### 7. Optional: E2B Code Interpreter
+### 8. Optional: HTTP Domain Whitelist
 
-For advanced transform nodes with sandboxed code execution:
+For enhanced security, restrict HTTP nodes to specific domains:
 
 ```bash
-# E2B Code Interpreter (Optional)
-E2B_API_KEY=e2b_...
+# Optional: Whitelist allowed domains for HTTP requests
+ALLOWED_HTTP_DOMAINS=api.example.com,*.trusted.com
 ```
 
-Get your key at [e2b.dev](https://e2b.dev)
+If not set, HTTP nodes can make requests to any external domain (internal IPs and metadata endpoints are always blocked).
 
 ---
 
@@ -258,6 +284,8 @@ npm start
 | **Agent** | AI reasoning with LLMs | Analyze data, make decisions |
 | **MCP Tool** | External tool calls | Firecrawl scraping, APIs |
 | **Transform** | Data manipulation | Parse JSON, filter arrays |
+| **Extract** | LLM-powered extraction | Extract structured data with JSON schema |
+| **HTTP** | HTTP API requests | Call REST APIs with custom headers/auth |
 | **If/Else** | Conditional logic | Route based on conditions |
 | **While Loop** | Iteration | Process multiple pages |
 | **User Approval** | Human-in-the-loop | Review before posting |
@@ -403,12 +431,118 @@ Add custom MCP servers in **Settings → MCP Registry**:
 - `CLERK_SECRET_KEY` - Clerk auth
 - `CLERK_JWT_ISSUER_DOMAIN` - Clerk + Convex integration
 - `FIRECRAWL_API_KEY` - Web scraping
+- `ENCRYPTION_KEY` - AES-256 encryption for user API keys (32 bytes base64)
+- `E2B_API_KEY` - Secure sandboxed code execution (REQUIRED for transform nodes)
 
 **Optional (can be added in UI instead):**
 - `ANTHROPIC_API_KEY` - Default Claude provider (Recommended for MCP)
-- `OPENAI_API_KEY` - Default gpt-5 provider (MCP coming soon)
-- `GROQ_API_KEY` - Default Groq provider (MCP coming soon)
-- `E2B_API_KEY` - Sandboxed code execution
+- `OPENAI_API_KEY` - Default GPT-4o provider (MCP in development)
+- `GROQ_API_KEY` - Default Groq provider (MCP in development)
+- `ALLOWED_HTTP_DOMAINS` - Whitelist for HTTP node requests (security)
+
+---
+
+## Security
+
+Open Agent Builder implements enterprise-grade security measures:
+
+### 🔐 Security Features
+
+- **AES-256-GCM Encryption** - User API keys encrypted at rest
+- **E2B Sandboxing** - All user code execution runs in isolated cloud environments
+- **SSRF Protection** - HTTP nodes blocked from accessing private IPs and cloud metadata
+- **Rate Limiting** - API abuse prevention (10 workflow executions/min per user)
+- **Authorization** - User ownership verification on all operations
+- **Safe Expression Evaluation** - No `eval()` or `Function()` in conditions/expressions
+- **Prototype Pollution Protection** - Variable substitution secured against attacks
+- **Secure Random Generation** - Cryptographically secure API key generation
+
+### 📋 Security Checklist
+
+Before deploying to production:
+
+- [x] Set `ENCRYPTION_KEY` (32-byte base64)
+- [x] Set `E2B_API_KEY` (required for transform nodes)
+- [x] Review `.env.local` for sensitive data
+- [ ] Enable HTTPS only (disable HTTP)
+- [ ] Configure security headers (see [SECURITY.md](./SECURITY.md))
+- [ ] Set up monitoring and alerts
+- [ ] Review rate limit configurations
+- [ ] Optional: Configure `ALLOWED_HTTP_DOMAINS` whitelist
+
+### 🔍 Verify Security Setup
+
+Run the verification script to ensure all security configurations are correct:
+
+```bash
+node scripts/verify-security-setup.js
+```
+
+Expected output:
+```
+✅ ENCRYPTION_KEY is valid (32 bytes)
+✅ E2B_API_KEY is set
+✅ All security files present
+✅ expr-eval installed
+```
+
+### 📚 Security Documentation
+
+- **[SECURITY.md](./SECURITY.md)** - Complete security guide
+- **[SECURITY-FIXES-2025-11-19.md](./SECURITY-FIXES-2025-11-19.md)** - Recent security updates
+- **[VERIFICATION-REPORT.md](./VERIFICATION-REPORT.md)** - Security verification details
+
+### 🚨 Reporting Security Issues
+
+If you discover a security vulnerability, please email security@your-domain.com instead of opening a public issue.
+
+---
+
+## 📚 Documentation
+
+### Quick Navigation
+
+| I want to... | Read this document |
+|--------------|-------------------|
+| **Get started quickly** | This README |
+| **Learn how to use the app** | [USER-MANUAL.md](./USER-MANUAL.md) |
+| **Understand security features** | [SECURITY.md](./SECURITY.md) |
+| **Develop or contribute** | [CLAUDE.md](./CLAUDE.md) |
+| **Deploy to production** | [Deployment](#deployment) + [SECURITY.md](./SECURITY.md) |
+| **Troubleshoot issues** | [USER-MANUAL.md](./USER-MANUAL.md#troubleshooting) |
+| **Find the right document** | [DOCS-INDEX.md](./DOCS-INDEX.md) |
+
+### Available Documentation
+
+- **[USER-MANUAL.md](./USER-MANUAL.md)** - Comprehensive user guide (2000+ lines)
+  - Getting started tutorial
+  - Interface walkthrough
+  - All 11 node types explained
+  - Advanced features and best practices
+  - Troubleshooting guide
+  - FAQ (40+ questions)
+
+- **[SECURITY.md](./SECURITY.md)** - Complete security guide
+  - All 8 security features explained
+  - Production deployment checklist
+  - Monitoring and incident response
+  - OWASP Top 10 coverage
+
+- **[CLAUDE.md](./CLAUDE.md)** - Developer documentation
+  - Architecture overview
+  - Project structure
+  - Adding new node types
+  - Development patterns
+
+- **[DOCS-INDEX.md](./DOCS-INDEX.md)** - Documentation navigation guide
+  - Quick navigation by task
+  - Documentation by audience
+  - Reading paths for different user types
+
+- **[VERIFICATION-REPORT.md](./VERIFICATION-REPORT.md)** - Security verification status
+- **[SECURITY-FIXES-2025-11-19.md](./SECURITY-FIXES-2025-11-19.md)** - Recent security updates
+
+---
 
 ## API Usage
 
@@ -449,7 +583,7 @@ flowchart TD
 
   subgraph Integrations
     D1["Firecrawl API"]
-    D2["LLMs (Claude, gpt-5, Groq)"]
+    D2["LLMs (Claude, GPT-4o, Groq)"]
     D3["MCP Servers"]
     C_desc --> D1
     C_desc --> D2
@@ -463,7 +597,6 @@ flowchart TD
   D3 --> D_common
   D_common --> D_common_desc
 ```
-</details>
 
 ---
 

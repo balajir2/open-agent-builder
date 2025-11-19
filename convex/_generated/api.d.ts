@@ -12,6 +12,7 @@ import type * as admin from "../admin.js";
 import type * as apiKeys from "../apiKeys.js";
 import type * as approvals from "../approvals.js";
 import type * as executions from "../executions.js";
+import type * as lib_encryption from "../lib/encryption.js";
 import type * as mcpServers from "../mcpServers.js";
 import type * as templates from "../templates.js";
 import type * as uiBuilderConfigurations from "../uiBuilderConfigurations.js";
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   apiKeys: typeof apiKeys;
   approvals: typeof approvals;
   executions: typeof executions;
+  "lib/encryption": typeof lib_encryption;
   mcpServers: typeof mcpServers;
   templates: typeof templates;
   uiBuilderConfigurations: typeof uiBuilderConfigurations;

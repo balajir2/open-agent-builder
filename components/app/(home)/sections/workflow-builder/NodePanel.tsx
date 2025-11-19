@@ -52,43 +52,40 @@ export default function NodePanel({
     user?.id ? { userId: user.id } : "skip"
   );
 
-  // Get available models based on active API keys
+  // Get available models - show all providers, with indicators for configured keys
   const getAvailableModels = () => {
-    if (!userLLMKeys) return [];
+    const activeKeys = userLLMKeys?.filter(key => key.isActive) || [];
+    const hasProvider = (provider: string) => activeKeys.some(key => key.provider === provider);
 
-    const models: { provider: string; models: Array<{ id: string; name: string }> }[] = [];
-
-    // Check for active keys and add corresponding models
-    const activeKeys = userLLMKeys.filter(key => key.isActive);
-
-    activeKeys.forEach(key => {
-      if (key.provider === 'anthropic') {
-        models.push({
-          provider: 'Anthropic',
-          models: [
-            { id: 'anthropic/claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5' },
-            { id: 'anthropic/claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' },
-          ]
-        });
-      } else if (key.provider === 'openai') {
-        models.push({
-          provider: 'OpenAI',
-          models: [
-            { id: 'openai/gpt-4o', name: 'GPT-5' },
-            { id: 'openai/gpt-4o-mini', name: 'GPT-5 Mini' },
-          ]
-        });
-      } else if (key.provider === 'groq') {
-        models.push({
-          provider: 'Groq',
-          models: [
-            { id: 'groq/openai/gpt-oss-120b', name: 'GPT OSS 120B' },
-          ]
-        });
+    // Always show all providers - they work with environment variables as fallback
+    const allModels: { provider: string; models: Array<{ id: string; name: string }>; hasKey: boolean }[] = [
+      {
+        provider: 'Anthropic',
+        hasKey: hasProvider('anthropic'),
+        models: [
+          { id: 'anthropic/claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5' },
+          { id: 'anthropic/claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' },
+        ]
+      },
+      {
+        provider: 'OpenAI',
+        hasKey: hasProvider('openai'),
+        models: [
+          { id: 'openai/gpt-4o', name: 'GPT-4o' },
+          { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' },
+        ]
+      },
+      {
+        provider: 'Groq',
+        hasKey: hasProvider('groq'),
+        models: [
+          { id: 'groq/llama-3.3-70b-versatile', name: 'Llama 3.3 70B' },
+          { id: 'groq/llama-3.1-8b-instant', name: 'Llama 3.1 8B' },
+        ]
       }
-    });
+    ];
 
-    return models;
+    return allModels;
   };
 
   // Helper to update JSON schema from fields array
@@ -495,10 +492,12 @@ export default function NodePanel({
                 className="w-full px-14 py-10 bg-background-base border border-border-faint rounded-10 text-sm text-accent-black focus:outline-none focus:border-heat-100 transition-colors flex items-center justify-between hover:bg-black-alpha-4"
               >
                 <span className="truncate">
-                  {model ? (
+                  {model && model !== "custom" ? (
                     // Find the display name for the selected model
                     getAvailableModels().flatMap(p => p.models).find(m => m.id === model)?.name ||
-                    model
+                    model.split('/').pop() || model
+                  ) : model === "custom" ? (
+                    customModel || "Custom Model"
                   ) : (
                     <span className="text-black-alpha-32">Select a model...</span>
                   )}
@@ -512,47 +511,56 @@ export default function NodePanel({
 
               {showModelsDropdown && (
                 <div className="mt-8 p-8 bg-background-base border border-border-faint rounded-10 space-y-8 max-h-[300px] overflow-y-auto">
-                  {getAvailableModels().length === 0 ? (
-                    <div className="p-16 text-center">
-                      <p className="text-sm text-black-alpha-48 mb-12">
-                        No API keys configured
-                      </p>
-                      <button
-                        onClick={() => {
-                          setShowModelsDropdown(false);
-                          onOpenSettings?.();
-                        }}
-                        className="px-12 py-6 bg-heat-100 text-white rounded-8 text-sm hover:bg-heat-120 transition-colors"
-                      >
-                        Add API Keys
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      {getAvailableModels().map((provider) => (
-                        <div key={provider.provider}>
-                          <div className="text-xs font-medium text-black-alpha-48 mb-4">
-                            {provider.provider}
-                          </div>
-                          {provider.models.map((modelOption) => (
-                            <button
-                              key={modelOption.id}
-                              onClick={() => {
-                                setModel(modelOption.id);
-                                setShowModelsDropdown(false);
-                              }}
-                              className={`w-full text-left px-8 py-6 rounded-6 text-sm transition-colors ${
-                                model === modelOption.id
-                                  ? 'bg-heat-100 text-white'
-                                  : 'hover:bg-black-alpha-4 text-accent-black'
-                              }`}
-                            >
-                              {modelOption.name}
-                            </button>
-                          ))}
-                        </div>
+                  {getAvailableModels().map((provider) => (
+                    <div key={provider.provider}>
+                      <div className="text-xs font-medium text-black-alpha-48 mb-4 flex items-center justify-between">
+                        <span>{provider.provider}</span>
+                        {provider.hasKey ? (
+                          <span className="text-xs px-6 py-2 bg-green-100 text-green-700 rounded-4">
+                            ✓ Key set
+                          </span>
+                        ) : (
+                          <span className="text-xs px-6 py-2 bg-yellow-50 text-yellow-700 rounded-4">
+                            Using env
+                          </span>
+                        )}
+                      </div>
+                      {provider.models.map((modelOption) => (
+                        <button
+                          key={modelOption.id}
+                          onClick={() => {
+                            setModel(modelOption.id);
+                            setShowModelsDropdown(false);
+                          }}
+                          className={`w-full text-left px-8 py-6 rounded-6 text-sm transition-colors ${
+                            model === modelOption.id
+                              ? 'bg-heat-100 text-white'
+                              : 'hover:bg-black-alpha-4 text-accent-black'
+                          }`}
+                        >
+                          {modelOption.name}
+                        </button>
                       ))}
+                    </div>
+                  ))}
+
+                      {/* Info about API keys */}
                       <div className="pt-8 mt-8 border-t border-border-faint">
+                        <p className="text-xs text-black-alpha-48 mb-8 px-8">
+                          Models with "Using env" use environment variables. Add your own keys in Settings for better control.
+                        </p>
+                        <button
+                          onClick={() => {
+                            setShowModelsDropdown(false);
+                            onOpenSettings?.();
+                          }}
+                          className="w-full text-left px-8 py-6 rounded-6 text-sm transition-colors hover:bg-black-alpha-4 text-heat-100 font-medium"
+                        >
+                          ⚙️ Configure API Keys
+                        </button>
+                      </div>
+
+                      <div className="pt-8 border-t border-border-faint">
                         <button
                           onClick={() => {
                             setModel("custom");
@@ -567,8 +575,6 @@ export default function NodePanel({
                           Custom Model...
                         </button>
                       </div>
-                    </>
-                  )}
                 </div>
               )}
 

@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       workflows: workflows.map((w: any) => ({
-        id: w.customId || w._id, // Use customId if exists, otherwise Convex ID
+        id: (w.customId && w.customId.trim() !== '') ? w.customId : w._id, // Use non-empty customId, otherwise Convex ID
         name: w.name,
         description: w.description,
         category: w.category,
