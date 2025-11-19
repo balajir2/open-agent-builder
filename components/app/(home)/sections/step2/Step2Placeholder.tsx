@@ -3,6 +3,8 @@
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { listTemplates } from "@/lib/workflow/templates";
+import { useUser } from "@clerk/nextjs";
+import { toast } from "sonner";
 
 interface Step2PlaceholderProps {
   onReset: () => void;
@@ -16,9 +18,11 @@ interface Workflow {
   title: string;
   description?: string;
   createdAt: string;
+  userId?: string;
 }
 
 export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWorkflow, onLoadTemplate }: Step2PlaceholderProps) {
+  const { user } = useUser();
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [teamWorkflows, setTeamWorkflows] = useState<Workflow[]>([]);
   const [activeTab, setActiveTab] = useState<"workflows" | "templates" | "team">("templates");
@@ -36,6 +40,7 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
             title: w.name,
             description: w.description,
             createdAt: new Date(w.updatedAt || w.createdAt).toLocaleDateString(),
+            userId: w.userId,
           })));
         }
       } catch (error) {
@@ -54,6 +59,7 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
             title: w.name,
             description: w.description,
             createdAt: new Date(w.updatedAt || w.createdAt).toLocaleDateString(),
+            userId: w.userId,
           })));
         }
       } catch (error) {
@@ -65,7 +71,36 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
     loadTeamWorkflows();
   }, []);
 
-  const renderWorkflows = (items: Workflow[]) => {
+  const handleDelete = async (e: React.MouseEvent, id: string, isTeam: boolean) => {
+    e.stopPropagation();
+
+    if (!window.confirm("Are you sure you want to delete this workflow?")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/workflows?id=${id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        if (isTeam) {
+          setTeamWorkflows(prev => prev.filter(w => w.id !== id));
+        } else {
+          setWorkflows(prev => prev.filter(w => w.id !== id));
+        }
+        toast.success("Workflow deleted successfully");
+      } else {
+        console.error('Failed to delete workflow');
+        toast.error("Failed to delete workflow");
+      }
+    } catch (error) {
+      console.error('Error deleting workflow:', error);
+      toast.error("Error deleting workflow");
+    }
+  };
+
+  const renderWorkflows = (items: Workflow[], isTeam: boolean = false) => {
     if (items.length > 0) {
       return items.map((workflow, index) => (
         <motion.div
@@ -80,10 +115,24 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
           className="relative cursor-pointer"
           onClick={() => onLoadWorkflow?.(workflow.id)}
         >
-          <div className="bg-accent-white rounded-12 p-24 border border-border-faint hover:border-heat-100 hover:shadow-sm transition-all h-full min-h-[160px] group">
+          <div className="bg-accent-white rounded-12 p-24 border border-border-faint hover:border-heat-100 hover:shadow-sm transition-all h-full min-h-[160px] group relative">
             <div className="absolute inset-0 rounded-12 bg-gradient-to-br from-heat-4 to-transparent opacity-0 group-hover:opacity-10 transition-opacity" />
             <div className="relative">
-              <h3 className="text-label-large text-accent-black font-medium mb-8">{workflow.title}</h3>
+              <div className="flex justify-between items-start mb-8">
+                <h3 className="text-label-large text-accent-black font-medium pr-8">{workflow.title}</h3>
+                {/* Only show delete button if user is the owner */}
+                {user?.id === workflow.userId && (
+                  <button
+                    onClick={(e) => handleDelete(e, workflow.id, isTeam)}
+                    className="text-black-alpha-32 hover:text-red-500 transition-colors p-4 -mr-4 -mt-4 rounded-full hover:bg-red-50"
+                    title="Delete workflow"
+                  >
+                    <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                )}
+              </div>
               {workflow.description && (
                 <p className="text-body-small text-black-alpha-48 mb-12 line-clamp-2">{workflow.description}</p>
               )}
@@ -119,31 +168,28 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
       <div className="flex justify-center gap-8 mb-24">
         <button
           onClick={() => setActiveTab("workflows")}
-          className={`px-20 py-10 rounded-8 text-body-medium transition-all ${
-            activeTab === "workflows"
-              ? "bg-heat-100 text-white"
-              : "bg-background-base text-accent-black hover:bg-black-alpha-4 border border-border-faint"
-          }`}
+          className={`px-20 py-10 rounded-8 text-body-medium transition-all ${activeTab === "workflows"
+            ? "bg-heat-100 text-white"
+            : "bg-background-base text-accent-black hover:bg-black-alpha-4 border border-border-faint"
+            }`}
         >
           Your Workflows ({workflows.length})
         </button>
         <button
           onClick={() => setActiveTab("team")}
-          className={`px-20 py-10 rounded-8 text-body-medium transition-all ${
-            activeTab === "team"
-              ? "bg-heat-100 text-white"
-              : "bg-background-base text-accent-black hover:bg-black-alpha-4 border border-border-faint"
-          }`}
+          className={`px-20 py-10 rounded-8 text-body-medium transition-all ${activeTab === "team"
+            ? "bg-heat-100 text-white"
+            : "bg-background-base text-accent-black hover:bg-black-alpha-4 border border-border-faint"
+            }`}
         >
           Team Workflows ({teamWorkflows.length})
         </button>
         <button
           onClick={() => setActiveTab("templates")}
-          className={`px-20 py-10 rounded-8 text-body-medium transition-all ${
-            activeTab === "templates"
-              ? "bg-heat-100 text-white"
-              : "bg-background-base text-accent-black hover:bg-black-alpha-4 border border-border-faint"
-          }`}
+          className={`px-20 py-10 rounded-8 text-body-medium transition-all ${activeTab === "templates"
+            ? "bg-heat-100 text-white"
+            : "bg-background-base text-accent-black hover:bg-black-alpha-4 border border-border-faint"
+            }`}
         >
           Templates ({templates.length})
         </button>
@@ -176,8 +222,8 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
         </motion.div>
 
         {/* Show Workflows or Templates based on tab */}
-        {activeTab === "workflows" && renderWorkflows(workflows)}
-        {activeTab === "team" && renderWorkflows(teamWorkflows)}
+        {activeTab === "workflows" && renderWorkflows(workflows, false)}
+        {activeTab === "team" && renderWorkflows(teamWorkflows, true)}
         {activeTab === "templates" && (
           templates.map((template, index) => (
             <motion.div
