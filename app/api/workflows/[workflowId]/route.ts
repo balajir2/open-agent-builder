@@ -85,13 +85,33 @@ export async function DELETE(
     const convex = await getAuthenticatedConvexClient();
 
     // Look up by customId to get Convex ID
-    const workflow = await convex.query(api.workflows.getWorkflowByCustomId, {
+    const debugLogs: string[] = [];
+    debugLogs.push(`[DELETE] Attempting to delete workflow: ${workflowId}`);
+
+    let workflow = await convex.query(api.workflows.getWorkflowByCustomId, {
       customId: workflowId,
     });
+    debugLogs.push(`[DELETE] CustomID lookup result: ${workflow ? 'Found' : 'Not Found'}`);
+
+    // If not found, try direct lookup as Convex ID
+    if (!workflow) {
+      debugLogs.push(`[DELETE] Trying direct ID lookup for: ${workflowId}`);
+      try {
+        workflow = await convex.query(api.workflows.getWorkflow, {
+          id: workflowId as any,
+        });
+        debugLogs.push(`[DELETE] Direct ID lookup result: ${workflow ? 'Found' : 'Not Found'}`);
+      } catch (e) {
+        debugLogs.push(`[DELETE] Direct ID lookup failed: ${e}`);
+      }
+    }
 
     if (!workflow) {
       return NextResponse.json(
-        { error: `Workflow ${workflowId} not found` },
+        {
+          error: `Workflow ${workflowId} not found`,
+          debug: debugLogs
+        },
         { status: 404 }
       );
     }
@@ -105,6 +125,7 @@ export async function DELETE(
       success: true,
       source: 'convex',
       message: `Workflow ${workflowId} deleted`,
+      debug: debugLogs
     });
   } catch (error) {
     console.error('Error deleting workflow:', error);

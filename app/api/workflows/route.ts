@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
         updatedAt: w.updatedAt,
         nodeCount: w.nodes?.length || 0,
         edgeCount: w.edges?.length || 0,
+        userId: w.userId,
       })),
       total: workflows.length,
       source: 'convex',
@@ -165,13 +166,13 @@ export async function DELETE(request: NextRequest) {
 
     const convex = await getAuthenticatedConvexClient();
 
-    // Look up workflow by customId first, then try Convex ID
+    // Look up by customId to get Convex ID
     let workflow = await convex.query(api.workflows.getWorkflowByCustomId, {
       customId: workflowId,
     });
 
-    // If not found and looks like Convex ID, try direct lookup
-    if (!workflow && workflowId.startsWith('j')) {
+    // If not found, try direct lookup as Convex ID
+    if (!workflow) {
       try {
         workflow = await convex.query(api.workflows.getWorkflow, {
           id: workflowId as any,
@@ -196,7 +197,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({
       success: true,
       source: 'convex',
-      message: 'Workflow deleted successfully',
+      message: `Workflow ${workflowId} deleted`,
     });
   } catch (error) {
     console.error('Error deleting workflow:', error);
