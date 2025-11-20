@@ -1,67 +1,9 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 
 /**
  * API Key Management for Secure Workflow API Access
  */
-
-// Generate secure random token
-function generateSecureToken(length: number): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
-
-// Simple hash function
-function hashKey(key: string): string {
-  // Simple hash for Convex environment
-  // In production, consider using a more robust hashing method
-  let hash = 0;
-  for (let i = 0; i < key.length; i++) {
-    const char = key.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return 'hash_' + Math.abs(hash).toString(36) + '_' + key.length;
-}
-
-// Generate new API key
-export const generate = mutation({
-  args: {
-    name: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    // Generate secure key
-    const key = `sk_live_${generateSecureToken(32)}`;
-    const keyHash = hashKey(key);
-    const keyPrefix = key.substring(0, 15) + "...";
-
-    const apiKeyId = await ctx.db.insert("apiKeys", {
-      key: keyHash,
-      keyPrefix,
-      userId: identity.subject,
-      name: args.name,
-      usageCount: 0,
-      createdAt: new Date().toISOString(),
-    });
-
-    // Return plain key ONCE (never shown again!)
-    return {
-      id: apiKeyId,
-      key, // Only time user sees this!
-      keyPrefix,
-      name: args.name,
-    };
-  },
-});
 
 // List user's API keys (without actual key values)
 export const list = query({
@@ -105,15 +47,33 @@ export const revoke = mutation({
   },
 });
 
-// Verify API key (called by middleware)
-export const verify = mutation({
-  args: { key: v.string() },
+// Internal mutation to create API key (called from action)
+export const createApiKey = internalMutation({
+  args: {
+    key: v.string(),
+    keyPrefix: v.string(),
+    userId: v.string(),
+    name: v.string(),
+  },
   handler: async (ctx, args) => {
-    const keyHash = hashKey(args.key);
+    return await ctx.db.insert("apiKeys", {
+      key: args.key,
+      keyPrefix: args.keyPrefix,
+      userId: args.userId,
+      name: args.name,
+      usageCount: 0,
+      createdAt: new Date().toISOString(),
+    });
+  },
+});
 
+// Internal mutation to verify and update API key (called from action)
+export const verifyAndUpdateApiKey = internalMutation({
+  args: { keyHash: v.string() },
+  handler: async (ctx, args) => {
     const apiKey = await ctx.db
       .query("apiKeys")
-      .withIndex("by_key", (q) => q.eq("key", keyHash))
+      .withIndex("by_key", (q) => q.eq("key", args.keyHash))
       .first();
 
     if (!apiKey) {

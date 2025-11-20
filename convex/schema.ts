@@ -184,7 +184,23 @@ export default defineSchema({
     .index("by_userProvider", ["userId", "provider"])
     .index("by_active", ["isActive"]),
 
-      // UI Builder configurations - Stores UI components for workflows
+  // User Tool API Keys - Store user's keys for standard tools (Serper, Firecrawl, etc.)
+  userToolKeys: defineTable({
+    userId: v.string(), // Clerk user ID
+    toolId: v.string(), // ID from toolRegistry (e.g., "serper-search")
+    encryptedKey: v.string(), // Encrypted API key
+    keyPrefix: v.string(), // First/last few chars for display
+    isActive: v.boolean(), // Whether this key is currently active
+
+    // Timestamps
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_toolId", ["toolId"])
+    .index("by_userTool", ["userId", "toolId"]),
+
+  // UI Builder configurations - Stores UI components for workflows
   uiBuilderConfigurations: defineTable({
     userId: v.string(), // Clerk user ID who owns this configuration
     workflowId: v.string(), // ID of the workflow this configuration is for

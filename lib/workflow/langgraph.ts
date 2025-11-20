@@ -105,7 +105,7 @@ export class LangGraphExecutor {
     onNodeUpdate?: (nodeId: string, result: NodeExecutionResult) => void,
     apiKeys?: { anthropic?: string; groq?: string; openai?: string; firecrawl?: string; arcade?: string }
   ) {
-    
+
     this.workflow = workflow;
     this.onNodeUpdate = onNodeUpdate;
     this.apiKeys = apiKeys;
@@ -139,7 +139,7 @@ export class LangGraphExecutor {
       fullNodes: this.workflow.nodes,
       fullEdges: this.workflow.edges,
     });
-    
+
     const builder = new StateGraph(WorkflowStateAnnotation);
     this.parallelNodeIds.clear();
     this.edgesBySource = new Map();
@@ -1361,9 +1361,9 @@ const ${node.id} = async (state: typeof StateAnnotation.State) => state.variable
 
   const graphBuilder = `const graph = new StateGraph(StateAnnotation)
 ${nodes.filter(n => {
-  const t = (n.data as any)?.nodeType || n.type;
-  return t !== 'start' && t !== 'end';
-}).map(n => `  .addNode("${n.id}", ${n.id})`).join('\n')}
+    const t = (n.data as any)?.nodeType || n.type;
+    return t !== 'start' && t !== 'end';
+  }).map(n => `  .addNode("${n.id}", ${n.id})`).join('\n')}
   .addNode("end", async (state) => state.variables)
 ${edges.map(e => `  .addEdge("${e.source}", "${e.target}")`).join('\n')}
   .addEdge(START, "${startNode?.id || 'start'}")

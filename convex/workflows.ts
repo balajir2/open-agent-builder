@@ -131,8 +131,31 @@ export const saveWorkflow = mutation({
 // Delete workflow
 export const deleteWorkflow = mutation({
   args: { id: v.id("workflows") },
-  handler: async ({ db }, { id }) => {
-    await db.delete(id);
+  handler: async (ctx, { id }) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (!identity) {
+      throw new Error("Unauthorized: must be authenticated to delete workflows");
+    }
+
+    // Get the workflow to check ownership
+    const workflow = await ctx.db.get(id);
+
+    if (!workflow) {
+      throw new Error("Workflow not found");
+    }
+
+    // Check if user owns this workflow
+    if (workflow.userId && workflow.userId !== identity.subject) {
+      throw new Error("Unauthorized: you can only delete your own workflows");
+    }
+
+    // Prevent deletion of public templates (unless admin in future)
+    if (workflow.isTemplate && workflow.isPublic) {
+      throw new Error("Cannot delete public templates");
+    }
+
+    await ctx.db.delete(id);
     return { success: true };
   },
 });

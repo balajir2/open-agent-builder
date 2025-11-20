@@ -184,10 +184,12 @@ function StyleGuidePageContent() {
                   <HomeHeroBadge />
                   <HomeHeroTitle />
 
-                  <p className="text-center text-body-large">
-                    Build intelligent web scraping workflows powered by AI.
-                    <br className="lg-max:hidden" />
-                    Turn any website into structured, agent-ready data.
+                  <div className="text-center text-body-large">
+                    <p>
+                      Build intelligent web scraping workflows powered by AI.
+                      <br className="lg-max:hidden" />
+                      Turn any website into structured, agent-ready data.
+                    </p>
                     <Link
                       className="bg-black-alpha-4 hover:bg-black-alpha-6 lg:ml-4 rounded-6 px-8 lg:px-6 text-label-large lg-max:py-2 h-30 lg:h-24 block lg-max:mt-8 lg-max:mx-auto lg-max:w-max lg:inline-block gap-4 transition-all"
                       href="https://firecrawl.dev"
@@ -195,7 +197,7 @@ function StyleGuidePageContent() {
                     >
                       AI agent workflows
                     </Link>
-                  </p>
+                  </div>
                 </motion.div>
               ) : (
                 <SignedIn>

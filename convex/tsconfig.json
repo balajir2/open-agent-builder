@@ -3,8 +3,8 @@
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ES2021"],
-    "types": []
+    "lib": ["ES2021", "DOM"],
+    "types": ["node"]
   },
   "include": ["."]
 }

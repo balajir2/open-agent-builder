@@ -3,12 +3,19 @@
 import { motion, AnimatePresence } from "framer-motion";
 import React, { useState, useEffect } from "react";
 import { CheckCircle, XCircle, AlertCircle, Key, Copy, Trash2, Upload, Plug, Plus, ChevronDown, ChevronRight, TestTube, Globe, Brain, Database, Package, Loader2, Shield, Lock, ClipboardPaste, Edit, Eye, EyeOff } from "lucide-react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
 import { useUser } from "@clerk/nextjs";
 import { Id } from "@/convex/_generated/dataModel";
 import PasteConfigModal from "./PasteConfigModal";
+import ToolKeysSettings from "../settings/ToolKeysSettings";
+
+// ... (existing imports)
+
+// ... (inside component)
+
+
 
 interface SettingsPanelProps {
   isOpen: boolean;
@@ -64,14 +71,14 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const [selectedProvider, setSelectedProvider] = useState<'anthropic' | 'openai' | 'groq' | null>(null);
 
   const apiKeys = useQuery(api.apiKeys.list, {});
-  const generateKey = useMutation(api.apiKeys.generate);
+  const generateKey = useAction(api.apiKeysActions.generate);
   const revokeKey = useMutation(api.apiKeys.revoke);
 
   // LLM Keys queries and mutations
   const userLLMKeys = useQuery(api.userLLMKeys.getUserLLMKeys,
     user?.id ? { userId: user.id } : "skip"
   );
-  const upsertLLMKey = useMutation(api.userLLMKeys.upsertLLMKey);
+  const upsertLLMKey = useAction(api.userLLMKeysActions.upsertLLMKey);
   const deleteLLMKey = useMutation(api.userLLMKeys.deleteLLMKey);
   const toggleLLMKeyActive = useMutation(api.userLLMKeys.toggleKeyActive);
 
@@ -138,6 +145,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   return (
     <AnimatePresence>
       <motion.div
+        key="settings-modal"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -200,8 +208,8 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                     {['anthropic', 'openai', 'groq'].map(provider => {
                       const providerKey = userLLMKeys?.find(k => k.provider === provider && k.isActive);
                       const hasEnvKey = provider === 'anthropic' ? serverConfig?.anthropicConfigured :
-                                       provider === 'openai' ? serverConfig?.openaiConfigured :
-                                       serverConfig?.groqConfigured;
+                        provider === 'openai' ? serverConfig?.openaiConfigured :
+                          serverConfig?.groqConfigured;
 
                       return (
                         <div key={provider} className="p-12 bg-background-base rounded-8 border border-border-faint">
@@ -267,6 +275,9 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                     </p>
                   </div>
                 </div>
+
+                {/* Tool API Keys */}
+                <ToolKeysSettings />
 
                 {/* Integrations */}
                 <div>
@@ -547,6 +558,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
       {/* Add MCP Modal */}
       {showAddMCPModal && (
         <AddMCPModal
+          key="add-mcp-modal"
           isOpen={showAddMCPModal}
           onClose={() => {
             setShowAddMCPModal(false);
@@ -619,6 +631,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
       {/* Add/Edit LLM Key Modal */}
       {showAddLLMKey && (
         <AddLLMKeyModal
+          key="add-llm-key-modal"
           isOpen={showAddLLMKey}
           onClose={() => {
             setShowAddLLMKey(false);
@@ -644,6 +657,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
       {/* Paste Config Modal */}
       {showPasteConfigModal && (
         <PasteConfigModal
+          key="paste-config-modal"
           isOpen={showPasteConfigModal}
           onClose={() => setShowPasteConfigModal(false)}
           onSave={async (servers) => {
@@ -1227,8 +1241,8 @@ function AddLLMKeyModal({ isOpen, onClose, selectedProvider, onSave }: AddLLMKey
                 onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
                 placeholder={
                   formData.provider === 'anthropic' ? 'sk-ant-...' :
-                  formData.provider === 'openai' ? 'sk-proj-...' :
-                  'gsk_...'
+                    formData.provider === 'openai' ? 'sk-proj-...' :
+                      'gsk_...'
                 }
                 className="w-full pr-32 px-12 py-8 bg-background-base border border-border-faint rounded-8 text-body-small text-accent-black font-mono"
               />

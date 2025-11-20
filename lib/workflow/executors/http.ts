@@ -1,8 +1,9 @@
 import { WorkflowNode, WorkflowState } from '../types';
 import { substituteVariables } from '../variable-substitution';
+import { validateURLForSSRF, getAllowedDomains, isAllowedDomain } from '../ssrf-protection';
 
 /**
- * Execute HTTP Request Node
+ * Execute HTTP Request Node with SSRF Protection
  */
 export async function executeHTTPNode(
   node: WorkflowNode,
@@ -15,6 +16,23 @@ export async function executeHTTPNode(
     // Substitute variables in URL
     const url = substituteVariables(nodeData.httpUrl || '', state);
     const method = nodeData.httpMethod || 'GET';
+
+    // SSRF Protection: Validate URL
+    const validation = await validateURLForSSRF(url);
+
+    if (!validation.valid) {
+      throw new Error(`SSRF Protection: ${validation.reason}`);
+    }
+
+    // Optional: Check domain whitelist if configured
+    const allowedDomains = getAllowedDomains();
+    if (allowedDomains && allowedDomains.length > 0) {
+      if (!isAllowedDomain(url, allowedDomains)) {
+        throw new Error(
+          `Domain not in whitelist. Allowed domains: ${allowedDomains.join(', ')}`
+        );
+      }
+    }
 
     // Build headers
     const headers: Record<string, string> = {};
@@ -57,10 +75,16 @@ export async function executeHTTPNode(
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
+    // Convert headers to plain object
+    const headersObj: Record<string, string> = {};
+    response.headers.forEach((value, key) => {
+      headersObj[key] = value;
+    });
+
     return {
       status: response.status,
       statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries()),
+      headers: headersObj,
       data: responseData,
       url,
       method,
