@@ -13,7 +13,7 @@ export function safeJsonParse<T = any>(
   fallbackToRaw: boolean = true
 ): T | string {
   if (!content) {
-    return '' as any;
+    return ''; // Return empty string without type assertion
   }
 
   try {
@@ -21,7 +21,7 @@ export function safeJsonParse<T = any>(
   } catch (e) {
     if (fallbackToRaw) {
       // If not valid JSON, return the raw content
-      return content as any;
+      return content; // Return string without type assertion
     }
     throw new Error(
       `Invalid JSON: ${e instanceof Error ? e.message : 'Parse error'}`
@@ -96,10 +96,21 @@ export function normalizeToolResult(
 
   // Handle objects (already parsed)
   if (typeof result === 'object') {
+    let raw: string | undefined;
+    if (includeRaw) {
+      try {
+        raw = JSON.stringify(result);
+      } catch (e) {
+        // Handle circular references or other serialization errors
+        raw = '[Object - Could not serialize: circular reference detected]';
+        console.warn('[normalizeToolResult] Circular reference detected in tool result');
+      }
+    }
+
     return {
       data: result,
       isJson: true,
-      ...(includeRaw && { raw: JSON.stringify(result) }),
+      ...(raw && { raw }),
     };
   }
 
@@ -151,6 +162,18 @@ export function formatToolResultForLLM(result: NormalizedToolResult): string {
     try {
       return JSON.stringify(data, null, 2);
     } catch (e) {
+      // Handle circular references
+      if (e instanceof Error && e.message.includes('circular')) {
+        console.warn('[formatToolResultForLLM] Circular reference detected, using fallback');
+        // Try to extract useful information without full serialization
+        if (Array.isArray(data)) {
+          return `[Array with ${data.length} items - contains circular reference]`;
+        }
+        if (typeof data === 'object' && data !== null) {
+          const keys = Object.keys(data);
+          return `{Object with keys: ${keys.join(', ')} - contains circular reference}`;
+        }
+      }
       // Fallback to string representation
       return String(data);
     }
@@ -177,24 +200,52 @@ export function wrapToolFunction<TInput = any, TOutput = any>(
     name?: string;
     /** Normalize the result */
     normalize?: boolean;
+    /** Maximum response size in bytes (default: 10MB) */
+    maxSize?: number;
   } = {}
 ): (input: TInput) => Promise<string> {
-  const { name = 'unknown', normalize = true } = options;
+  const { name = 'unknown', normalize = true, maxSize = 10 * 1024 * 1024 } = options;
 
   return async (input: TInput): Promise<string> => {
     try {
       const result = await toolFn(input);
 
+      // Convert result to string to check size
+      let stringResult: string;
       if (!normalize) {
-        return typeof result === 'string' ? result : JSON.stringify(result);
+        stringResult = typeof result === 'string' ? result : JSON.stringify(result);
+      } else {
+        const normalized = normalizeToolResult(result, { includeRaw: false });
+        stringResult = formatToolResultForLLM(normalized);
       }
 
-      const normalized = normalizeToolResult(result, { includeRaw: false });
-      return formatToolResultForLLM(normalized);
+      // Check response size
+      const sizeInBytes = Buffer.byteLength(stringResult, 'utf8');
+      if (sizeInBytes > maxSize) {
+        const sizeMB = (sizeInBytes / (1024 * 1024)).toFixed(2);
+        const maxSizeMB = (maxSize / (1024 * 1024)).toFixed(2);
+        console.error(`[Tool: ${name}] Response too large: ${sizeMB}MB (max: ${maxSizeMB}MB)`);
+        return `Error: Tool response too large (${sizeMB}MB). Maximum allowed: ${maxSizeMB}MB. Please refine your query to get a smaller result.`;
+      }
+
+      return stringResult;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`[Tool: ${name}] Error:`, error);
-      return `Error executing ${name}: ${errorMessage}`;
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      console.error(`[Tool: ${name}] Error:`, {
+        message: errorMessage,
+        stack: errorStack,
+        input: typeof input === 'string' ? input.substring(0, 100) : '[complex input]',
+      });
+
+      // Return structured error for better handling
+      return JSON.stringify({
+        error: true,
+        message: errorMessage,
+        tool: name,
+        timestamp: new Date().toISOString(),
+      });
     }
   };
 }
@@ -254,12 +305,30 @@ export function validateToolResult(
   }
 
   // Check required fields (for objects)
-  if (requiredFields.length > 0 && typeof result === 'object') {
+  if (requiredFields.length > 0 && typeof result === 'object' && result !== null) {
     for (const field of requiredFields) {
+      // Check if field exists
       if (!(field in result)) {
         return {
           valid: false,
           error: `Missing required field: ${field}`,
+        };
+      }
+
+      // Check if field has a value (not null or undefined)
+      const value = (result as any)[field];
+      if (value === null || value === undefined) {
+        return {
+          valid: false,
+          error: `Required field '${field}' is null or undefined`,
+        };
+      }
+
+      // Check if string fields are not empty
+      if (typeof value === 'string' && value.trim() === '') {
+        return {
+          valid: false,
+          error: `Required field '${field}' is an empty string`,
         };
       }
     }

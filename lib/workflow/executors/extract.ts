@@ -35,7 +35,18 @@ export async function executeExtractNode(
       const contextData = typeof lastOutput === 'string'
         ? lastOutput
         : JSON.stringify(lastOutput, null, 2);
-      fullPrompt = `${fullPrompt}\n\nData to extract from:\n${contextData.substring(0, 10000)}`;
+
+      const maxLength = 10000;
+      const truncated = contextData.substring(0, maxLength);
+      const wasTruncated = contextData.length > maxLength;
+
+      fullPrompt = `${fullPrompt}\n\nData to extract from:\n${truncated}`;
+
+      if (wasTruncated) {
+        const originalLength = contextData.length;
+        console.warn(`[Extract] Input truncated from ${originalLength} to ${maxLength} characters`);
+        fullPrompt += `\n\n[Note: Input was truncated from ${originalLength} to ${maxLength} characters due to length limits]`;
+      }
     }
 
     // Parse JSON schema
@@ -54,7 +65,7 @@ export async function executeExtractNode(
         type: 'mcp' as const,
         server_label: mcp.name,
         server_url: mcp.url.includes('{FIRECRAWL_API_KEY}')
-          ? mcp.url.replace('{FIRECRAWL_API_KEY}', apiKeys?.firecrawl || '')
+          ? mcp.url.replace('{FIRECRAWL_API_KEY}', encodeURIComponent(apiKeys?.firecrawl || ''))
           : mcp.url,
         authorization: mcp.accessToken ? `Bearer ${mcp.accessToken}` : undefined,
         require_approval: 'never' as const,

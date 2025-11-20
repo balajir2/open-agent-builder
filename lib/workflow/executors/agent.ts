@@ -75,9 +75,11 @@ export async function executeAgentNode(
         }
       }
     }
-    console.log(`[TAVILY DEBUG] Tools created: ${standardTools.length}`, standardTools.map(t => t?.name || 'unnamed'));
-    console.log(`[TAVILY DEBUG] Selected tools config:`, data.selectedTools);
-    console.log(`[TAVILY DEBUG] Tavily API key present:`, !!apiKeys?.tavily);
+    // Debug logging (only in development)
+    if (process.env.DEBUG_TOOLS || process.env.NODE_ENV === 'development') {
+      console.log(`[Tools] Created ${standardTools.length} tools:`, standardTools.map(t => t?.name || 'unnamed'));
+      console.log(`[Tools] Selected tools config:`, data.selectedTools);
+    }
 
 
     // Validate API keys are provided
@@ -183,7 +185,7 @@ export async function executeAgentNode(
         const mcpServers = realMcpTools.map((mcp: any) => ({
           type: 'url' as const,
           url: mcp.url.includes('{FIRECRAWL_API_KEY}')
-            ? mcp.url.replace('{FIRECRAWL_API_KEY}', apiKeys.firecrawl || '')
+            ? mcp.url.replace('{FIRECRAWL_API_KEY}', encodeURIComponent(apiKeys.firecrawl || ''))
             : mcp.url,
           name: mcp.name,
           authorization_token: mcp.accessToken,
@@ -692,6 +694,140 @@ export async function executeAgentNode(
           configuration: {
             baseURL: 'https://api.groq.com/openai/v1',
           },
+        });
+
+        const response = await model.invoke(messages);
+        responseText = response.content as string;
+        usage = response.response_metadata?.usage || {};
+      }
+    } else if (provider === 'google' && apiKeys?.google) {
+      // Google Gemini implementation
+      const { ChatGoogleGenerativeAI } = await import('@langchain/google-genai');
+
+      if (hasMcpTools || standardTools.length > 0) {
+        // Gemini with tools
+        const model = new ChatGoogleGenerativeAI({
+          apiKey: apiKeys.google,
+          modelName: modelName,
+        });
+
+        // Convert both MCP and standard tools to OpenAI format
+        // LangChain will handle the conversion to Gemini's format internally
+        const tools = [
+          ...mcpTools.map((mcp: any) => ({
+            type: "function" as const,
+            function: {
+              name: mcp.name || mcp.toolName || 'unknown_tool',
+              description: mcp.description || 'No description',
+              parameters: {
+                type: "object",
+                properties: mcp.schema?.properties || {},
+                required: mcp.schema?.required || []
+              }
+            }
+          })),
+          ...standardTools.map(tool => convertToOpenAITool(tool))
+        ];
+
+        const response = await model.invoke(messages, {
+          tools: tools as any,
+        });
+
+        usage = response.response_metadata?.usage || {};
+
+        // Check for tool calls
+        if (response.tool_calls && response.tool_calls.length > 0) {
+          const toolResults = await Promise.all(
+            response.tool_calls.map(async (call: any) => {
+              try {
+                // Check MCP tools first
+                const mcpServer = mcpTools.find((m: any) =>
+                  (m.name || m.toolName) === call.name
+                );
+
+                if (mcpServer) {
+                  const args = call.args;
+
+                  const mcpResponse = await fetch(mcpServer.url, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      ...(mcpServer.authToken && { 'Authorization': `Bearer ${mcpServer.authToken}` })
+                    },
+                    body: JSON.stringify({
+                      jsonrpc: '2.0',
+                      id: Date.now(),
+                      method: 'tools/call',
+                      params: {
+                        name: mcpServer.name || mcpServer.toolName,
+                        arguments: args
+                      }
+                    })
+                  });
+
+                  const mcpResult = await mcpResponse.json();
+                  return {
+                    tool_call_id: call.id,
+                    role: "tool" as const,
+                    content: JSON.stringify(mcpResult.result || mcpResult)
+                  };
+                }
+
+                // Check standard tools
+                const standardTool = standardTools.find(t => t.name === call.name);
+                if (standardTool) {
+                  const result = await standardTool.invoke(call.args);
+                  return {
+                    tool_call_id: call.id,
+                    role: "tool" as const,
+                    content: typeof result === 'string' ? result : JSON.stringify(result)
+                  };
+                }
+
+                return {
+                  tool_call_id: call.id,
+                  role: "tool" as const,
+                  content: JSON.stringify({ error: 'Tool not found' })
+                };
+              } catch (error) {
+                return {
+                  tool_call_id: call.id,
+                  role: "tool" as const,
+                  content: JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' })
+                };
+              }
+            })
+          );
+
+          // Get final response with tool results
+          const finalResponse = await model.invoke([
+            ...messages as any,
+            response,
+            ...toolResults
+          ]);
+
+          responseText = finalResponse.content as string;
+          usage = {
+            ...usage,
+            prompt_tokens: (usage.prompt_tokens || 0) + (finalResponse.response_metadata?.usage?.prompt_tokens || 0),
+            completion_tokens: (usage.completion_tokens || 0) + (finalResponse.response_metadata?.usage?.completion_tokens || 0),
+            total_tokens: (usage.total_tokens || 0) + (finalResponse.response_metadata?.usage?.total_tokens || 0),
+          };
+
+          toolCalls = response.tool_calls.map((call: any, idx) => ({
+            id: call.id,
+            name: call.name,
+            arguments: call.args,
+            output: toolResults[idx] ? parseToolCallResult(toolResults[idx].content) : null
+          }));
+        } else {
+          responseText = response.content as string;
+        }
+      } else {
+        // Regular Gemini call without tools
+        const model = new ChatGoogleGenerativeAI({
+          apiKey: apiKeys.google,
+          modelName: modelName,
         });
 
         const response = await model.invoke(messages);
