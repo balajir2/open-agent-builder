@@ -74,30 +74,37 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
   const handleDelete = async (e: React.MouseEvent, id: string, isTeam: boolean) => {
     e.stopPropagation();
 
-    if (!window.confirm("Are you sure you want to delete this workflow?")) {
-      return;
-    }
+    toast("Are you sure you want to delete this workflow?", {
+      action: {
+        label: "Delete",
+        onClick: async () => {
+          try {
+            const response = await fetch(`/api/workflows?id=${id}`, {
+              method: 'DELETE',
+            });
 
-    try {
-      const response = await fetch(`/api/workflows?id=${id}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        if (isTeam) {
-          setTeamWorkflows(prev => prev.filter(w => w.id !== id));
-        } else {
-          setWorkflows(prev => prev.filter(w => w.id !== id));
-        }
-        toast.success("Workflow deleted successfully");
-      } else {
-        console.error('Failed to delete workflow');
-        toast.error("Failed to delete workflow");
-      }
-    } catch (error) {
-      console.error('Error deleting workflow:', error);
-      toast.error("Error deleting workflow");
-    }
+            if (response.ok) {
+              if (isTeam) {
+                setTeamWorkflows(prev => prev.filter(w => w.id !== id));
+              } else {
+                setWorkflows(prev => prev.filter(w => w.id !== id));
+              }
+              toast.success("Workflow deleted successfully");
+            } else {
+              console.error('Failed to delete workflow');
+              toast.error("Failed to delete workflow");
+            }
+          } catch (error) {
+            console.error('Error deleting workflow:', error);
+            toast.error("Error deleting workflow");
+          }
+        },
+      },
+      cancel: {
+        label: "Cancel",
+        onClick: () => { },
+      },
+    });
   };
 
   const renderWorkflows = (items: Workflow[], isTeam: boolean = false) => {

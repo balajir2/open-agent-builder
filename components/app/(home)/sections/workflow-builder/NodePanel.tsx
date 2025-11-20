@@ -10,6 +10,8 @@ import { api } from "@/convex/_generated/api";
 import { useUser } from "@clerk/nextjs";
 import { Id } from "@/convex/_generated/dataModel";
 import FirecrawlLogo from "@/components/icons/FirecrawlLogo";
+import { toolRegistry, getToolsByCategory } from "@/lib/tools/registry";
+import { ToolConfig } from "@/lib/tools/types";
 
 interface NodePanelProps {
   nodeData: {
@@ -49,6 +51,11 @@ export default function NodePanel({
 
   // Fetch user's LLM API keys to determine available models
   const userLLMKeys = useQuery(api.userLLMKeys.getUserLLMKeys,
+    user?.id ? { userId: user.id } : "skip"
+  );
+
+  // Fetch configured tool keys
+  const configuredToolKeys = useQuery(api.userToolKeys.getUserToolKeys,
     user?.id ? { userId: user.id } : "skip"
   );
 
@@ -142,8 +149,8 @@ export default function NodePanel({
 
                   const urlMatch = toolUrlNormalized === serverUrlNormalized ||
                     (toolUrlNormalized && serverUrlNormalized &&
-                     (toolUrlNormalized.includes(serverUrlNormalized) ||
-                      serverUrlNormalized.includes(toolUrlNormalized)));
+                      (toolUrlNormalized.includes(serverUrlNormalized) ||
+                        serverUrlNormalized.includes(toolUrlNormalized)));
 
                   const nameMatch = server.name?.toLowerCase() === tool.name?.toLowerCase() ||
                     server.label?.toLowerCase() === tool.label?.toLowerCase();
@@ -182,6 +189,8 @@ export default function NodePanel({
   const [schemaFields, setSchemaFields] = useState<
     Array<{ name: string; type: string; required: boolean }>
   >([{ name: "result", type: "string", required: false }]);
+  const [selectedTools, setSelectedTools] = useState<ToolConfig[]>([]);
+  const [showStandardTools, setShowStandardTools] = useState(false);
   const lastLoadedNodeId = useRef<string | null>(null);
   const lastSyncedInstructionsRef = useRef<string | null>(null);
 
@@ -205,6 +214,7 @@ export default function NodePanel({
       setModel(data.model || "anthropic/claude-sonnet-4-5-20250929");
       setOutputFormat(data.outputFormat || "Text");
       setShowSearchSources(data.showSearchSources ?? false);
+      setSelectedTools(data.selectedTools || []);
       lastSyncedInstructionsRef.current = incomingInstructions;
 
       // Initialize MCP servers from node data
@@ -232,8 +242,8 @@ export default function NodePanel({
                   // Match by URL (exact match after normalization)
                   const urlMatch = toolUrlNormalized === serverUrlNormalized ||
                     (toolUrlNormalized && serverUrlNormalized &&
-                     toolUrlNormalized.includes(serverUrlNormalized.split('/')[0]) ||
-                     serverUrlNormalized.includes(toolUrlNormalized.split('/')[0]));
+                      toolUrlNormalized.includes(serverUrlNormalized.split('/')[0]) ||
+                      serverUrlNormalized.includes(toolUrlNormalized.split('/')[0]));
 
                   // Match by name (case-insensitive)
                   const nameMatch = server.name?.toLowerCase() === tool.name?.toLowerCase() ||
@@ -331,6 +341,7 @@ export default function NodePanel({
           showSearchSources,
           mcpTools: mcpTools.length > 0 ? mcpTools : undefined,
           mcpServerIds: currentMCPServerIds.length > 0 ? currentMCPServerIds : undefined,
+          selectedTools: selectedTools.length > 0 ? selectedTools : undefined,
         });
       } catch (error) {
         console.error("Error updating node:", error);
@@ -348,6 +359,7 @@ export default function NodePanel({
     showSearchSources,
     currentMCPServerIds,
     mcpServers,
+    selectedTools,
   ]);
 
   return (
@@ -470,9 +482,8 @@ export default function NodePanel({
               </label>
               <button
                 onClick={() => setIncludeChatHistory(!includeChatHistory)}
-                className={`w-48 h-28 rounded-full transition-colors relative ${
-                  includeChatHistory ? "bg-heat-100" : "bg-black-alpha-12"
-                }`}
+                className={`w-48 h-28 rounded-full transition-colors relative ${includeChatHistory ? "bg-heat-100" : "bg-black-alpha-12"
+                  }`}
               >
                 <motion.div
                   className="w-24 h-24 bg-white rounded-full absolute top-2 shadow-sm"
@@ -503,9 +514,8 @@ export default function NodePanel({
                   )}
                 </span>
                 <ChevronDown
-                  className={`w-16 h-16 text-black-alpha-48 transition-transform ${
-                    showModelsDropdown ? 'rotate-180' : ''
-                  }`}
+                  className={`w-16 h-16 text-black-alpha-48 transition-transform ${showModelsDropdown ? 'rotate-180' : ''
+                    }`}
                 />
               </button>
 
@@ -532,11 +542,10 @@ export default function NodePanel({
                             setModel(modelOption.id);
                             setShowModelsDropdown(false);
                           }}
-                          className={`w-full text-left px-8 py-6 rounded-6 text-sm transition-colors ${
-                            model === modelOption.id
-                              ? 'bg-heat-100 text-white'
-                              : 'hover:bg-black-alpha-4 text-accent-black'
-                          }`}
+                          className={`w-full text-left px-8 py-6 rounded-6 text-sm transition-colors ${model === modelOption.id
+                            ? 'bg-heat-100 text-white'
+                            : 'hover:bg-black-alpha-4 text-accent-black'
+                            }`}
                         >
                           {modelOption.name}
                         </button>
@@ -544,37 +553,36 @@ export default function NodePanel({
                     </div>
                   ))}
 
-                      {/* Info about API keys */}
-                      <div className="pt-8 mt-8 border-t border-border-faint">
-                        <p className="text-xs text-black-alpha-48 mb-8 px-8">
-                          Models with "Using env" use environment variables. Add your own keys in Settings for better control.
-                        </p>
-                        <button
-                          onClick={() => {
-                            setShowModelsDropdown(false);
-                            onOpenSettings?.();
-                          }}
-                          className="w-full text-left px-8 py-6 rounded-6 text-sm transition-colors hover:bg-black-alpha-4 text-heat-100 font-medium"
-                        >
-                          ⚙️ Configure API Keys
-                        </button>
-                      </div>
+                  {/* Info about API keys */}
+                  <div className="pt-8 mt-8 border-t border-border-faint">
+                    <p className="text-xs text-black-alpha-48 mb-8 px-8">
+                      Models with "Using env" use environment variables. Add your own keys in Settings for better control.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setShowModelsDropdown(false);
+                        onOpenSettings?.();
+                      }}
+                      className="w-full text-left px-8 py-6 rounded-6 text-sm transition-colors hover:bg-black-alpha-4 text-heat-100 font-medium"
+                    >
+                      ⚙️ Configure API Keys
+                    </button>
+                  </div>
 
-                      <div className="pt-8 border-t border-border-faint">
-                        <button
-                          onClick={() => {
-                            setModel("custom");
-                            setShowModelsDropdown(false);
-                          }}
-                          className={`w-full text-left px-8 py-6 rounded-6 text-sm transition-colors ${
-                            model === "custom"
-                              ? 'bg-heat-100 text-white'
-                              : 'hover:bg-black-alpha-4 text-accent-black'
-                          }`}
-                        >
-                          Custom Model...
-                        </button>
-                      </div>
+                  <div className="pt-8 border-t border-border-faint">
+                    <button
+                      onClick={() => {
+                        setModel("custom");
+                        setShowModelsDropdown(false);
+                      }}
+                      className={`w-full text-left px-8 py-6 rounded-6 text-sm transition-colors ${model === "custom"
+                        ? 'bg-heat-100 text-white'
+                        : 'hover:bg-black-alpha-4 text-accent-black'
+                        }`}
+                    >
+                      Custom Model...
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -788,11 +796,10 @@ export default function NodePanel({
                                         toast.success(`Added ${server.name} to this agent`);
                                       }
                                     }}
-                                    className={`px-12 py-8 rounded-8 text-xs font-medium transition-colors ${
-                                      isConnected
-                                        ? 'bg-accent-white border border-border-faint text-accent-black hover:bg-black-alpha-4'
-                                        : 'bg-heat-100 text-white hover:bg-heat-200'
-                                    }`}
+                                    className={`px-12 py-8 rounded-8 text-xs font-medium transition-colors ${isConnected
+                                      ? 'bg-accent-white border border-border-faint text-accent-black hover:bg-black-alpha-4'
+                                      : 'bg-heat-100 text-white hover:bg-heat-200'
+                                      }`}
                                   >
                                     {isConnected ? 'Remove' : 'Add'}
                                   </button>
@@ -896,6 +903,214 @@ export default function NodePanel({
                 <div className="p-16 bg-background-base rounded-10 border border-border-faint text-center">
                   <p className="text-sm text-black-alpha-48">No MCP servers connected</p>
                 </div>
+              )}
+            </div>
+
+            {/* Standard Tools Field */}
+            <div>
+              <div className="flex items-center justify-between mb-8">
+                <label className="block text-sm font-medium text-black-alpha-48">
+                  Standard Tools
+                </label>
+                <button
+                  onClick={() => setShowStandardTools(!showStandardTools)}
+                  className="w-32 h-32 rounded-6 hover:bg-black-alpha-4 transition-colors flex items-center justify-center"
+                  title="Add standard tools"
+                >
+                  <svg
+                    className={`w-18 h-18 text-black-alpha-48 transition-transform ${showStandardTools ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Selected Tools List */}
+              {selectedTools.length > 0 && (
+                <div className="space-y-8 mb-12">
+                  {selectedTools.map((toolConfig) => {
+                    const toolDef = toolRegistry.find(t => t.id === toolConfig.toolId);
+                    if (!toolDef) return null;
+
+                    return (
+                      <div key={toolConfig.toolId} className="bg-background-base rounded-10 border border-border-faint overflow-hidden">
+                        <div className="px-14 py-10 flex items-center justify-between">
+                          <div className="flex items-center gap-8">
+                            {toolDef.icon && <toolDef.icon className="w-14 h-14 text-black-alpha-64" />}
+                            <span className="text-sm text-accent-black font-medium">{toolDef.label}</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setSelectedTools(prev => prev.filter(t => t.toolId !== toolConfig.toolId));
+                            }}
+                            className="text-xs text-red-500 hover:text-red-600 font-medium"
+                          >
+                            Remove
+                          </button>
+                        </div>
+
+                        {/* Tool Configuration Fields */}
+                        {toolDef.fields.length > 0 && (
+                          <div className="px-14 pb-14 space-y-8 border-t border-border-faint pt-8">
+                            {toolDef.fields.map(field => (
+                              <div key={field.name}>
+                                <label className="block text-xs text-black-alpha-48 mb-4">
+                                  {field.label} {field.required && <span className="text-red-500">*</span>}
+                                </label>
+                                {field.type === 'select' ? (
+                                  <select
+                                    value={toolConfig.config[field.name] || field.defaultValue || ''}
+                                    onChange={(e) => {
+                                      const newConfig = { ...toolConfig.config, [field.name]: e.target.value };
+                                      setSelectedTools(prev => prev.map(t =>
+                                        t.toolId === toolConfig.toolId ? { ...t, config: newConfig } : t
+                                      ));
+                                    }}
+                                    className="w-full px-10 py-6 bg-accent-white border border-border-faint rounded-6 text-xs text-accent-black focus:outline-none focus:border-heat-100"
+                                  >
+                                    {field.options?.map(opt => (
+                                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    ))}
+                                  </select>
+                                ) : field.type === 'boolean' ? (
+                                  <div className="flex items-center gap-8">
+                                    <button
+                                      onClick={() => {
+                                        const newVal = !toolConfig.config[field.name];
+                                        const newConfig = { ...toolConfig.config, [field.name]: newVal };
+                                        setSelectedTools(prev => prev.map(t =>
+                                          t.toolId === toolConfig.toolId ? { ...t, config: newConfig } : t
+                                        ));
+                                      }}
+                                      className={`w-36 h-20 rounded-full transition-colors relative ${toolConfig.config[field.name] ? "bg-heat-100" : "bg-black-alpha-12"
+                                        }`}
+                                    >
+                                      <motion.div
+                                        className="w-16 h-16 bg-white rounded-full absolute top-2 shadow-sm"
+                                        animate={{ left: toolConfig.config[field.name] ? "18px" : "2px" }}
+                                        transition={{ duration: 0.2 }}
+                                      />
+                                    </button>
+                                    <span className="text-xs text-black-alpha-64">
+                                      {toolConfig.config[field.name] ? 'Enabled' : 'Disabled'}
+                                    </span>
+                                  </div>
+                                ) : field.global ? (
+                                  // Global Field (API Key) - Show status instead of input
+                                  <div className="flex items-center justify-between bg-accent-white border border-border-faint rounded-6 px-10 py-6">
+                                    <div className="flex items-center gap-6">
+                                      {configuredToolKeys?.some(k => k.toolId === toolConfig.toolId && k.isActive) ? (
+                                        <>
+                                          <div className="w-6 h-6 rounded-full bg-green-500" />
+                                          <span className="text-xs text-accent-black font-medium">Ready to use</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <div className="w-6 h-6 rounded-full bg-orange-500" />
+                                          <span className="text-xs text-orange-600 font-medium">API Key required</span>
+                                        </>
+                                      )}
+                                    </div>
+                                    <button
+                                      onClick={() => onOpenSettings?.()}
+                                      className="text-[10px] font-medium text-heat-100 hover:text-heat-200 hover:underline"
+                                    >
+                                      Configure in Settings
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <input
+                                    type={field.type === 'secret' ? 'password' : 'text'}
+                                    value={toolConfig.config[field.name] || ''}
+                                    onChange={(e) => {
+                                      const newConfig = { ...toolConfig.config, [field.name]: e.target.value };
+                                      setSelectedTools(prev => prev.map(t =>
+                                        t.toolId === toolConfig.toolId ? { ...t, config: newConfig } : t
+                                      ));
+                                    }}
+                                    placeholder={field.placeholder}
+                                    className="w-full px-10 py-6 bg-accent-white border border-border-faint rounded-6 text-xs text-accent-black placeholder-black-alpha-32 focus:outline-none focus:border-heat-100"
+                                  />
+                                )}
+                                {field.description && (
+                                  <p className="text-[10px] text-black-alpha-32 mt-2">{field.description}</p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Tool Selector */}
+              {showStandardTools && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mb-12 p-12 bg-[#f4f4f5] rounded-12 border border-border-faint"
+                >
+                  {['web-search', 'scraping', 'extraction'].map(category => {
+                    const tools = getToolsByCategory(category);
+                    if (tools.length === 0) return null;
+
+                    return (
+                      <div key={category} className="mb-12 last:mb-0">
+                        <h5 className="text-xs font-semibold text-black-alpha-48 uppercase tracking-wider mb-6">
+                          {category.replace('-', ' ')}
+                        </h5>
+                        <div className="space-y-4">
+                          {tools.map(tool => {
+                            const isSelected = selectedTools.some(t => t.toolId === tool.id);
+                            return (
+                              <button
+                                key={tool.id}
+                                onClick={() => {
+                                  if (!isSelected) {
+                                    // Initialize with defaults
+                                    const initialConfig: Record<string, any> = {};
+                                    tool.fields.forEach(f => {
+                                      if (f.defaultValue !== undefined) initialConfig[f.name] = f.defaultValue;
+                                    });
+
+                                    setSelectedTools(prev => [...prev, {
+                                      toolId: tool.id,
+                                      enabled: true,
+                                      config: initialConfig
+                                    }]);
+                                    setShowStandardTools(false);
+                                  }
+                                }}
+                                disabled={isSelected}
+                                className={`w-full text-left px-10 py-8 rounded-8 flex items-center gap-8 transition-colors ${isSelected
+                                  ? 'opacity-50 cursor-not-allowed bg-black-alpha-4'
+                                  : 'hover:bg-white hover:shadow-sm'
+                                  }`}
+                              >
+                                {tool.icon && <tool.icon className="w-14 h-14 text-black-alpha-64" />}
+                                <div>
+                                  <div className="text-sm font-medium text-accent-black">{tool.label}</div>
+                                  <div className="text-xs text-black-alpha-48">{tool.description}</div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </motion.div>
               )}
             </div>
 
