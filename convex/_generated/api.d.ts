@@ -18,6 +18,7 @@ import type * as templates from "../templates.js";
 import type * as uiBuilderConfigurations from "../uiBuilderConfigurations.js";
 import type * as userLLMKeys from "../userLLMKeys.js";
 import type * as userMCPs from "../userMCPs.js";
+import type * as userToolKeys from "../userToolKeys.js";
 import type * as workflows from "../workflows.js";
 
 import type {
@@ -45,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   uiBuilderConfigurations: typeof uiBuilderConfigurations;
   userLLMKeys: typeof userLLMKeys;
   userMCPs: typeof userMCPs;
+  userToolKeys: typeof userToolKeys;
   workflows: typeof workflows;
 }>;
 declare const fullApiWithMounts: typeof fullApi;

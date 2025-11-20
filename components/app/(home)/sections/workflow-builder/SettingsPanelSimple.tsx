@@ -8,7 +8,13 @@ import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
 import { useUser } from "@clerk/nextjs";
 import { Id } from "@/convex/_generated/dataModel";
-import PasteConfigModal from "./PasteConfigModal";
+import ToolKeysSettings from "../settings/ToolKeysSettings";
+
+// ... (existing imports)
+
+// ... (inside component)
+
+
 
 interface SettingsPanelProps {
   isOpen: boolean;
@@ -201,8 +207,8 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                     {['anthropic', 'openai', 'groq'].map(provider => {
                       const providerKey = userLLMKeys?.find(k => k.provider === provider && k.isActive);
                       const hasEnvKey = provider === 'anthropic' ? serverConfig?.anthropicConfigured :
-                                       provider === 'openai' ? serverConfig?.openaiConfigured :
-                                       serverConfig?.groqConfigured;
+                        provider === 'openai' ? serverConfig?.openaiConfigured :
+                          serverConfig?.groqConfigured;
 
                       return (
                         <div key={provider} className="p-12 bg-background-base rounded-8 border border-border-faint">
@@ -268,6 +274,9 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                     </p>
                   </div>
                 </div>
+
+                {/* Tool API Keys */}
+                <ToolKeysSettings />
 
                 {/* Integrations */}
                 <div>
@@ -1231,8 +1240,8 @@ function AddLLMKeyModal({ isOpen, onClose, selectedProvider, onSave }: AddLLMKey
                 onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
                 placeholder={
                   formData.provider === 'anthropic' ? 'sk-ant-...' :
-                  formData.provider === 'openai' ? 'sk-proj-...' :
-                  'gsk_...'
+                    formData.provider === 'openai' ? 'sk-proj-...' :
+                      'gsk_...'
                 }
                 className="w-full pr-32 px-12 py-8 bg-background-base border border-border-faint rounded-8 text-body-small text-accent-black font-mono"
               />
