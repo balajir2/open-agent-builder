@@ -40,12 +40,34 @@ export class ToolFactory {
                 });
 
             case "serper-search":
-                if (!apiKeys.serper) return null;
-                return new Serper(apiKeys.serper);
+                if (!apiKeys.serper) {
+                    console.warn('[ToolFactory] Missing Serper API key');
+                    return null;
+                }
+                // Wrap LangChain's Serper tool for consistent error handling
+                const serperTool = new Serper(apiKeys.serper);
+                return new DynamicTool({
+                    name: serperTool.name,
+                    description: serperTool.description,
+                    func: wrapToolFunction(async (input: string) => {
+                        return await serperTool.call(input);
+                    }, { name: "serper_search" }),
+                });
 
             case "serpapi-search":
-                if (!apiKeys.serpapi) return null;
-                return new SerpAPI(apiKeys.serpapi);
+                if (!apiKeys.serpapi) {
+                    console.warn('[ToolFactory] Missing SerpAPI key');
+                    return null;
+                }
+                // Wrap LangChain's SerpAPI tool for consistent error handling
+                const serpApiTool = new SerpAPI(apiKeys.serpapi);
+                return new DynamicTool({
+                    name: serpApiTool.name,
+                    description: serpApiTool.description,
+                    func: wrapToolFunction(async (input: string) => {
+                        return await serpApiTool.call(input);
+                    }, { name: "serpapi_search" }),
+                });
 
             case "scraperapi":
                 if (!apiKeys.scraperapi) return null;
