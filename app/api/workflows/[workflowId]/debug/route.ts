@@ -8,14 +8,14 @@ import { api } from '@/convex/_generated/api';
  */
 export async function GET(
   request: Request,
-  { params }: { params: { workflowId: string } }
+  { params }: { params: Promise<{ workflowId: string }> }
 ) {
-  const { workflowId } = params;
-  
+  const { workflowId } = await params;
+
   try {
     // Initialize Convex client
     const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
-    
+
     // Get workflow
     let workflow;
     try {

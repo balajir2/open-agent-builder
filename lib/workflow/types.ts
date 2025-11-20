@@ -23,6 +23,7 @@ export interface NodeData {
   jsonOutputSchema?: string;
   jsonSchema?: any;
   mcpTools?: any[];
+  selectedTools?: import('../../lib/tools/types').ToolConfig[]; // Standard tools configuration
   systemPrompt?: string;
 
   // MCP node data
