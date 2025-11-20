@@ -74,6 +74,10 @@ export async function executeAgentNode(
         }
       }
     }
+    console.log(`[TAVILY DEBUG] Tools created: ${standardTools.length}`, standardTools.map(t => t?.name || 'unnamed'));
+    console.log(`[TAVILY DEBUG] Selected tools config:`, data.selectedTools);
+    console.log(`[TAVILY DEBUG] Tavily API key present:`, !!apiKeys?.tavily);
+
 
     // Validate API keys are provided
     if (!apiKeys) {
