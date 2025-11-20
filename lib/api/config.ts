@@ -7,6 +7,7 @@ export interface APIKeys {
   anthropic?: string;
   groq?: string;
   openai?: string;
+  google?: string;  // Google Gemini
   firecrawl?: string;
   arcade?: string;
   e2b?: string;
@@ -26,6 +27,7 @@ export function getServerAPIKeys(): APIKeys {
     anthropic: process.env.ANTHROPIC_API_KEY,
     groq: process.env.GROQ_API_KEY,
     openai: process.env.OPENAI_API_KEY,
+    google: process.env.GOOGLE_API_KEY,
     firecrawl: process.env.FIRECRAWL_API_KEY,
     arcade: process.env.ARCADE_API_KEY,
     e2b: process.env.E2B_API_KEY,
@@ -41,6 +43,6 @@ export function getServerAPIKeys(): APIKeys {
  * Check if required API keys are configured
  */
 export function hasServerAPIKeys(): boolean {
-  const hasLLMKey = !!(process.env.ANTHROPIC_API_KEY || process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY);
+  const hasLLMKey = !!(process.env.ANTHROPIC_API_KEY || process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY || process.env.GOOGLE_API_KEY);
   return hasLLMKey && !!process.env.FIRECRAWL_API_KEY;
 }
