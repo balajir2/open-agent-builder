@@ -8,6 +8,7 @@ import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
 import { useUser } from "@clerk/nextjs";
 import { Id } from "@/convex/_generated/dataModel";
+import PasteConfigModal from "./PasteConfigModal";
 import ToolKeysSettings from "../settings/ToolKeysSettings";
 
 // ... (existing imports)
@@ -70,14 +71,14 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const [selectedProvider, setSelectedProvider] = useState<'anthropic' | 'openai' | 'groq' | null>(null);
 
   const apiKeys = useQuery(api.apiKeys.list, {});
-  const generateKey = useAction(api.apiKeys.generate);
+  const generateKey = useAction(api.apiKeysActions.generate);
   const revokeKey = useMutation(api.apiKeys.revoke);
 
   // LLM Keys queries and mutations
   const userLLMKeys = useQuery(api.userLLMKeys.getUserLLMKeys,
     user?.id ? { userId: user.id } : "skip"
   );
-  const upsertLLMKey = useAction(api.userLLMKeys.upsertLLMKey);
+  const upsertLLMKey = useAction(api.userLLMKeysActions.upsertLLMKey);
   const deleteLLMKey = useMutation(api.userLLMKeys.deleteLLMKey);
   const toggleLLMKeyActive = useMutation(api.userLLMKeys.toggleKeyActive);
 
