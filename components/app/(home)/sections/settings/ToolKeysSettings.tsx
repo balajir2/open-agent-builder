@@ -19,7 +19,7 @@ export default function ToolKeysSettings() {
         user?.id ? { userId: user.id } : "skip"
     );
 
-    const upsertKey = useAction(api.userToolKeys.upsertToolKey);
+    const upsertKey = useAction(api.userToolKeysActions.upsertToolKey);
     const deleteKey = useMutation(api.userToolKeys.deleteToolKey);
 
     const handleSaveKey = async (toolId: string) => {
