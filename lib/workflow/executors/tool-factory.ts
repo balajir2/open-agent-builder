@@ -97,6 +97,88 @@ export class ToolFactory {
                     }, { name: "content-extractor" }),
                 });
 
+            case "firecrawl":
+                if (!apiKeys.firecrawl) {
+                    console.warn('[ToolFactory] Missing Firecrawl API key');
+                    return null;
+                }
+
+                return new DynamicTool({
+                    name: "firecrawl_scrape",
+                    description: "Scrape and extract content from any website URL using Firecrawl. Returns clean, LLM-ready markdown content including main text, links, and images. Input should be a valid URL (e.g., 'https://example.com').",
+                    func: wrapToolFunction(async (url: string) => {
+                        const mode = toolConfig.mode || 'scrape';
+
+                        if (mode === 'scrape') {
+                            // Single page scrape using Firecrawl v1 API
+                            const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${apiKeys.firecrawl}`,
+                                },
+                                body: JSON.stringify({
+                                    url: url,
+                                    formats: ['markdown', 'html'],
+                                }),
+                            });
+
+                            if (!response.ok) {
+                                const error = await response.text();
+                                throw new Error(`Firecrawl API error: ${response.status} - ${error}`);
+                            }
+
+                            const result = await response.json();
+
+                            if (!result.success) {
+                                throw new Error(`Firecrawl scrape failed: ${result.error || 'Unknown error'}`);
+                            }
+
+                            // Return markdown content (best for LLMs)
+                            return {
+                                url: url,
+                                markdown: result.data?.markdown || result.data?.content || '',
+                                title: result.data?.metadata?.title || 'Unknown',
+                                description: result.data?.metadata?.description || '',
+                            };
+                        } else {
+                            // Crawl entire site using Firecrawl v1 API
+                            const response = await fetch('https://api.firecrawl.dev/v1/crawl', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${apiKeys.firecrawl}`,
+                                },
+                                body: JSON.stringify({
+                                    url: url,
+                                    limit: toolConfig.maxPages || 10,
+                                    scrapeOptions: {
+                                        formats: ['markdown'],
+                                    },
+                                }),
+                            });
+
+                            if (!response.ok) {
+                                const error = await response.text();
+                                throw new Error(`Firecrawl API error: ${response.status} - ${error}`);
+                            }
+
+                            const result = await response.json();
+
+                            if (!result.success) {
+                                throw new Error(`Firecrawl crawl failed: ${result.error || 'Unknown error'}`);
+                            }
+
+                            // Return array of pages
+                            return result.data?.map((page: any) => ({
+                                url: page.url,
+                                markdown: page.markdown || page.content,
+                                title: page.metadata?.title || 'Unknown',
+                            })) || [];
+                        }
+                    }, { name: "firecrawl_scrape" }),
+                });
+
             default:
                 console.warn(`Unknown tool ID: ${id}`);
                 return null;
