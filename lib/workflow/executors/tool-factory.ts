@@ -1,5 +1,5 @@
-import { TavilySearchResults } from "@langchain/community/tools/tavily_search";
-import { GoogleSerperRun } from "@langchain/community/tools/google_serper";
+import { TavilySearchAPIRetriever } from "@langchain/community/retrievers/tavily_search_api";
+import { Serper } from "@langchain/community/tools/serper";
 import { SerpAPI } from "@langchain/community/tools/serpapi";
 import { DynamicTool, StructuredTool } from "@langchain/core/tools";
 import { APIKeys } from "@/lib/api/config";
@@ -13,30 +13,38 @@ interface ToolConfig {
 
 export class ToolFactory {
     static async createTool(toolConfig: ToolConfig, apiKeys: APIKeys): Promise<StructuredTool | null> {
-        const { id } = toolConfig;
+        // Handle both 'id' and 'toolId' properties (UI sends 'toolId', but we expect 'id')
+        const id = toolConfig.id || (toolConfig as any).toolId;
+
+        if (!id) {
+            console.error('[ToolFactory] No id or toolId found in toolConfig:', toolConfig);
+            return null;
+        }
 
         switch (id) {
             case "tavily-search":
                 if (!apiKeys.tavily) return null;
-                return new TavilySearchResults({
+                // Tavily is a retriever, wrap it as a tool
+                const retriever = new TavilySearchAPIRetriever({
                     apiKey: apiKeys.tavily,
-                    maxResults: toolConfig.maxResults || 5,
-                    kwargs: {
-                        search_depth: toolConfig.searchDepth || "basic",
-                    }
+                    k: toolConfig.maxResults || 5,
+                });
+                return new DynamicTool({
+                    name: "tavily_search",
+                    description: "Search the web using Tavily API. Input should be a search query string.",
+                    func: async (query: string) => {
+                        const docs = await retriever.invoke(query);
+                        return docs.map(doc => doc.pageContent).join("\n\n");
+                    },
                 });
 
             case "serper-search":
                 if (!apiKeys.serper) return null;
-                return new GoogleSerperRun({
-                    apiKey: apiKeys.serper,
-                });
+                return new Serper(apiKeys.serper);
 
             case "serpapi-search":
                 if (!apiKeys.serpapi) return null;
-                return new SerpAPI(apiKeys.serpapi, {
-                    engine: toolConfig.engine || "google",
-                });
+                return new SerpAPI(apiKeys.serpapi);
 
             case "scraperapi":
                 if (!apiKeys.scraperapi) return null;
