@@ -5,6 +5,7 @@ import { resolveMCPServers, migrateMCPData } from '@/lib/mcp/resolver';
 import { ToolFactory } from './tool-factory';
 import { APIKeys } from '@/lib/api/config';
 import { convertToOpenAITool } from '@langchain/core/utils/function_calling';
+import { parseToolCallResult } from './tool-utils';
 
 // Helper to unwrap MCP responses
 function unwrapMCPResponse(response: any, serverName: string = 'MCP'): any {
@@ -492,7 +493,7 @@ export async function executeAgentNode(
               server_name: 'MCP',
               arguments: tu.input,
               tool_use_id: tu.id,
-              output: JSON.parse(toolResults[idx].content)
+              output: parseToolCallResult(toolResults[idx].content)
             }));
           } else {
             const textBlock = initialResponse.content.find((item: any) => item.type === 'text') as any;
@@ -632,7 +633,7 @@ export async function executeAgentNode(
             id: call.id,
             name: call.function.name,
             arguments: JSON.parse(call.function.arguments),
-            output: toolResults[idx] ? JSON.parse(toolResults[idx].content) : null
+            output: toolResults[idx] ? parseToolCallResult(toolResults[idx].content) : null
           }));
         } else {
           responseText = message.content || '';

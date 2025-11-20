@@ -20,7 +20,9 @@
       "Bash(else echo \"Dependencies NOT installed\")",
       "Bash(fi)",
       "Bash(nul)",
-      "Bash(cmd.exe /c \"taskkill /F /PID 36736\")"
+      "Bash(cmd.exe /c \"taskkill /F /PID 36736\")",
+      "Bash(cmd.exe /c \"taskkill /F /PID 16368\")",
+      "Bash(npx kill-port:*)"
     ],
     "deny": [],
     "ask": []
