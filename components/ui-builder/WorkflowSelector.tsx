@@ -12,7 +12,7 @@ export default function WorkflowSelector({
   selectedWorkflowId,
   onSelectWorkflow,
 }: WorkflowSelectorProps) {
-  const workflows = useQuery(api.workflows.list);
+  const workflows = useQuery(api.workflows.listAll);
 
 
   const filteredWorkflows =
