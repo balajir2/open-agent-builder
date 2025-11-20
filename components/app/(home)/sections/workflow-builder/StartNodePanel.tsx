@@ -6,10 +6,12 @@ import type { Node } from "@xyflow/react";
 
 interface InputVariable {
   name: string;
-  type: "string" | "number" | "boolean" | "url" | "object";
+  type: "string" | "number" | "boolean" | "url" | "object" | "document";
   required: boolean;
   defaultValue?: string;
   description?: string;
+  // For document type:
+  documentName?: string; // the user-provided required document name
 }
 
 interface StartNodePanelProps {
@@ -19,7 +21,8 @@ interface StartNodePanelProps {
 }
 
 export default function StartNodePanel({ node, onClose, onUpdate }: StartNodePanelProps) {
-  const nodeData = node?.data as any;
+  const nodeData = (node?.data || {}) as any;
+
   const [inputVariables, setInputVariables] = useState<InputVariable[]>(
     nodeData?.inputVariables || [
       {
@@ -28,7 +31,7 @@ export default function StartNodePanel({ node, onClose, onUpdate }: StartNodePan
         required: false,
         defaultValue: "",
         description: "",
-      }
+      },
     ]
   );
 
@@ -46,10 +49,10 @@ export default function StartNodePanel({ node, onClose, onUpdate }: StartNodePan
   }, [inputVariables, node, onUpdate]);
 
   const addVariable = () => {
-    setInputVariables([
-      ...inputVariables,
+    setInputVariables((prev) => [
+      ...prev,
       {
-        name: `input${inputVariables.length + 1}`,
+        name: `input${prev.length + 1}`,
         type: "string",
         required: false,
         description: "",
@@ -57,14 +60,27 @@ export default function StartNodePanel({ node, onClose, onUpdate }: StartNodePan
     ]);
   };
 
+  const addDocumentVariable = () => {
+    setInputVariables((prev) => [
+      ...prev,
+      {
+        name: `document_${prev.length + 1}`,
+        type: "document",
+        required: true, // documents often required by default — change if you prefer false
+        description: "Required document",
+        documentName: "", // user will fill this in
+      },
+    ]);
+  };
+
   const updateVariable = (index: number, updates: Partial<InputVariable>) => {
-    setInputVariables(
-      inputVariables.map((v, i) => (i === index ? { ...v, ...updates } : v))
+    setInputVariables((prev) =>
+      prev.map((v, i) => (i === index ? { ...v, ...updates } : v))
     );
   };
 
   const removeVariable = (index: number) => {
-    setInputVariables(inputVariables.filter((_, i) => i !== index));
+    setInputVariables((prev) => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -90,9 +106,7 @@ export default function StartNodePanel({ node, onClose, onUpdate }: StartNodePan
                 </svg>
               </button>
             </div>
-            <p className="text-sm text-black-alpha-48">
-              Define the workflow inputs
-            </p>
+            <p className="text-sm text-black-alpha-48">Define the workflow inputs</p>
           </div>
 
           {/* Content */}
@@ -100,19 +114,33 @@ export default function StartNodePanel({ node, onClose, onUpdate }: StartNodePan
             {/* Input Variables List */}
             <div>
               <div className="flex items-center justify-between mb-12">
-                <h3 className="text-sm font-medium text-accent-black">
-                  Input variables
-                </h3>
-                <button
-                  onClick={addVariable}
-                  className="px-12 py-6 bg-background-base hover:bg-black-alpha-4 border border-border-faint rounded-8 text-xs text-accent-black transition-colors flex items-center gap-6"
-                >
-                  <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add Variable
-                </button>
+                <h3 className="text-sm font-medium text-accent-black">Input variables</h3>
+                <div className="flex items-center gap-8">
+                  <button
+                    onClick={addVariable}
+                    className="px-12 py-6 bg-background-base hover:bg-black-alpha-4 border border-border-faint rounded-8 text-xs text-accent-black transition-colors flex items-center gap-6"
+                  >
+                    <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Variable
+                  </button>
+
+                  {/* Add Document button: now adds a document variable entry (no file picker) */}
+                  <button
+                    onClick={addDocumentVariable}
+                    className="px-12 py-6 bg-background-base hover:bg-black-alpha-4 border border-border-faint rounded-8 text-xs text-accent-black transition-colors flex items-center gap-6"
+                    title="Add a document input (enter required document name below)"
+                  >
+                    <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 2h6l4 4v14a2 2 0 01-2 2H7a2 2 0 01-2-2V4a2 2 0 012-2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 2v6h6" />
+                    </svg>
+                    Add Document
+                  </button>
+                </div>
               </div>
+
               <div className="space-y-12">
                 {inputVariables.length === 0 ? (
                   <div className="p-20 bg-accent-white border border-border-faint border-dashed rounded-12 text-center">
@@ -131,79 +159,97 @@ export default function StartNodePanel({ node, onClose, onUpdate }: StartNodePan
                   inputVariables.map((variable, index) => (
                     <div key={index} className="p-16 bg-background-base rounded-12 border border-border-faint">
                       <div className="space-y-12">
-                      {/* Name */}
-                      <div>
-                        <label className="block text-xs text-black-alpha-48 mb-6">Variable Name</label>
-                        <input
-                          type="text"
-                          value={variable.name}
-                          onChange={(e) => updateVariable(index, { name: e.target.value })}
-                          className="w-full px-12 py-8 bg-accent-white border border-border-faint rounded-8 text-sm text-accent-black font-mono focus:outline-none focus:border-heat-100"
-                          placeholder="variable_name"
-                        />
-                      </div>
-
-                      {/* Type */}
-                      <div>
-                        <label className="block text-xs text-black-alpha-48 mb-6">Type</label>
-                        <select
-                          value={variable.type}
-                          onChange={(e) => updateVariable(index, { type: e.target.value as any })}
-                          className="w-full px-12 py-8 bg-accent-white border border-border-faint rounded-8 text-sm text-accent-black focus:outline-none focus:border-heat-100"
-                        >
-                          <option value="string">String</option>
-                          <option value="number">Number</option>
-                          <option value="boolean">Boolean</option>
-                          <option value="url">URL</option>
-                          <option value="object">Object</option>
-                        </select>
-                      </div>
-
-                      {/* Description */}
-                      <div>
-                        <label className="block text-xs text-black-alpha-48 mb-6">Description</label>
-                        <input
-                          type="text"
-                          value={variable.description || ''}
-                          onChange={(e) => updateVariable(index, { description: e.target.value })}
-                          className="w-full px-12 py-8 bg-accent-white border border-border-faint rounded-8 text-sm text-accent-black focus:outline-none focus:border-heat-100"
-                          placeholder="Describe this input..."
-                        />
-                      </div>
-
-                      {/* Default Value */}
-                      <div>
-                        <label className="block text-xs text-black-alpha-48 mb-6">Default Value</label>
-                        <input
-                          type="text"
-                          value={variable.defaultValue || ''}
-                          onChange={(e) => updateVariable(index, { defaultValue: e.target.value })}
-                          className="w-full px-12 py-8 bg-accent-white border border-border-faint rounded-8 text-sm text-accent-black focus:outline-none focus:border-heat-100"
-                          placeholder="Default value..."
-                        />
-                      </div>
-
-                      {/* Required Toggle & Delete */}
-                      <div className="flex items-center justify-between pt-8">
-                        <label className="flex items-center gap-8 cursor-pointer">
+                        {/* Name */}
+                        <div>
+                          <label className="block text-xs text-black-alpha-48 mb-6">Variable Name</label>
                           <input
-                            type="checkbox"
-                            checked={variable.required}
-                            onChange={(e) => updateVariable(index, { required: e.target.checked })}
-                            className="w-16 h-16 rounded-4 border border-border-faint text-heat-100 focus:ring-heat-100"
+                            type="text"
+                            value={variable.name}
+                            onChange={(e) => updateVariable(index, { name: e.target.value })}
+                            className="w-full px-12 py-8 bg-accent-white border border-border-faint rounded-8 text-sm text-accent-black font-mono focus:outline-none focus:border-heat-100"
+                            placeholder="variable_name"
                           />
-                          <span className="text-xs text-accent-black">Required</span>
-                        </label>
-                        <button
-                          onClick={() => removeVariable(index)}
-                          className="px-12 py-6 text-xs text-accent-black hover:bg-black-alpha-4 rounded-6 transition-colors flex items-center gap-6"
-                        >
-                          <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                          Remove
-                        </button>
-                      </div>
+                        </div>
+
+                        {/* Type */}
+                        <div>
+                          <label className="block text-xs text-black-alpha-48 mb-6">Type</label>
+                          <select
+                            value={variable.type}
+                            onChange={(e) => updateVariable(index, { type: e.target.value as any })}
+                            className="w-full px-12 py-8 bg-accent-white border border-border-faint rounded-8 text-sm text-accent-black focus:outline-none focus:border-heat-100"
+                          >
+                            <option value="string">String</option>
+                            <option value="number">Number</option>
+                            <option value="boolean">Boolean</option>
+                            <option value="url">URL</option>
+                            <option value="object">Object</option>
+                            <option value="document">Document (PDF)</option>
+                          </select>
+                        </div>
+
+                        {/* Description */}
+                        <div>
+                          <label className="block text-xs text-black-alpha-48 mb-6">Description</label>
+                          <input
+                            type="text"
+                            value={variable.description || ""}
+                            onChange={(e) => updateVariable(index, { description: e.target.value })}
+                            className="w-full px-12 py-8 bg-accent-white border border-border-faint rounded-8 text-sm text-accent-black focus:outline-none focus:border-heat-100"
+                            placeholder="Describe this input..."
+                          />
+                        </div>
+
+                        {/* Document-specific: show text input to enter required document name */}
+                        {variable.type === "document" ? (
+                          <div>
+                            <label className="block text-xs text-black-alpha-48 mb-6">Document Name (what user must provide)</label>
+                            <input
+                              type="text"
+                              value={variable.documentName || ""}
+                              onChange={(e) => updateVariable(index, { documentName: e.target.value })}
+                              className="w-full px-12 py-8 bg-accent-white border border-border-faint rounded-8 text-sm text-accent-black focus:outline-none focus:border-heat-100"
+                              placeholder="e.g. Passport scan (PDF)"
+                            />
+                            <p className="text-xs text-heat-100 mt-8">
+                              This is the friendly name for the document that will be requested when running the workflow. The workflow runner should prompt the user to upload a file that matches this name.
+                            </p>
+                          </div>
+                        ) : (
+                          /* Default Value */
+                          <div>
+                            <label className="block text-xs text-black-alpha-48 mb-6">Default Value</label>
+                            <input
+                              type="text"
+                              value={variable.defaultValue || ""}
+                              onChange={(e) => updateVariable(index, { defaultValue: e.target.value })}
+                              className="w-full px-12 py-8 bg-accent-white border border-border-faint rounded-8 text-sm text-accent-black focus:outline-none focus:border-heat-100"
+                              placeholder="Default value..."
+                            />
+                          </div>
+                        )}
+
+                        {/* Required Toggle & Delete */}
+                        <div className="flex items-center justify-between pt-8">
+                          <label className="flex items-center gap-8 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={variable.required}
+                              onChange={(e) => updateVariable(index, { required: e.target.checked })}
+                              className="w-16 h-16 rounded-4 border border-border-faint text-heat-100 focus:ring-heat-100"
+                            />
+                            <span className="text-xs text-accent-black">Required</span>
+                          </label>
+                          <button
+                            onClick={() => removeVariable(index)}
+                            className="px-12 py-6 text-xs text-accent-black hover:bg-black-alpha-4 rounded-6 transition-colors flex items-center gap-6"
+                          >
+                            <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Remove
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))
@@ -220,6 +266,9 @@ export default function StartNodePanel({ node, onClose, onUpdate }: StartNodePan
               </p>
               <p className="text-xs text-heat-100 leading-relaxed mt-8">
                 Use <code className="px-4 py-2 bg-heat-8 rounded text-accent-black">{`{{variable_name}}`}</code> in any node to reference these values.
+              </p>
+              <p className="text-xs text-heat-100 leading-relaxed mt-4">
+                Document inputs store a <strong>documentName</strong> which indicates the name/label of the required document (e.g. "Passport scan"). The workflow runner should prompt the user to upload the file when running.
               </p>
             </div>
           </div>
