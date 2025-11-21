@@ -43,8 +43,15 @@ export async function POST(
       anthropic: process.env.ANTHROPIC_API_KEY,
       groq: process.env.GROQ_API_KEY,
       openai: process.env.OPENAI_API_KEY,
+      google: process.env.GOOGLE_API_KEY,
       firecrawl: process.env.FIRECRAWL_API_KEY,
       arcade: process.env.ARCADE_API_KEY,
+      e2b: process.env.E2B_API_KEY,
+      tavily: process.env.TAVILY_API_KEY,
+      serper: process.env.SERPER_API_KEY,
+      serpapi: process.env.SERPAPI_API_KEY,
+      scraperapi: process.env.SCRAPERAPI_API_KEY,
+      browserless: process.env.BROWSERLESS_API_KEY,
     };
 
     // Execute workflow using LangGraph

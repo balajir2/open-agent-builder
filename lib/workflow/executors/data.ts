@@ -132,7 +132,13 @@ console.log(JSON.stringify(result));
 
     // Parse the result from stdout
     const resultText = execution.logs.stdout.join('\n');
-    const result = JSON.parse(resultText);
+    let result;
+    try {
+      result = JSON.parse(resultText);
+    } catch (e) {
+      console.error('Failed to parse E2B execution result:', resultText);
+      throw new Error(`Transform returned invalid JSON: ${e instanceof Error ? e.message : 'Parse error'}`);
+    }
 
     console.log('✅ E2B execution successful:', result);
 

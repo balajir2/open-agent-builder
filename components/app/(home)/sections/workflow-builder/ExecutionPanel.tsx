@@ -1,7 +1,8 @@
+// components/ExecutionPanel.tsx
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Workflow, WorkflowExecution, NodeExecutionResult, WorkflowPendingAuth } from "@/lib/workflow/types";
 import { toast } from "sonner";
 import {
@@ -79,7 +80,7 @@ export default function ExecutionPanel({
   environment,
   pendingAuth,
 }: ExecutionPanelProps) {
-  
+
   // Track Google Doc creation for toast notifications
   const [notifiedDocs, setNotifiedDocs] = useState<Set<string>>(new Set());
   const [isResumingAuth, setIsResumingAuth] = useState(false);
@@ -106,7 +107,7 @@ export default function ExecutionPanel({
       setIsResumingAuth(false);
     }
   }, [isResumingAuth, onResumePendingAuth]);
-  
+
   // Check for Google Doc creation and show toast
   useEffect(() => {
     Object.entries(nodeResults).forEach(([nodeId, result]) => {
@@ -114,16 +115,16 @@ export default function ExecutionPanel({
         const output = result.output;
         const outputStr = typeof output === 'string' ? output : JSON.stringify(output, null, 2);
         const outputObj = typeof output === 'object' ? output : null;
-        
+
         // Check if this is a Google Docs creation result
-        const isGoogleDocResult = outputObj?.result?.output?.value?.documentUrl || 
+        const isGoogleDocResult = outputObj?.result?.output?.value?.documentUrl ||
                                  outputStr.includes('documentUrl') ||
                                  outputStr.includes('Executive Summary');
-        
+
         if (isGoogleDocResult) {
           let docUrl: string | null = null;
           let docTitle: string | null = null;
-          
+
           // Extract document URL and title from the result
           if (outputObj?.result?.output?.value?.documentUrl) {
             docUrl = outputObj.result.output.value.documentUrl;
@@ -142,7 +143,7 @@ export default function ExecutionPanel({
               }
             }
           }
-          
+
           if (docUrl) {
             // Show success toast
             toast.success('Document Updated', {
@@ -153,7 +154,7 @@ export default function ExecutionPanel({
               },
               duration: 8000, // Show for 8 seconds
             });
-            
+
             // Mark this node as notified
             setNotifiedDocs(prev => new Set(prev).add(nodeId));
           }
@@ -165,6 +166,7 @@ export default function ExecutionPanel({
   useEffect(() => {
     setCopiedAuthLink(false);
   }, [pendingAuth?.authId]);
+
   // Get input variables from Start node
   const startNode = workflow?.nodes.find(n => (n.data as any)?.nodeType === 'start');
   const inputVariables = (startNode?.data as any)?.inputVariables || [];
@@ -174,6 +176,12 @@ export default function ExecutionPanel({
 
   // Initialize input state from variables
   const [inputValues, setInputValues] = useState<Record<string, any>>({});
+
+  // Upload-related state & refs
+  const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({});
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [uploadErrors, setUploadErrors] = useState<Record<string, string | null>>({});
+  const uploadXhrs = useRef<Record<string, XMLHttpRequest | null>>({});
 
   // Update inputValues when inputVariables change
   useEffect(() => {
@@ -194,6 +202,7 @@ export default function ExecutionPanel({
   const [copiedError, setCopiedError] = useState<string | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [expandedSchemas, setExpandedSchemas] = useState<Set<string>>(new Set());
+
   const handleCopyAllResults = () => {
     // Collect all results from the workflow with data flow information
     const results = {
@@ -318,6 +327,118 @@ export default function ExecutionPanel({
     setTimeout(() => setCopiedError(null), 2000);
   };
 
+  // ---------- Upload helpers ----------
+  const formatBytes = (b = 0) => {
+    if (b === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(b) / Math.log(k));
+    return parseFloat((b / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  };
+
+  /**
+   * Upload file for a named variable.
+   * Expects server response JSON: { fileUrl?, storageId?, originalFilename?, size? }
+   */
+  const uploadFileForVariable = (variableName: string, file: File) => {
+    if (!file) return;
+
+    // client-side validation example (max 20MB)
+    const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setUploadErrors(prev => ({ ...prev, [variableName]: `File too large (max ${formatBytes(MAX_FILE_SIZE_BYTES)})` }));
+      return;
+    }
+
+    setUploadErrors(prev => ({ ...prev, [variableName]: null }));
+    setUploadingFiles(prev => ({ ...prev, [variableName]: true }));
+    setUploadProgress(prev => ({ ...prev, [variableName]: 0 }));
+
+    const xhr = new XMLHttpRequest();
+    uploadXhrs.current[variableName] = xhr;
+
+    // If you proxy via /api/upload in your Next.js app, use that. Otherwise use convex direct HTTP action URL.
+    // Example: xhr.open("POST", "/api/upload");
+    // If you use direct convex action endpoint (and CORS enabled): xhr.open("POST", "https://your-dev.convex.site/http/uploadFile");
+    xhr.open("POST", "/api/upload");
+
+    xhr.upload.onprogress = (ev) => {
+      if (ev.lengthComputable) {
+        const percent = Math.round((ev.loaded / ev.total) * 100);
+        setUploadProgress(prev => ({ ...prev, [variableName]: percent }));
+      } else {
+        setUploadProgress(prev => ({ ...prev, [variableName]: 50 }));
+      }
+    };
+
+    xhr.onerror = () => {
+      setUploadingFiles(prev => ({ ...prev, [variableName]: false }));
+      setUploadErrors(prev => ({ ...prev, [variableName]: "Upload failed — network error" }));
+      setUploadProgress(prev => ({ ...prev, [variableName]: 0 }));
+      uploadXhrs.current[variableName] = null;
+    };
+
+    xhr.onload = () => {
+      setUploadingFiles(prev => ({ ...prev, [variableName]: false }));
+      uploadXhrs.current[variableName] = null;
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          const fileMeta = {
+            fileUrl: data.fileUrl ?? data.storageId ?? null,
+            storageId: data.storageId ?? null,
+            originalFilename: data.originalFilename ?? file.name,
+            size: data.size ?? file.size,
+            contentType: data.contentType ?? file.type,
+          };
+
+          setInputValues(prev => ({ ...prev, [variableName]: fileMeta }));
+          setUploadProgress(prev => ({ ...prev, [variableName]: 100 }));
+          setTimeout(() => setUploadProgress(prev => ({ ...prev, [variableName]: 0 })), 700);
+        } catch (e) {
+          setUploadErrors(prev => ({ ...prev, [variableName]: "Upload succeeded but response invalid" }));
+        }
+      } else {
+        let message = `Upload failed: ${xhr.status}`;
+        try {
+          const parsed = JSON.parse(xhr.responseText);
+          if (parsed?.error) message = parsed.error;
+        } catch {}
+        setUploadErrors(prev => ({ ...prev, [variableName]: message }));
+      }
+    };
+
+    const form = new FormData();
+    form.append("file", file);
+    form.append("variableName", variableName);
+    // append any metadata server expects:
+    // form.append("workflowId", workflow?.id ?? '');
+
+    xhr.send(form);
+  };
+
+  const cancelUploadForVariable = (variableName: string) => {
+    const xhr = uploadXhrs.current[variableName];
+    if (xhr) {
+      try { xhr.abort(); } catch {}
+      uploadXhrs.current[variableName] = null;
+    }
+    setUploadingFiles(prev => ({ ...prev, [variableName]: false }));
+    setUploadProgress(prev => ({ ...prev, [variableName]: 0 }));
+    setUploadErrors(prev => ({ ...prev, [variableName]: "Upload cancelled" }));
+  };
+
+  const removeUploadedFileForVariable = (variableName: string) => {
+    // If upload in progress, cancel
+    cancelUploadForVariable(variableName);
+    // Remove metadata from inputs
+    setInputValues(prev => ({ ...prev, [variableName]: null }));
+    setUploadErrors(prev => ({ ...prev, [variableName]: null }));
+    setUploadProgress(prev => ({ ...prev, [variableName]: 0 }));
+  };
+  // ---------- end upload helpers ----------
+
   return (
     <AnimatePresence>
       <motion.aside
@@ -436,123 +557,123 @@ export default function ExecutionPanel({
               </button>
             </div>
           </div>
-        {execution?.status === 'waiting-auth' && pendingAuth && pendingAuth.toolName === 'user-approval' && (
-          <div className="mb-16 p-16 bg-accent-white border border-border-faint rounded-8">
-            <div className="flex items-start gap-12 mb-12">
-              <div className="w-32 h-32 rounded-full bg-heat-100 flex items-center justify-center flex-shrink-0">
-                <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <p className="text-label-medium font-medium text-accent-black mb-4">
-                  Workflow Paused
-                </p>
-                <p className="text-body-small text-black-alpha-48 mb-8">
-                  Approval Required
-                </p>
-                <div className="p-12 bg-background-base border border-border-faint rounded-6">
-                  <p className="text-body-small text-accent-black whitespace-pre-wrap">
-                    {pendingAuth.message || 'This workflow requires your approval to continue.'}
+          {execution?.status === 'waiting-auth' && pendingAuth && pendingAuth.toolName === 'user-approval' && (
+            <div className="mb-16 p-16 bg-accent-white border border-border-faint rounded-8">
+              <div className="flex items-start gap-12 mb-12">
+                <div className="w-32 h-32 rounded-full bg-heat-100 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-label-medium font-medium text-accent-black mb-4">
+                    Workflow Paused
                   </p>
+                  <p className="text-body-small text-black-alpha-48 mb-8">
+                    Approval Required
+                  </p>
+                  <div className="p-12 bg-background-base border border-border-faint rounded-6">
+                    <p className="text-body-small text-accent-black whitespace-pre-wrap">
+                      {pendingAuth.message || 'This workflow requires your approval to continue.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-8">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsResumingAuth(true);
+                    try {
+                      await onResumePendingAuth();
+                      toast.success('Approved');
+                    } catch (error) {
+                      toast.error('Failed to resume workflow');
+                    } finally {
+                      setIsResumingAuth(false);
+                    }
+                  }}
+                  disabled={isResumingAuth}
+                  className="flex-1 px-14 py-8 bg-heat-100 hover:bg-heat-200 text-white rounded-6 text-body-small font-medium transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isResumingAuth ? 'Approving...' : 'Approve'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    toast.error('Rejected');
+                    onClose();
+                  }}
+                  className="flex-1 px-14 py-8 bg-background-base hover:bg-black-alpha-4 text-accent-black border border-border-faint rounded-6 text-body-small font-medium transition-all active:scale-[0.98]"
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          )}
+
+          {execution?.status === 'waiting-auth' && pendingAuth && pendingAuth.toolName !== 'user-approval' && (
+            <div className="m-20 mt-0 mb-16 p-16 bg-heat-4 border border-heat-100 rounded-12">
+              <div className="flex flex-col gap-12">
+                <div>
+                  <p className="text-label-medium font-medium text-accent-black">
+                    Authorization required for {pendingAuth.toolName}
+                  </p>
+                  <p className="text-body-small text-black-alpha-64 mt-4">
+                    {pendingAuth.message || 'Open the authorization link in a new tab, approve access, then resume the workflow.'}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-10 items-center">
+                  {pendingAuth.authUrl ? (
+                    <a
+                      href={pendingAuth.authUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-6 px-14 py-8 bg-accent-black hover:bg-black-alpha-88 text-white rounded-8 text-body-small font-medium transition-colors"
+                    >
+                      <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                      Open authorization
+                    </a>
+                  ) : (
+                    <span className="px-14 py-8 bg-accent-white border border-border-faint rounded-8 text-body-small text-black-alpha-64">
+                      Waiting for authorization link...
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleCopyAuthLink}
+                    disabled={!pendingAuth.authUrl}
+                    className="inline-flex items-center gap-6 px-14 py-8 bg-accent-white border border-border-faint rounded-8 text-body-small text-accent-black hover:bg-black-alpha-4 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    {copiedAuthLink ? 'Copied link' : 'Copy link'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResumeAuthorization}
+                    disabled={isResumingAuth}
+                    className="inline-flex items-center gap-6 px-14 py-8 bg-heat-100 hover:bg-heat-200 text-white rounded-8 text-body-small font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isResumingAuth ? (
+                      <svg className="w-14 h-14 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    ) : (
+                      <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    )}
+                    <span>{isResumingAuth ? 'Resuming…' : 'Resume workflow'}</span>
+                  </button>
                 </div>
               </div>
             </div>
-            <div className="flex gap-8">
-              <button
-                type="button"
-                onClick={async () => {
-                  setIsResumingAuth(true);
-                  try {
-                    await onResumePendingAuth();
-                    toast.success('Approved');
-                  } catch (error) {
-                    toast.error('Failed to resume workflow');
-                  } finally {
-                    setIsResumingAuth(false);
-                  }
-                }}
-                disabled={isResumingAuth}
-                className="flex-1 px-14 py-8 bg-heat-100 hover:bg-heat-200 text-white rounded-6 text-body-small font-medium transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isResumingAuth ? 'Approving...' : 'Approve'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  toast.error('Rejected');
-                  onClose();
-                }}
-                className="flex-1 px-14 py-8 bg-background-base hover:bg-black-alpha-4 text-accent-black border border-border-faint rounded-6 text-body-small font-medium transition-all active:scale-[0.98]"
-              >
-                Reject
-              </button>
-            </div>
-          </div>
-        )}
-
-        {execution?.status === 'waiting-auth' && pendingAuth && pendingAuth.toolName !== 'user-approval' && (
-          <div className="m-20 mt-0 mb-16 p-16 bg-heat-4 border border-heat-100 rounded-12">
-            <div className="flex flex-col gap-12">
-              <div>
-                <p className="text-label-medium font-medium text-accent-black">
-                  Authorization required for {pendingAuth.toolName}
-                </p>
-                <p className="text-body-small text-black-alpha-64 mt-4">
-                  {pendingAuth.message || 'Open the authorization link in a new tab, approve access, then resume the workflow.'}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-10 items-center">
-                {pendingAuth.authUrl ? (
-                  <a
-                    href={pendingAuth.authUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-6 px-14 py-8 bg-accent-black hover:bg-black-alpha-88 text-white rounded-8 text-body-small font-medium transition-colors"
-                  >
-                    <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                    Open authorization
-                  </a>
-                ) : (
-                  <span className="px-14 py-8 bg-accent-white border border-border-faint rounded-8 text-body-small text-black-alpha-64">
-                    Waiting for authorization link...
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={handleCopyAuthLink}
-                  disabled={!pendingAuth.authUrl}
-                  className="inline-flex items-center gap-6 px-14 py-8 bg-accent-white border border-border-faint rounded-8 text-body-small text-accent-black hover:bg-black-alpha-4 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                  {copiedAuthLink ? 'Copied link' : 'Copy link'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleResumeAuthorization}
-                  disabled={isResumingAuth}
-                  className="inline-flex items-center gap-6 px-14 py-8 bg-heat-100 hover:bg-heat-200 text-white rounded-8 text-body-small font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isResumingAuth ? (
-                    <svg className="w-14 h-14 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  ) : (
-                    <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  )}
-                  <span>{isResumingAuth ? 'Resuming…' : 'Resume workflow'}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+          )}
 
           {/* Current Node Indicator - Only show when running */}
           {isRunning && currentNodeId && (() => {
@@ -614,10 +735,112 @@ export default function ExecutionPanel({
                           placeholder={variable.defaultValue || '0'}
                           className="w-full px-12 py-10 bg-background-base border border-border-faint rounded-8 text-body-medium text-accent-black focus:outline-none focus:border-accent-black transition-colors"
                         />
+                      ) : variable.type === 'document' ? (
+                        // Document upload UI
+                        <div className="space-y-3">
+                          <div
+                            className={`relative border-2 rounded-lg p-4 transition-colors duration-150 ${uploadingFiles[variable.name] ? "border-indigo-400 bg-indigo-50/20" : "border-dashed border-gray-200 bg-white"}`}
+                            onDragOver={(e) => { e.preventDefault(); (e.currentTarget as HTMLElement).classList.add("border-indigo-400"); }}
+                            onDragLeave={(e) => { (e.currentTarget as HTMLElement).classList.remove("border-indigo-400"); }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              (e.currentTarget as HTMLElement).classList.remove("border-indigo-400");
+                              const file = e.dataTransfer.files[0];
+                              if (file) uploadFileForVariable(variable.name, file);
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded bg-indigo-600 flex items-center justify-center text-white">
+                                    <FileText className="w-5 h-5" />
+                                  </div>
+                                  <div>
+                                    <div className="text-sm font-medium">{variable.description || `Upload file for ${variable.name}`}</div>
+                                    <div className="text-xs text-gray-500">Drag & drop a file, or click to choose</div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded shadow cursor-pointer hover:brightness-110">
+                                  <input
+                                    type="file"
+                                    accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      const f = e.target.files?.[0] ?? null;
+                                      if (!f) return;
+                                      uploadFileForVariable(variable.name, f);
+                                      (e.target as HTMLInputElement).value = "";
+                                    }}
+                                  />
+                                  {uploadingFiles[variable.name] ? "Uploading…" : "Choose file"}
+                                </label>
+                              </div>
+                            </div>
+
+                            {/* existing uploaded file */}
+                            <div className="mt-4">
+                              {inputValues[variable.name] ? (
+                                <div className="flex items-center justify-between gap-4 p-3 bg-gray-50 rounded">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 flex items-center justify-center bg-white rounded border">
+                                      <svg className="w-6 h-6 text-indigo-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 2h6l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 2v6h6" />
+                                      </svg>
+                                    </div>
+                                    <div>
+                                      <div className="text-sm font-medium">{(inputValues[variable.name] as any).originalFilename ?? (inputValues[variable.name] as any).fileUrl ?? 'Uploaded file'}</div>
+                                      <div className="text-xs text-gray-500">{formatBytes((inputValues[variable.name] as any).size ?? 0)}</div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-3">
+                                    {/* view link if fileUrl present */}
+                                    {(inputValues[variable.name] as any)?.fileUrl ? (
+                                      <a href={(inputValues[variable.name] as any).fileUrl} target="_blank" rel="noreferrer" className="text-sm underline">View</a>
+                                    ) : null}
+
+                                    {uploadingFiles[variable.name] ? (
+                                      <button onClick={() => cancelUploadForVariable(variable.name)} className="text-sm px-3 py-1 border rounded">Cancel</button>
+                                    ) : (
+                                      <button onClick={() => removeUploadedFileForVariable(variable.name)} className="text-sm px-3 py-1 border rounded">Remove</button>
+                                    )}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-xs text-gray-500">No file uploaded yet</div>
+                              )}
+
+                              {/* progress bar */}
+                              {uploadingFiles[variable.name] || (uploadProgress[variable.name] && uploadProgress[variable.name] > 0) ? (
+                                <div className="mt-3">
+                                  <div className="h-2 w-full bg-gray-200 rounded overflow-hidden">
+                                    <div
+                                      style={{ width: `${uploadProgress[variable.name] ?? 0}%` }}
+                                      className="h-2 bg-indigo-600 transition-all duration-200"
+                                    />
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {uploadProgress[variable.name] ? `${uploadProgress[variable.name]}%` : "Uploading…"}
+                                  </div>
+                                </div>
+                              ) : null}
+
+                              {uploadErrors[variable.name] && (
+                                <div className="mt-2 text-xs text-red-500">
+                                  {uploadErrors[variable.name]}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       ) : (
                         <input
                           type="text"
-                          value={inputValues[variable.name] || ''}
+                          value={inputValues[variable.name] ?? ""}
                           onChange={(e) => setInputValues({ ...inputValues, [variable.name]: e.target.value })}
                           placeholder={variable.defaultValue || `Enter ${variable.name}...`}
                           className="w-full px-12 py-10 bg-background-base border border-border-faint rounded-8 text-body-medium text-accent-black focus:outline-none focus:border-accent-black transition-colors"
@@ -1007,7 +1230,6 @@ export default function ExecutionPanel({
                           </div>
                         )}
 
-
                         {result.pendingAuth && (
                           <div className="mt-12 p-12 bg-heat-4 border border-heat-100 rounded-8">
                             <p className="text-body-small font-medium text-accent-black">
@@ -1036,22 +1258,22 @@ export default function ExecutionPanel({
                         {result.output && !result.error && (
                           <div className="mt-12">
                             <p className="text-body-small text-black-alpha-48 mb-6">Output:</p>
-                            
+
                             {/* Special handling for Google Docs results */}
                             {(() => {
                               const output = result.output;
                               const outputStr = typeof output === 'string' ? output : JSON.stringify(output, null, 2);
                               const outputObj = typeof output === 'object' ? output : null;
-                              
+
                               // Check if this is a Google Docs creation result
-                              const isGoogleDocResult = outputObj?.result?.output?.value?.documentUrl || 
+                              const isGoogleDocResult = outputObj?.result?.output?.value?.documentUrl ||
                                                        outputStr.includes('documentUrl') ||
                                                        outputStr.includes('Executive Summary');
-                              
+
                               if (isGoogleDocResult) {
                                 let docUrl: string | null = null;
                                 let docTitle: string | null = null;
-                                
+
                                 // Extract document URL and title from the result
                                 if (outputObj?.result?.output?.value?.documentUrl) {
                                   docUrl = outputObj.result.output.value.documentUrl;
@@ -1070,7 +1292,7 @@ export default function ExecutionPanel({
                                     }
                                   }
                                 }
-                                
+
                                 if (docUrl) {
                                   return (
                                     <div className="space-y-12">
@@ -1089,7 +1311,7 @@ export default function ExecutionPanel({
                                         <p className="text-body-small text-black-alpha-48 mb-12">
                                           Your executive summary has been created in Google Docs.
                                         </p>
-                                        
+
                                         {/* Clickable document link */}
                                         <a
                                           href={docUrl}
@@ -1103,7 +1325,7 @@ export default function ExecutionPanel({
                                           Open {docTitle}
                                         </a>
                                       </div>
-                                      
+
                                       {/* Raw output for debugging */}
                                       <details className="group">
                                         <summary className="cursor-pointer text-body-small text-black-alpha-48 hover:text-accent-black transition-colors flex items-center gap-4">
@@ -1122,7 +1344,7 @@ export default function ExecutionPanel({
                                   );
                                 }
                               }
-                              
+
                               // Default output display
                               return (
                                 <div className="bg-background-base rounded-8 p-12 border border-border-faint">
@@ -1177,8 +1399,6 @@ export default function ExecutionPanel({
                             </div>
                           </div>
                         )}
-
-
                         {/* Timing */}
                         {result.startedAt && (
                           <div className="flex items-center gap-8 mt-12 text-body-small text-black-alpha-48">
