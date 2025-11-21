@@ -61,6 +61,19 @@ export async function executeAgentNode(
       mcpTools = await resolveMCPServers(migratedData.mcpServerIds);
     }
 
+    // Filter out invalid MCP tool entries (null, undefined, or missing required properties)
+    mcpTools = mcpTools.filter((mcp: any) => {
+      if (!mcp) {
+        console.warn('[Agent] Filtered out null/undefined MCP tool');
+        return false;
+      }
+      if (!mcp.name && !mcp.toolName) {
+        console.warn('[Agent] Filtered out MCP tool without name:', mcp);
+        return false;
+      }
+      return true;
+    });
+
     // Instantiate standard tools
     const standardTools: any[] = [];
     if (data.selectedTools && Array.isArray(data.selectedTools)) {
@@ -77,7 +90,8 @@ export async function executeAgentNode(
     }
     // Debug logging (only in development)
     if (process.env.DEBUG_TOOLS || process.env.NODE_ENV === 'development') {
-      console.log(`[Tools] Created ${standardTools.length} tools:`, standardTools.map(t => t?.name || 'unnamed'));
+      console.log(`[Tools] MCP tools count: ${mcpTools.length}`, mcpTools.map((m: any) => ({ name: m?.name, hasUrl: !!m?.url })));
+      console.log(`[Tools] Created ${standardTools.length} standard tools:`, standardTools.map(t => t?.name || 'unnamed'));
       console.log(`[Tools] Selected tools config:`, data.selectedTools);
     }
 
@@ -184,9 +198,9 @@ export async function executeAgentNode(
         // Build MCP servers configuration
         const mcpServers = realMcpTools.map((mcp: any) => ({
           type: 'url' as const,
-          url: mcp.url.includes('{FIRECRAWL_API_KEY}')
+          url: mcp.url && mcp.url.includes('{FIRECRAWL_API_KEY}')
             ? mcp.url.replace('{FIRECRAWL_API_KEY}', encodeURIComponent(apiKeys.firecrawl || ''))
-            : mcp.url,
+            : (mcp.url || ''),
           name: mcp.name,
           authorization_token: mcp.accessToken,
         }));
@@ -331,7 +345,13 @@ export async function executeAgentNode(
           const toolSchemas = await Promise.all(realMcpTools.map(async (mcp: any) => {
             try {
               console.log(`[MCP] Listing tools from ${mcp.name}...`);
-              const listResponse = await fetch(mcp.url, {
+
+              // Replace URL placeholders
+              const resolvedUrl = mcp.url && mcp.url.includes('{FIRECRAWL_API_KEY}')
+                ? mcp.url.replace('{FIRECRAWL_API_KEY}', encodeURIComponent(apiKeys.firecrawl || ''))
+                : (mcp.url || '');
+
+              const listResponse = await fetch(resolvedUrl, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -361,7 +381,7 @@ export async function executeAgentNode(
                 name: tool.name,
                 description: tool.description || 'No description',
                 input_schema: tool.input_schema || { type: 'object', properties: {} },
-                mcpUrl: mcp.url,
+                mcpUrl: resolvedUrl,
                 mcpName: mcp.name,
                 mcpAccessToken: mcp.accessToken
               }));
@@ -562,7 +582,12 @@ export async function executeAgentNode(
                 if (mcpServer) {
                   const args = JSON.parse(call.function.arguments);
 
-                  const mcpResponse = await fetch(mcpServer.url, {
+                  // Replace URL placeholders
+                  const resolvedMcpUrl = mcpServer.url && mcpServer.url.includes('{FIRECRAWL_API_KEY}')
+                    ? mcpServer.url.replace('{FIRECRAWL_API_KEY}', encodeURIComponent(apiKeys.firecrawl || ''))
+                    : (mcpServer.url || '');
+
+                  const mcpResponse = await fetch(resolvedMcpUrl, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
@@ -665,7 +690,9 @@ export async function executeAgentNode(
         const tools = mcpTools.map((mcp: any) => ({
           type: "mcp" as const,
           server_label: mcp.name || mcp.toolName || 'unknown_tool',
-          server_url: mcp.url,
+          server_url: mcp.url && mcp.url.includes('{FIRECRAWL_API_KEY}')
+            ? mcp.url.replace('{FIRECRAWL_API_KEY}', encodeURIComponent(apiKeys.firecrawl || ''))
+            : (mcp.url || ''),
         }));
 
         const response = await client.responses.create({
@@ -748,7 +775,12 @@ export async function executeAgentNode(
                 if (mcpServer) {
                   const args = call.args;
 
-                  const mcpResponse = await fetch(mcpServer.url, {
+                  // Replace URL placeholders
+                  const resolvedMcpUrl = mcpServer.url && mcpServer.url.includes('{FIRECRAWL_API_KEY}')
+                    ? mcpServer.url.replace('{FIRECRAWL_API_KEY}', encodeURIComponent(apiKeys.firecrawl || ''))
+                    : (mcpServer.url || '');
+
+                  const mcpResponse = await fetch(resolvedMcpUrl, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',

@@ -506,41 +506,54 @@ If you discover a security vulnerability, please email security@your-domain.com 
 |--------------|-------------------|
 | **Get started quickly** | This README |
 | **Learn how to use the app** | [USER-MANUAL.md](./USER-MANUAL.md) |
+| **Understand the architecture** | [ARCHITECTURE.md](./ARCHITECTURE.md) ⭐ |
 | **Understand security features** | [SECURITY.md](./SECURITY.md) |
 | **Develop or contribute** | [CLAUDE.md](./CLAUDE.md) |
+| **Add new tools** | [ADDING-NEW-TOOLS.md](./ADDING-NEW-TOOLS.md) |
 | **Deploy to production** | [Deployment](#deployment) + [SECURITY.md](./SECURITY.md) |
 | **Troubleshoot issues** | [USER-MANUAL.md](./USER-MANUAL.md#troubleshooting) |
-| **Find the right document** | [DOCS-INDEX.md](./DOCS-INDEX.md) |
 
-### Available Documentation
+### Core Documentation
 
-- **[USER-MANUAL.md](./USER-MANUAL.md)** - Comprehensive user guide (2000+ lines)
+- **[USER-MANUAL.md](./USER-MANUAL.md)** - Complete user guide (2000+ lines)
   - Getting started tutorial
-  - Interface walkthrough
-  - All 11 node types explained
+  - All 14 node types explained in detail
   - Advanced features and best practices
-  - Troubleshooting guide
-  - FAQ (40+ questions)
+  - Troubleshooting guide with solutions
+  - 40+ FAQ questions
 
-- **[SECURITY.md](./SECURITY.md)** - Complete security guide
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** ⭐ - Complete system design (800+ lines)
+  - Tech stack and design patterns
+  - Project structure and organization
+  - Core systems (execution, rate limiting, security)
+  - Database schema and API design
+  - Scalability and monitoring
+
+- **[CLAUDE.md](./CLAUDE.md)** - Developer guide (500+ lines)
+  - Development setup and commands
+  - Project structure and configuration
+  - Adding new node types
+  - Common development tasks
+
+- **[SECURITY.md](./SECURITY.md)** - Security guide (500+ lines)
   - All 8 security features explained
   - Production deployment checklist
   - Monitoring and incident response
   - OWASP Top 10 coverage
 
-- **[CLAUDE.md](./CLAUDE.md)** - Developer documentation
-  - Architecture overview
-  - Project structure
-  - Adding new node types
-  - Development patterns
+- **[ADDING-NEW-TOOLS.md](./ADDING-NEW-TOOLS.md)** - Tool development
+  - Step-by-step guide to add tools
+  - Tool architecture explained
+  - Best practices and examples
 
-- **[DOCS-INDEX.md](./DOCS-INDEX.md)** - Documentation navigation guide
-  - Quick navigation by task
-  - Documentation by audience
-  - Reading paths for different user types
+- **[VERIFICATION-REPORT.md](./VERIFICATION-REPORT.md)** - Security verification
 
-- **[VERIFICATION-REPORT.md](./VERIFICATION-REPORT.md)** - Security verification status
-- **[SECURITY-FIXES-2025-11-19.md](./SECURITY-FIXES-2025-11-19.md)** - Recent security updates
+### Specialized Guides
+
+Additional guides are available in [docs/guides/](./docs/guides/):
+- UI Builder documentation (4 guides)
+- Workflow Runner guide
+- Vercel deployment guide
 
 ---
 
