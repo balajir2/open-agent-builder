@@ -13,6 +13,7 @@ import type * as apiKeys from "../apiKeys.js";
 import type * as apiKeysActions from "../apiKeysActions.js";
 import type * as approvals from "../approvals.js";
 import type * as executions from "../executions.js";
+import type * as functions_rateLimits_check from "../functions/rateLimits/check.js";
 import type * as http_uploadFile from "../http/uploadFile.js";
 import type * as http from "../http.js";
 import type * as lib_encryption from "../lib/encryption.js";
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   apiKeysActions: typeof apiKeysActions;
   approvals: typeof approvals;
   executions: typeof executions;
+  "functions/rateLimits/check": typeof functions_rateLimits_check;
   "http/uploadFile": typeof http_uploadFile;
   http: typeof http;
   "lib/encryption": typeof lib_encryption;
