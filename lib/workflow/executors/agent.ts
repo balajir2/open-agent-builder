@@ -355,6 +355,7 @@ export async function executeAgentNode(
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
+                  'Accept': 'application/json',
                   ...(mcp.accessToken && { 'Authorization': `Bearer ${mcp.accessToken}` })
                 },
                 body: JSON.stringify({
@@ -374,7 +375,7 @@ export async function executeAgentNode(
 
               toolsList = unwrapMCPResponse(toolsList, mcp.name);
 
-              const tools = toolsList.result?.tools || [];
+              const tools = toolsList.tools || [];
               console.log(`[MCP] Found ${tools.length} tools from ${mcp.name}`);
 
               return tools.map((tool: any) => ({
@@ -457,7 +458,11 @@ export async function executeAgentNode(
                 try {
                   const callResponse = await fetch(toolDef.mcpUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Accept': 'application/json',
+                      ...(toolDef.mcpAccessToken && { 'Authorization': `Bearer ${toolDef.mcpAccessToken}` })
+                    },
                     body: JSON.stringify({
                       jsonrpc: '2.0',
                       id: Date.now(),
