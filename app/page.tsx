@@ -119,6 +119,14 @@ function StyleGuidePageContent() {
               </div>
               
               <div className="flex gap-8 items-center">
+                <SignedIn>
+                  <Link href="/ui-user-workflows">
+                    <ButtonUI variant="outline">
+                      UI for Workflows
+                    </ButtonUI>
+                  </Link>
+                </SignedIn>
+
                 {/* UI Builder Link */}
                 <SignedIn>
                   <Link href="/ui-builder">
