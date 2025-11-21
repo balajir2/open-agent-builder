@@ -1,15 +1,14 @@
 "use client";
 
 import WorkflowRunnerUI from "@/components/workflow-runner/WorkflowRunnerUI";
-import { useState } from "react";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
-import HeaderBrandKit from "@/components/shared/header/BrandKit/BrandKit";
-import HeaderWrapper from "@/components/shared/header/Wrapper/Wrapper";
-import HeaderDropdownWrapper from "@/components/shared/header/Dropdown/Wrapper/Wrapper";
+import HeaderBrandKit from "@/components/layout/header/BrandKit/BrandKit";
+import HeaderWrapper from "@/components/layout/header/Wrapper/Wrapper";
+import HeaderDropdownWrapper from "@/components/layout/header/Dropdown/Wrapper/Wrapper";
 import ButtonUI from "@/components/ui/shadcn/button";
-import GithubIcon from "@/components/shared/header/Github/_svg/GithubIcon";
+import GithubIcon from "@/components/layout/header/Github/_svg/GithubIcon";
 import { Connector } from "@/components/shared/layout/curvy-rect";
-import { HeaderProvider } from "@/components/shared/header/HeaderContext";
+import { HeaderProvider } from "@/components/layout/header/HeaderContext";
 
 export default function WorkflowRunnerPage() {
   return (
@@ -101,6 +100,6 @@ export default function WorkflowRunnerPage() {
           </div>
         </SignedOut>
       </div>
-    </HeaderProvider>
+    </HeaderProvider >
   );
 }

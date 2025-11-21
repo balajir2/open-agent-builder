@@ -2,7 +2,7 @@
 
 import { JSX } from "react";
 
-import { useHeaderContext } from "@/components/shared/header/HeaderContext";
+import { useHeaderContext } from "@/components/layout/header/HeaderContext";
 import { cn } from "@/utils/cn";
 
 import ChevronDown from "./_svg/ChevronDown";

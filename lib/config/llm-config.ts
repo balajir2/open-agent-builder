@@ -8,7 +8,7 @@
 export interface LLMModel {
   id: string;
   name: string;
-  provider: 'anthropic' | 'openai' | 'groq';
+  provider: 'anthropic' | 'openai' | 'groq' | 'google';
   contextWindow: number;
   inputCostPer1M: number;
   outputCostPer1M: number;
@@ -114,12 +114,44 @@ export const llmProviders: LLMProvider[] = [
       },
     ],
   },
+  {
+    id: 'google',
+    name: 'Google',
+    envKey: 'GOOGLE_API_KEY',
+    defaultModel: 'gemini-1.5-pro',
+    models: [
+      {
+        id: 'gemini-1.5-pro',
+        name: 'Gemini 1.5 Pro',
+        provider: 'google',
+        contextWindow: 2000000,
+        inputCostPer1M: 3.50,
+        outputCostPer1M: 10.50,
+        supportsJSON: true,
+        supportsMCP: true,
+        maxTokens: 8192,
+        description: 'Mid-size multimodal model for complex reasoning',
+      },
+      {
+        id: 'gemini-1.5-flash',
+        name: 'Gemini 1.5 Flash',
+        provider: 'google',
+        contextWindow: 1000000,
+        inputCostPer1M: 0.075,
+        outputCostPer1M: 0.30,
+        supportsJSON: true,
+        supportsMCP: true,
+        maxTokens: 8192,
+        description: 'Fast and versatile multimodal model',
+      },
+    ],
+  },
 ];
 
 /**
  * Get default model for a provider
  */
-export function getDefaultModel(provider: 'anthropic' | 'openai' | 'groq'): string {
+export function getDefaultModel(provider: 'anthropic' | 'openai' | 'groq' | 'google'): string {
   const config = llmProviders.find(p => p.id === provider);
   return config?.defaultModel || '';
 }
@@ -127,7 +159,7 @@ export function getDefaultModel(provider: 'anthropic' | 'openai' | 'groq'): stri
 /**
  * Get all models for a provider
  */
-export function getModelsForProvider(provider: 'anthropic' | 'openai' | 'groq'): LLMModel[] {
+export function getModelsForProvider(provider: 'anthropic' | 'openai' | 'groq' | 'google'): LLMModel[] {
   const config = llmProviders.find(p => p.id === provider);
   return config?.models || [];
 }
@@ -165,7 +197,7 @@ export function getAllModels(): Array<LLMModel & { fullId: string }> {
 /**
  * Check if provider API key is configured
  */
-export function isProviderConfigured(provider: 'anthropic' | 'openai' | 'groq'): boolean {
+export function isProviderConfigured(provider: 'anthropic' | 'openai' | 'groq' | 'google'): boolean {
   const config = llmProviders.find(p => p.id === provider);
   if (!config) return false;
 
