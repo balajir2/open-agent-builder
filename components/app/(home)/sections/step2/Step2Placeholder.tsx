@@ -37,7 +37,7 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
         if (data.workflows && Array.isArray(data.workflows)) {
           setWorkflows(data.workflows.map((w: any) => ({
             id: w.id,
-            title: w.name,
+            title:cleanName(w.name),
             description: w.description,
             createdAt: new Date(w.updatedAt || w.createdAt).toLocaleDateString(),
             userId: w.userId,
@@ -56,7 +56,7 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
         if (data.workflows && Array.isArray(data.workflows)) {
           setTeamWorkflows(data.workflows.map((w: any) => ({
             id: w.id,
-            title: w.name,
+            title: cleanName(w.name),
             description: w.description,
             createdAt: new Date(w.updatedAt || w.createdAt).toLocaleDateString(),
             userId: w.userId,
@@ -70,6 +70,21 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
     loadWorkflows();
     loadTeamWorkflows();
   }, []);
+
+
+    function cleanName(name: string) {
+    let cleaned = name.replace(/^copy of\s*/i, ""); // remove "Copy of"
+
+    const parts = cleaned.split("_");
+
+    // If pattern: [prefix, number, suffix]
+    if (parts.length === 3 && /^\d+$/.test(parts[1])) {
+      cleaned = `${parts[0]}_${parts[2]}`;
+    }
+
+    return cleaned;
+  }
+
 
   const handleDelete = async (e: React.MouseEvent, id: string, isTeam: boolean) => {
     e.stopPropagation();
