@@ -2,10 +2,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { Document, Packer, Paragraph } from "docx";
 import { saveAs } from "file-saver";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 import {
   Search, X, Save, Check, Download, ChevronDown,
   FileText, FileDown, Loader, CheckCircle,
@@ -17,7 +17,6 @@ import {
   getDocumentSaveLocation
 } from '@/utils/document-export';
 import { FileLocationModal } from '@/components/ui/FileLocationModal';
-
 import { useRouter, useSearchParams } from "next/navigation";
 
 // Type definitions for input requirements and validation
@@ -35,6 +34,219 @@ interface InputValidation {
   message: string;
 }
 
+// File metadata returned by upload endpoint
+interface FileMeta {
+  storageId?: string;        // Convex storage id
+  fileUrl?: string;          // optional public URL (if you generate a signed URL)
+  originalFilename?: string;
+  size?: number;
+  contentType?: string;
+}
+
+/* ===========================
+   Utility: color/style helpers
+   =========================== */
+
+const problematicColorPattern = /\b(?:color|color-mix|lab|lch|device-cmyk)\([^\)]*\)|var\([^\)]+\)/i;
+const gradientPattern = /(linear-gradient|radial-gradient|conic-gradient|repeating-linear-gradient)\([^\)]*\)/i;
+
+function getResolvedColorOrFallback(el: Element | null): string {
+  let node: Element | null = el;
+  while (node) {
+    try {
+      const cs = window.getComputedStyle(node);
+      const color = cs && (cs.color || cs.fill || cs.backgroundColor);
+      if (color && !problematicColorPattern.test(color)) return color;
+    } catch (e) {
+      // ignore and continue up the tree
+    }
+    node = node.parentElement;
+  }
+  return "rgb(0, 0, 0)";
+}
+
+function safeSetStyle(el: HTMLElement, prop: string, value: string) {
+  try {
+    el.style.setProperty(prop, value, "important");
+  } catch (e) {
+    try {
+      // fallback
+      // @ts-ignore
+      el.style[prop] = value;
+    } catch { /* ignore */ }
+  }
+}
+
+function inlineBasicComputedStyles(origEl: Element, cloneEl: HTMLElement) {
+  try {
+    const cs = window.getComputedStyle(origEl as Element);
+    if (!cs) return;
+    const safeProps = [
+      "color",
+      "background-color",
+      "font-family",
+      "font-size",
+      "font-weight",
+      "line-height",
+      "text-decoration",
+      "letter-spacing",
+      "text-align",
+      "padding",
+      "margin",
+      "border-radius",
+    ];
+    for (const p of safeProps) {
+      let v = (cs as any).getPropertyValue(p);
+      if (v && typeof v === "string") {
+        if (problematicColorPattern.test(v)) {
+          v = getResolvedColorOrFallback(origEl);
+        }
+        if (gradientPattern.test(v)) {
+          if (p === "background-color") continue;
+          v = v.replace(gradientPattern, "none");
+        }
+        safeSetStyle(cloneEl, p, v.trim());
+      }
+    }
+  } catch (e) {
+    // ignore errors for individual elements
+  }
+}
+
+function inlineSvgColorsForPair(orig: Element, clone: Element) {
+  try {
+    const svgElements = [clone, ...Array.from(clone.querySelectorAll("[fill], [stroke], svg *"))];
+    const origBase = orig;
+    svgElements.forEach((cEl) => {
+      let resolvedFill = getResolvedColorOrFallback(origBase);
+      let resolvedStroke = resolvedFill;
+      try {
+        const cs = window.getComputedStyle(origBase as Element);
+        if (cs) {
+          if (cs.fill && !problematicColorPattern.test(cs.fill)) resolvedFill = cs.fill;
+          if (cs.stroke && !problematicColorPattern.test(cs.stroke)) resolvedStroke = cs.stroke;
+        }
+      } catch { }
+      try { (cEl as Element).setAttribute("fill", resolvedFill); } catch { }
+      try { (cEl as Element).setAttribute("stroke", resolvedStroke); } catch { }
+      try {
+        (cEl as HTMLElement).style && safeSetStyle(cEl as HTMLElement, "fill", resolvedFill);
+        (cEl as HTMLElement).style && safeSetStyle(cEl as HTMLElement, "stroke", resolvedStroke);
+      } catch { }
+    });
+  } catch (e) {
+    // ignore
+  }
+}
+
+function sanitizeCloneForCanvas(cloneRoot: HTMLElement, origRoot: Element) {
+  const walker = document.createTreeWalker(cloneRoot, NodeFilter.SHOW_ELEMENT, null);
+  const nodes: Element[] = [];
+  let cur: Element | null = walker.currentNode as Element | null;
+  if (cur) nodes.push(cur);
+  while (walker.nextNode()) {
+    cur = walker.currentNode as Element | null;
+    if (cur) nodes.push(cur);
+  }
+
+  for (const el of nodes) {
+    try {
+      const origEquivalent = findBestMatchInOriginal(el, origRoot) || origRoot;
+      inlineBasicComputedStyles(origEquivalent, el as HTMLElement);
+
+      safeSetStyle(el as HTMLElement, "background-image", "none");
+      safeSetStyle(el as HTMLElement, "box-shadow", "none");
+      safeSetStyle(el as HTMLElement, "filter", "none");
+      safeSetStyle(el as HTMLElement, "-webkit-filter", "none");
+      safeSetStyle(el as HTMLElement, "backdrop-filter", "none");
+      safeSetStyle(el as HTMLElement, "-webkit-backdrop-filter", "none");
+      safeSetStyle(el as HTMLElement, "clip-path", "none");
+      safeSetStyle(el as HTMLElement, "mask", "none");
+      safeSetStyle(el as HTMLElement, "mask-image", "none");
+      safeSetStyle(el as HTMLElement, "mix-blend-mode", "normal");
+
+      const styleAttr = el.getAttribute("style");
+      if (styleAttr && problematicColorPattern.test(styleAttr)) {
+        const resolved = getResolvedColorOrFallback(origEquivalent);
+        const replaced = styleAttr.replace(problematicColorPattern, resolved);
+        try {
+          el.setAttribute("style", replaced);
+        } catch { }
+      }
+
+      try {
+        const origCS = window.getComputedStyle(origEquivalent);
+        const bg = origCS && (origCS.backgroundImage || origCS.background);
+        if (bg && gradientPattern.test(bg)) {
+          const bgColor = origCS.backgroundColor;
+          const safe = bgColor && !problematicColorPattern.test(bgColor) ? bgColor : getResolvedColorOrFallback(origEquivalent);
+          safeSetStyle(el as HTMLElement, "background", safe);
+        } else if (bg && problematicColorPattern.test(String(bg))) {
+          const safe = getResolvedColorOrFallback(origEquivalent);
+          safeSetStyle(el as HTMLElement, "background", safe);
+        }
+      } catch (e) { }
+
+      const tag = el.tagName?.toLowerCase?.() ?? "";
+      if (tag === "svg" || el.querySelectorAll && el.querySelectorAll("svg, [fill], [stroke]").length) {
+        inlineSvgColorsForPair(origEquivalent, el);
+      }
+    } catch (e) {
+      // ignore per-element errors
+    }
+  }
+}
+
+function findBestMatchInOriginal(cloneEl: Element, origRoot: Element): Element | null {
+  const id = cloneEl.getAttribute && cloneEl.getAttribute("id");
+  if (id) {
+    try {
+      const found = origRoot.querySelector(`#${CSS.escape(id)}`);
+      if (found) return found;
+    } catch { }
+  }
+
+  const path: Array<{ tag: string; idx: number }> = [];
+  let cur: Element | null = cloneEl;
+  const maxDepth = 30;
+  let depth = 0;
+
+  while (cur && depth < maxDepth) {
+    const parent = cur.parentElement;
+    if (!parent) break;
+
+    const siblings = Array.from(parent.children as HTMLCollectionOf<Element>).filter(
+      (ch: Element) => ch.tagName === cur!.tagName
+    );
+
+    const idx = siblings.indexOf(cur);
+    path.push({ tag: cur.tagName.toLowerCase(), idx: idx >= 0 ? idx : 0 });
+    cur = parent;
+    depth++;
+  }
+
+  path.reverse();
+
+  let node: Element | null = origRoot;
+  for (const step of path) {
+    if (!node) break;
+    const candidates = Array.from(node.children as HTMLCollectionOf<Element>).filter(
+      (c: Element) => c.tagName.toLowerCase() === step.tag
+    );
+    if (candidates.length === 0) {
+      node = null;
+      break;
+    }
+    node = candidates[step.idx] || candidates[0];
+  }
+
+  return node;
+}
+
+/* ===========================
+   Main component
+   =========================== */
+
 export default function WorkflowRunnerUI() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -43,7 +255,8 @@ export default function WorkflowRunnerUI() {
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>("");
   const [workflowResponses, setWorkflowResponses] = useState<any[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [inputFields, setInputFields] = useState<Record<string, string>>({});
+
+  const [inputFields, setInputFields] = useState<Record<string, any>>({});
   const [workflowDetails, setWorkflowDetails] = useState<any>(null);
   const [showDownloadSuccess, setShowDownloadSuccess] = useState(false);
   const [downloadLocation, setDownloadLocation] = useState("");
@@ -59,9 +272,19 @@ export default function WorkflowRunnerUI() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const formatDropdownRef = useRef<HTMLDivElement>(null);
 
-  // NOTE: removed allWorkflows/searchTerm/workflows since page expects workflowid in URL
+  // Upload state per document variable
+  const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({});
+  const [uploadErrors, setUploadErrors] = useState<Record<string, string | null>>({});
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const uploadXhrs = useRef<Record<string, XMLHttpRequest | null>>({});
 
-  // If URL contains ?workflowid=..., preselect it on mount / when searchParams available
+  // ref for capturing the right panel content (for PDF)
+  const resultRef = useRef<HTMLDivElement | null>(null);
+
+  // UI config
+  const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+  const ACCEPTED_MIME = "application/pdf";
+
   useEffect(() => {
     try {
       const paramId = searchParams?.get("workflowid");
@@ -75,7 +298,6 @@ export default function WorkflowRunnerUI() {
     }
   }, [searchParams]);
 
-  // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (formatDropdownRef.current && !formatDropdownRef.current.contains(event.target as Node)) {
@@ -92,7 +314,6 @@ export default function WorkflowRunnerUI() {
     };
   }, [showFormatDropdown]);
 
-  // Load saved input presets from localStorage
   useEffect(() => {
     const savedPresets = localStorage.getItem('workflowInputPresets');
     if (savedPresets) {
@@ -104,14 +325,12 @@ export default function WorkflowRunnerUI() {
     }
   }, []);
 
-  // Fetch workflow details when selectedWorkflowId set (populated from URL)
   useEffect(() => {
     if (!selectedWorkflowId) return;
 
     const fetchWorkflowDetails = async () => {
       setIsLoading(true);
       try {
-        console.log("Fetching details for workflow ID:", selectedWorkflowId);
         const res = await fetch(`/api/workflows/${selectedWorkflowId}/getWorkflowDetails`);
         if (!res.ok) throw new Error(`Failed to fetch workflow details: ${res.status}`);
         const data = await res.json();
@@ -119,10 +338,15 @@ export default function WorkflowRunnerUI() {
         if (data) {
           setWorkflowDetails(data);
 
-          // Initialize empty fields for all required inputs
           const inputs = Array.isArray(data.requiredInputs) ? data.requiredInputs : [];
-          const initialInputs: Record<string, string> = {};
-          inputs.forEach((i) => (initialInputs[i.name] = i.defaultValue || ""));
+          const initialInputs: Record<string, any> = {};
+          inputs.forEach((i: InputRequirement) => {
+            if (i.type === "document") {
+              initialInputs[i.name] = null;
+            } else {
+              initialInputs[i.name] = i.defaultValue ?? "";
+            }
+          });
           setInputFields(initialInputs);
         }
       } catch (err) {
@@ -136,29 +360,58 @@ export default function WorkflowRunnerUI() {
     fetchWorkflowDetails();
   }, [selectedWorkflowId]);
 
-  async function handleDownloadResult(content: string) {
-  try {
-    const doc = new Document({
-      sections: [
-        {
-          children: [
-            new Paragraph(content),
-          ],
-        },
-      ],
+  useEffect(() => {
+    if (!workflowDetails || !Array.isArray(workflowDetails.requiredInputs)) return;
+
+    setInputFields(prev => {
+      const next: Record<string, any> = {};
+      const seen = new Set<string>();
+
+      for (const input of workflowDetails.requiredInputs) {
+        seen.add(input.name);
+        if (prev && Object.prototype.hasOwnProperty.call(prev, input.name)) {
+          next[input.name] = prev[input.name];
+        } else {
+          next[input.name] = input.type === 'document' ? null : (input.defaultValue ?? "");
+        }
+      }
+
+      return next;
     });
 
-    const blob = await Packer.toBlob(doc);
-    saveAs(blob, "workflow-output.docx");
-  } catch (err) {
-    console.error("Error downloading DOCX:", err);
+    setTimeout(() => {
+      validateAllFields();
+    }, 0);
+  }, [workflowDetails?.requiredInputs]);
+
+  async function handleDownloadResult(content: string) {
+    try {
+      const doc = new Document({
+        sections: [
+          {
+            children: [
+              new Paragraph(content),
+            ],
+          },
+        ],
+      });
+
+      const blob = await Packer.toBlob(doc);
+      saveAs(blob, "workflow-output.docx");
+    } catch (err) {
+      console.error("Error downloading DOCX:", err);
+    }
   }
-}
 
+  const formatBytes = (b = 0) => {
+    if (b === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(b) / Math.log(k));
+    return parseFloat((b / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  };
 
-
-  // Handle input change with validation
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: any) => {
     setInputFields(prev => ({
       ...prev,
       [field]: value
@@ -166,8 +419,7 @@ export default function WorkflowRunnerUI() {
     validateField(field, value);
   };
 
-  // Validate a single field
-  const validateField = (field: string, value: string) => {
+  const validateField = (field: string, value: any) => {
     if (!workflowDetails?.requiredInputs || !Array.isArray(workflowDetails.requiredInputs)) return;
 
     const inputRequirement = workflowDetails.requiredInputs.find(
@@ -179,16 +431,29 @@ export default function WorkflowRunnerUI() {
     let isValid = true;
     let message = "";
 
-    if (inputRequirement.required && !value.trim()) {
-      isValid = false;
-      message = "This field is required";
-    } else if (inputRequirement.type === "number") {
+    if (inputRequirement.required) {
+      if (inputRequirement.type === "document") {
+        if (!value || typeof value !== "object" || !(value.storageId || value.fileUrl)) {
+          isValid = false;
+          message = "Required document not uploaded";
+        }
+      } else {
+        if (String(value || "").trim() === "") {
+          isValid = false;
+          message = "This field is required";
+        }
+      }
+    }
+
+    if (isValid && inputRequirement.type === "number" && value !== undefined && value !== null && String(value).trim() !== "") {
       const num = Number(value);
       if (isNaN(num)) {
         isValid = false;
         message = "Please enter a valid number";
       }
-    } else if (inputRequirement.type === "select" && inputRequirement.options) {
+    }
+
+    if (isValid && inputRequirement.type === "select" && inputRequirement.options) {
       if (value && !inputRequirement.options.includes(value)) {
         isValid = false;
         message = "Please select a valid option";
@@ -201,7 +466,6 @@ export default function WorkflowRunnerUI() {
     }));
   };
 
-  // Validate all fields
   const validateAllFields = (): boolean => {
     if (!workflowDetails?.requiredInputs || !Array.isArray(workflowDetails.requiredInputs)) return true;
 
@@ -209,23 +473,33 @@ export default function WorkflowRunnerUI() {
     const newValidation: Record<string, InputValidation> = {};
 
     workflowDetails.requiredInputs.forEach((input: InputRequirement) => {
-      const value = inputFields[input.name] || "";
+      const value = inputFields[input.name];
 
       let isValid = true;
       let message = "";
 
-      if (input.required && !value.trim()) {
-        isValid = false;
-        message = "This field is required";
-        allValid = false;
-      } else if (input.type === "number" && value) {
+      if (input.required) {
+        if (input.type === "document") {
+          if (!value || typeof value !== "object" || !(value.storageId || value.fileUrl)) {
+            isValid = false;
+            message = "Required document not uploaded";
+            allValid = false;
+          }
+        } else if (String(value || "").trim() === "") {
+          isValid = false;
+          message = "This field is required";
+          allValid = false;
+        }
+      }
+
+      if (isValid && input.type === "number" && value) {
         const num = Number(value);
         if (isNaN(num)) {
           isValid = false;
           message = "Please enter a valid number";
           allValid = false;
         }
-      } else if (input.type === "select" && input.options && value) {
+      } else if (isValid && input.type === "select" && input.options && value) {
         if (!input.options.includes(value)) {
           isValid = false;
           message = "Please select a valid option";
@@ -240,7 +514,6 @@ export default function WorkflowRunnerUI() {
     return allValid;
   };
 
-  // Load a saved preset
   const loadPreset = (presetName: string) => {
     if (selectedWorkflowId && savedInputPresets && typeof savedInputPresets === 'object' && savedInputPresets[selectedWorkflowId]) {
       const presets = savedInputPresets[selectedWorkflowId];
@@ -263,7 +536,6 @@ export default function WorkflowRunnerUI() {
     }
   };
 
-  // Save current inputs as a preset
   const saveCurrentInputs = (presetName: string) => {
     if (!presetName.trim() || !selectedWorkflowId) return;
 
@@ -289,7 +561,6 @@ export default function WorkflowRunnerUI() {
     }
   };
 
-  // Delete a saved preset
   const deletePreset = (presetName: string) => {
     if (!selectedWorkflowId || !savedInputPresets[selectedWorkflowId]) return;
 
@@ -309,7 +580,111 @@ export default function WorkflowRunnerUI() {
     }
   };
 
-  // Execute the selected workflow with the provided inputs
+  // Upload file using XMLHttpRequest to track progress and POST to Convex HTTP action
+  const uploadDocumentForVariable = (variableName: string, file: File) => {
+    if (!file) return;
+
+    // Client-side validation
+    if (ACCEPTED_MIME && file.type !== ACCEPTED_MIME) {
+      setUploadErrors(prev => ({ ...prev, [variableName]: "Only PDF files are accepted" }));
+      return;
+    }
+    if (MAX_FILE_SIZE_BYTES && file.size > MAX_FILE_SIZE_BYTES) {
+      setUploadErrors(prev => ({ ...prev, [variableName]: `File is too large (max ${formatBytes(MAX_FILE_SIZE_BYTES)})` }));
+      return;
+    }
+
+    setUploadErrors(prev => ({ ...prev, [variableName]: null }));
+    setUploadingFiles(prev => ({ ...prev, [variableName]: true }));
+    setUploadProgress(prev => ({ ...prev, [variableName]: 0 }));
+
+    const xhr = new XMLHttpRequest();
+    uploadXhrs.current[variableName] = xhr;
+
+    xhr.upload.onprogress = (ev) => {
+      if (ev.lengthComputable) {
+        const percent = Math.round((ev.loaded / ev.total) * 100);
+        setUploadProgress(prev => ({ ...prev, [variableName]: percent }));
+      } else {
+        setUploadProgress(prev => ({ ...prev, [variableName]: 50 })); // indeterminate-ish
+      }
+    };
+
+    xhr.onerror = () => {
+      setUploadingFiles(prev => ({ ...prev, [variableName]: false }));
+      setUploadErrors(prev => ({ ...prev, [variableName]: "Upload failed — network error" }));
+      setUploadProgress(prev => ({ ...prev, [variableName]: 0 }));
+      uploadXhrs.current[variableName] = null;
+    };
+
+    xhr.onload = () => {
+      setUploadingFiles(prev => ({ ...prev, [variableName]: false }));
+      uploadXhrs.current[variableName] = null;
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (data.error) {
+            setUploadErrors(prev => ({ ...prev, [variableName]: data.error }));
+            return;
+          }
+
+          const fileMeta: FileMeta = {
+            storageId: data.storageId,
+            originalFilename: data.originalFilename ?? file.name,
+            size: data.size ?? file.size,
+            contentType: data.contentType ?? file.type,
+            // fileUrl remains optional (implement server action if you want signed URL)
+          };
+
+          setInputFields(prev => ({ ...prev, [variableName]: fileMeta }));
+          setUploadProgress(prev => ({ ...prev, [variableName]: 100 }));
+          setTimeout(() => setUploadProgress(prev => ({ ...prev, [variableName]: 0 })), 800);
+          validateField(variableName, fileMeta);
+        } catch (e) {
+          setUploadErrors(prev => ({ ...prev, [variableName]: "Upload succeeded but response invalid" }));
+        }
+      } else {
+        const text = xhr.responseText || `${xhr.status}`;
+        setUploadErrors(prev => ({ ...prev, [variableName]: `Upload failed: ${text}` }));
+      }
+    };
+
+    const form = new FormData();
+    form.append("file", file);
+    form.append("filename", file.name);
+    form.append("variableName", variableName);
+    form.append("workflowId", selectedWorkflowId || "");
+
+    const uploadUrl = process.env.NEXT_PUBLIC_CONVEX_UPLOAD_ACTION_URL;
+    if (!uploadUrl) {
+      setUploadingFiles(prev => ({ ...prev, [variableName]: false }));
+      setUploadErrors(prev => ({ ...prev, [variableName]: "Upload URL not configured (NEXT_PUBLIC_CONVEX_UPLOAD_ACTION_URL)" }));
+      return;
+    }
+
+    // xhr.open("POST", uploadUrl);
+    xhr.open("POST", "/api/upload");
+    xhr.send(form);
+  };
+
+  const cancelUpload = (variableName: string) => {
+    const xhr = uploadXhrs.current[variableName];
+    if (xhr) {
+      try { xhr.abort(); } catch (e) { /* ignore */ }
+      uploadXhrs.current[variableName] = null;
+    }
+    setUploadingFiles(prev => ({ ...prev, [variableName]: false }));
+    setUploadProgress(prev => ({ ...prev, [variableName]: 0 }));
+    setUploadErrors(prev => ({ ...prev, [variableName]: "Upload cancelled" }));
+  };
+
+  const removeUploadedFile = (variableName: string) => {
+    cancelUpload(variableName);
+    setInputFields(prev => ({ ...prev, [variableName]: null }));
+    setUploadProgress(prev => ({ ...prev, [variableName]: 0 }));
+    setUploadErrors(prev => ({ ...prev, [variableName]: null }));
+  };
+
   const handleRunWorkflow = async () => {
     if (!selectedWorkflowId) {
       alert("Please provide a workflow id in the URL (workflowid query param).");
@@ -340,7 +715,7 @@ export default function WorkflowRunnerUI() {
           try {
             const errorDetail = await response.text();
             if (errorDetail) errorText += `: ${errorDetail}`;
-          } catch {}
+          } catch { }
         }
         throw new Error(errorText);
       }
@@ -399,7 +774,6 @@ export default function WorkflowRunnerUI() {
     }
   };
 
-  // Extract workflow data from responses for download
   const getWorkflowData = () => {
     let workflowId = selectedWorkflowId || "workflow";
     let workflowName = workflowDetails?.name || "Workflow Execution";
@@ -436,8 +810,89 @@ export default function WorkflowRunnerUI() {
     return { workflowId, workflowName, nodeResults, variables };
   };
 
-  // Handle document download
-  const handleDownloadResults = async (format: 'html' | 'docx' | 'ppt') => {
+  async function handleDownloadResultAsDocxFromHTML(htmlContent: string, filename = "workflow-output.docx") {
+    try {
+      const plain = htmlContent.replace(/<[^>]*>/g, "");
+      const doc = new Document({
+        sections: [
+          {
+            children: [new Paragraph(plain)],
+          },
+        ],
+      });
+      const blob = await Packer.toBlob(doc);
+      saveAs(blob, filename);
+    } catch (err) {
+      console.error("Error downloading DOCX:", err);
+      alert("Error creating docx: " + (err instanceof Error ? err.message : String(err)));
+    }
+  }
+
+  async function downloadResultAsPDF(filename = "workflow-output.pdf") {
+    if (!resultRef.current) {
+      alert("Nothing to download");
+      return;
+    }
+    try {
+      setIsDownloading(true);
+
+      const orig = resultRef.current as Element;
+      const clone = orig.cloneNode(true) as HTMLElement;
+
+      sanitizeCloneForCanvas(clone, orig);
+
+      clone.style.position = "fixed";
+      clone.style.left = "-9999px";
+      clone.style.top = "0";
+      clone.style.width = `${orig.clientWidth}px`;
+      clone.style.boxSizing = "border-box";
+      clone.style.zIndex = "-9999";
+      document.body.appendChild(clone);
+
+      await new Promise((res) => setTimeout(res, 50));
+
+      const canvas = await html2canvas(clone, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: null,
+        foreignObjectRendering: true as any,
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "pt",
+        format: "a4",
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const renderedWidth = imgWidth * ratio;
+      const renderedHeight = imgHeight * ratio;
+
+      const marginLeft = (pdfWidth - renderedWidth) / 2;
+      const marginTop = (pdfHeight - renderedHeight) / 2;
+
+      pdf.addImage(imgData, "PNG", marginLeft > 0 ? marginLeft : 0, marginTop > 0 ? marginTop : 0, renderedWidth, renderedHeight);
+      pdf.save(filename);
+
+      document.body.removeChild(clone);
+    } catch (err: any) {
+      console.error("Error creating PDF:", err);
+      alert("Failed to create PDF: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsDownloading(false);
+    }
+  }
+
+  const handleDownloadResults = async (format: 'html' | 'docx' | 'ppt' | 'pdf') => {
     if (workflowResponses.length === 0) return;
 
     setIsDownloading(true);
@@ -445,34 +900,57 @@ export default function WorkflowRunnerUI() {
     const { workflowId, workflowName, nodeResults, variables } = getWorkflowData();
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    let extension = format === 'docx' ? 'docx' : format === 'ppt' ? 'pptx' : 'html';
-    const filename = `workflow-results-${workflowName}.${extension}`;
+    const safeName = (workflowName || 'workflow').replace(/\s+/g, '-').toLowerCase();
 
     try {
-      setDownloadedFormat(format === 'docx' ? 'Word document' : format === 'ppt' ? 'PowerPoint presentation' : 'HTML document');
+      setDownloadedFormat(format === 'docx' ? 'Word document' : format === 'ppt' ? 'PowerPoint presentation' : format === 'pdf' ? 'PDF document' : 'HTML document');
 
-      const docBlob = await generateDocumentFromResults(format, workflowId, workflowName, nodeResults, variables);
-      downloadDocument(docBlob, filename);
+      if (format === 'pdf') {
+        await downloadResultAsPDF(`workflow-results-${safeName}.pdf`);
+      } else {
+        try {
+          const docBlob = await generateDocumentFromResults(format, workflowId, workflowName, nodeResults, variables);
+          if (docBlob) {
+            const extension = format === 'docx' ? 'docx' : format === 'ppt' ? 'pptx' : 'html';
+            const filename = `workflow-results-${safeName}.${extension}`;
+            downloadDocument(docBlob, filename);
+          } else {
+            const rightPanelHtml = resultRef.current ? resultRef.current.innerHTML : "";
+            if (format === 'docx') {
+              await handleDownloadResultAsDocxFromHTML(rightPanelHtml, `workflow-results-${safeName}.docx`);
+            } else {
+              const blob = new Blob([rightPanelHtml], { type: "text/html;charset=utf-8" });
+              saveAs(blob, `workflow-results-${safeName}.html`);
+            }
+          }
+        } catch (err) {
+          console.warn("generateDocumentFromResults failed — falling back to simple export", err);
+          const rightPanelHtml = resultRef.current ? resultRef.current.innerHTML : "";
+          if (format === 'docx') {
+            await handleDownloadResultAsDocxFromHTML(rightPanelHtml, `workflow-results-${safeName}.docx`);
+          } else {
+            const blob = new Blob([rightPanelHtml], { type: "text/html;charset=utf-8" });
+            saveAs(blob, `workflow-results-${safeName}.html`);
+          }
+        }
+      }
     } catch (error) {
-      console.error('Error generating document:', error);
-      alert(`Failed to generate ${format.toUpperCase()} document: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error("Error generating document:", error);
+      alert(`Failed to generate ${format.toUpperCase()} document: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setIsDownloading(false);
+      setDownloadLocation(getDocumentSaveLocation());
+      setShowDownloadSuccess(true);
+      setShowLocationModal(true);
+      setTimeout(() => setShowDownloadSuccess(false), 5000);
     }
-
-    setDownloadLocation(getDocumentSaveLocation());
-    setShowDownloadSuccess(true);
-    setShowLocationModal(true);
-    setTimeout(() => setShowDownloadSuccess(false), 5000);
   };
 
-  // Debug logging
   useEffect(() => {
     console.log('Current workflow details:', workflowDetails);
     console.log('Current input fields:', inputFields);
   }, [workflowDetails, inputFields]);
 
-  // If no workflow id provided in URL, show a friendly message (you can change to redirect)
   if (!selectedWorkflowId) {
     return (
       <div className="flex items-center justify-center h-screen p-6">
@@ -496,17 +974,14 @@ export default function WorkflowRunnerUI() {
       style={{
         backgroundImage: `url('wave-blue.svg')`,
         backgroundRepeat: 'no-repeat',
-        backgroundSize: 'cover',       // try 'contain' or 'auto 100%' if needed
+        backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed',
       }}
     >
       <div className="flex-1 w-full h-full overflow-hidden py-4">
-        {/* --- UPDATED PANELS: gradient backgrounds (accent bars removed) --- */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 h-full">
-          {/* LEFT PANEL - Workflow Runner */}
           <div className="col-span-1 lg:col-span-2 relative rounded-lg overflow-hidden transition-all duration-300 ease-in-out hover:shadow-2xl border border-indigo-100">
-            {/* background gradient */}
             <div
               className="absolute inset-0 pointer-events-none"
               aria-hidden="true"
@@ -516,26 +991,21 @@ export default function WorkflowRunnerUI() {
               }}
             ></div>
 
-            {/* content */}
             <div className="relative z-10 flex flex-col h-full backdrop-blur-sm">
-              {/* HEADER */}
               <div className="p-6 border-b border-gray-200 
                               bg-gradient-to-r from-indigo-100 via-purple-100 to-indigo-200
                               flex items-center justify-between rounded-t-lg shadow-sm px-13 py-13">
                 <h2 className="text-xl font-semibold tracking-tight text-slate-800 flex items-center drop-shadow-sm">
-                  {/* <Play className="w-15 h-15 mr-3 text-indigo-600" /> */}
                   <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 bg-clip-text text-transparent">
                     Flow Executor
                   </span>
                 </h2>
               </div>
 
-              {/* BODY */}
               <div className="p-6">
                 <div className="mb-6">
                   <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                    {/* <Play className="w-5 h-5 text-indigo-600" /> */}
-                    {workflowDetails?.name.split("_").pop() || selectedWorkflowId}
+                    {workflowDetails?.name?.split?.("_")?.pop?.() || selectedWorkflowId}
                   </h3>
                   <p className="mt-1 text-sm text-gray-500">
                     Provide the required inputs below and click{" "}
@@ -543,16 +1013,10 @@ export default function WorkflowRunnerUI() {
                   </p>
                 </div>
 
-                {/* Workflow Inputs */}
                 {workflowDetails && (
                   <div className="mb-6 bg-white/90 rounded-lg border border-gray-200 p-4 shadow-sm">
                     <h3 className="text-md font-medium mb-4 text-gray-700 flex items-center">
                       <span className="mr-2">Required Inputs</span>
-                      {/* {workflowDetails.name && (
-                        <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded">
-                          {workflowDetails.name}
-                        </span>
-                      )} */}
                     </h3>
 
                     {isLoading ? (
@@ -573,7 +1037,6 @@ export default function WorkflowRunnerUI() {
                               <label className="block text-sm font-medium text-gray-700">
                                 {input.name}{" "}
                                 {input.required && <span className="text-red-500">*</span>}
-                                
                               </label>
                               {inputValidation[input.name] &&
                                 !inputValidation[input.name].isValid && (
@@ -581,11 +1044,7 @@ export default function WorkflowRunnerUI() {
                                     {inputValidation[input.name].message}
                                   </span>
                                 )}
-                                
                             </div>
-                            {/* <label className="block text-[10px] text-gray-700">
-                                {input.description}
-                            </label> */}
 
                             {input.type === "select" && input.options ? (
                               <select
@@ -593,12 +1052,11 @@ export default function WorkflowRunnerUI() {
                                 onChange={(e) =>
                                   handleInputChange(input.name, e.target.value)
                                 }
-                                className={`w-full px-4 py-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                  inputValidation[input.name] &&
-                                  !inputValidation[input.name].isValid
+                                className={`w-full px-4 py-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${inputValidation[input.name] &&
+                                    !inputValidation[input.name].isValid
                                     ? "border-red-300 bg-red-50"
                                     : "border-gray-300"
-                                }`}
+                                  }`}
                               >
                                 <option value="">-- Select an option --</option>
                                 {input.options.map((option) => (
@@ -610,47 +1068,145 @@ export default function WorkflowRunnerUI() {
                             ) : input.type === "number" ? (
                               <input
                                 type="number"
-                                value={inputFields[input.name] || ""}
+                                value={inputFields[input.name] ?? ""}
                                 onChange={(e) =>
                                   handleInputChange(input.name, e.target.value)
                                 }
                                 placeholder={input.description}
-                                className={`w-full px-4 py-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                  inputValidation[input.name] &&
-                                  !inputValidation[input.name].isValid
+                                className={`w-full px-4 py-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${inputValidation[input.name] &&
+                                    !inputValidation[input.name].isValid
                                     ? "border-red-300 bg-red-50"
                                     : "border-gray-300"
-                                }`}
+                                  }`}
                               />
                             ) : input.type === "textarea" ? (
                               <textarea
-                                value={inputFields[input.name] || ""}
+                                value={inputFields[input.name] ?? ""}
                                 onChange={(e) =>
                                   handleInputChange(input.name, e.target.value)
                                 }
                                 placeholder={input.description}
                                 rows={4}
-                                className={`w-full px-4 py-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                  inputValidation[input.name] &&
-                                  !inputValidation[input.name].isValid
+                                className={`w-full px-4 py-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${inputValidation[input.name] &&
+                                    !inputValidation[input.name].isValid
                                     ? "border-red-300 bg-red-50"
                                     : "border-gray-300"
-                                }`}
+                                  }`}
                               />
+                            ) : input.type === "document" ? (
+                              <div className="space-y-3">
+                                <div
+                                  className={`relative border-2 rounded-lg p-4 transition-colors duration-150 ${uploadingFiles[input.name] ? "border-indigo-400 bg-indigo-50/40" : "border-dashed border-gray-200 bg-white"}`}
+                                  onDragOver={(e) => { e.preventDefault(); (e.currentTarget as HTMLElement).classList.add("border-indigo-400"); }}
+                                  onDragLeave={(e) => { (e.currentTarget as HTMLElement).classList.remove("border-indigo-400"); }}
+                                  onDrop={(e) => {
+                                    e.preventDefault();
+                                    (e.currentTarget as HTMLElement).classList.remove("border-indigo-400");
+                                    const file = e.dataTransfer.files[0];
+                                    if (file) uploadDocumentForVariable(input.name, file);
+                                  }}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <div className="flex items-center gap-3">
+                                        <svg className="w-8 h-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 2h6l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 2v6h6" />
+                                        </svg>
+                                        <div>
+                                          <div className="text-sm font-medium">{input.description || (input as any).documentName || "Upload PDF"}</div>
+                                          <div className="text-xs text-gray-500">Drag & drop a PDF here, or click to select. Max: {formatBytes(MAX_FILE_SIZE_BYTES)}</div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <label className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded shadow cursor-pointer hover:brightness-110">
+                                        <input
+                                          type="file"
+                                          accept="application/pdf"
+                                          className="hidden"
+                                          onChange={(e) => {
+                                            const f = e.target.files?.[0] ?? null;
+                                            if (!f) return;
+                                            uploadDocumentForVariable(input.name, f);
+                                            (e.target as HTMLInputElement).value = "";
+                                          }}
+                                        />
+                                        {uploadingFiles[input.name] ? "Uploading…" : "Choose file"}
+                                      </label>
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-4">
+                                    {inputFields[input.name] && (inputFields[input.name] as FileMeta).originalFilename ? (
+                                      <div className="flex items-center justify-between gap-4 p-3 bg-gray-50 rounded">
+                                        <div className="flex items-center gap-3">
+                                          <div className="w-12 h-12 flex items-center justify-center bg-white rounded border">
+                                            <svg className="w-6 h-6 text-indigo-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 2h6l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" />
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 2v6h6" />
+                                            </svg>
+                                          </div>
+                                          <div>
+                                            <div className="text-sm font-medium">{(inputFields[input.name] as FileMeta).originalFilename}</div>
+                                            <div className="text-xs text-gray-500">{formatBytes((inputFields[input.name] as FileMeta).size)}</div>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-3">
+                                          {(inputFields[input.name] as FileMeta).fileUrl ? (
+                                            <a href={(inputFields[input.name] as FileMeta).fileUrl} target="_blank" rel="noreferrer" className="text-sm underline">View</a>
+                                          ) : ( (inputFields[input.name] as FileMeta).storageId ? (
+                                            <span className="text-sm inline-flex items-center gap-2 px-2 py-1 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">Uploaded</span>
+                                          ) : null )}
+
+                                          {uploadingFiles[input.name] ? (
+                                            <button onClick={() => cancelUpload(input.name)} className="text-sm px-3 py-1 border rounded">Cancel</button>
+                                          ) : (
+                                            <button onClick={() => removeUploadedFile(input.name)} className="text-sm px-3 py-1 border rounded">Remove</button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="text-xs text-gray-500">No file uploaded yet</div>
+                                    )}
+
+                                    {uploadingFiles[input.name] || (uploadProgress[input.name] && uploadProgress[input.name] > 0) ? (
+                                      <div className="mt-3">
+                                        <div className="h-2 w-full bg-gray-200 rounded overflow-hidden">
+                                          <div
+                                            style={{ width: `${uploadProgress[input.name] ?? 0}%` }}
+                                            className={`h-2 bg-indigo-600 transition-all duration-200 ${uploadProgress[input.name] ? "" : "animate-pulse"}`}
+                                          />
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-1">
+                                          {uploadProgress[input.name] ? `${uploadProgress[input.name]}%` : "Uploading…"}
+                                        </div>
+                                      </div>
+                                    ) : null}
+
+                                    {uploadErrors[input.name] && (
+                                      <div className="mt-2 text-xs text-red-500">
+                                        {uploadErrors[input.name]}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
                             ) : (
                               <input
                                 type="text"
-                                value={inputFields[input.name] || ""}
+                                value={inputFields[input.name] ?? ""}
                                 onChange={(e) =>
                                   handleInputChange(input.name, e.target.value)
                                 }
                                 placeholder={input.description}
-                                className={`w-full px-4 py-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                  inputValidation[input.name] &&
-                                  !inputValidation[input.name].isValid
+                                className={`w-full px-4 py-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${inputValidation[input.name] &&
+                                    !inputValidation[input.name].isValid
                                     ? "border-red-300 bg-red-50"
                                     : "border-gray-300"
-                                }`}
+                                  }`}
                               />
                             )}
                           </div>
@@ -667,7 +1223,6 @@ export default function WorkflowRunnerUI() {
                   </div>
                 )}
 
-                {/* Run Button */}
                 <button
                   onClick={handleRunWorkflow}
                   disabled={isExecuting || !selectedWorkflowId}
@@ -693,7 +1248,6 @@ export default function WorkflowRunnerUI() {
             </div>
           </div>
 
-          {/* RIGHT PANEL - Workflow Results */}
           <div className="col-span-1 lg:col-span-3 relative rounded-lg overflow-hidden transition-all duration-300 ease-in-out hover:shadow-2xl border border-indigo-100">
             <div
               className="absolute inset-0 pointer-events-none"
@@ -715,7 +1269,6 @@ export default function WorkflowRunnerUI() {
                   </span>
                 </h2>
 
-                {/* DOWNLOAD BUTTON (top-right of Results header) */}
                 <div className=" flex items-center gap-2 px-5 py-5">
                   <button
                     onClick={() => handleDownloadResults('docx')}
@@ -742,22 +1295,16 @@ export default function WorkflowRunnerUI() {
               </div>
 
               <div className="flex-1 p-4 overflow-hidden">
-                {/* Download Success Message */}
                 {showDownloadSuccess && (
                   <div className="flex items-start gap-2 p-3 mb-4 bg-green-50 rounded-md border border-green-200">
-                    {/* <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" /> */}
                     <div>
                       <p className="text-sm font-medium text-green-800">
                         {downloadedFormat} downloaded successfully!
-                      </p>
-                      <p className="text-xs text-green-700 mt-1">
-                        {/* File saved to your {downloadLocation} */}
                       </p>
                     </div>
                   </div>
                 )}
 
-                {/* Results Display - Only Show Final Output */}
                 {workflowResponses.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-gray-500 p-8">
                     <div className="p-8 rounded-full bg-indigo-50 mb-6">
@@ -782,7 +1329,7 @@ export default function WorkflowRunnerUI() {
                         </div>
                       </div>
                     ) : (
-                      <div>
+                      <div ref={resultRef as any}>
                         {getFinalWorkflowResult(workflowResponses)}
                       </div>
                     )}
@@ -792,24 +1339,23 @@ export default function WorkflowRunnerUI() {
             </div>
           </div>
         </div>
-        {/* --- END UPDATED PANELS --- */}
       </div>
 
-      {/* File Location Modal */}
-      {/* <FileLocationModal
+      <FileLocationModal
         isOpen={showLocationModal}
         onClose={() => setShowLocationModal(false)}
         fileType={downloadedFormat}
         location={downloadLocation}
-      /> */}
+      />
     </div>
   );
 }
 
-// Helper functions (getFinalWorkflowResult, formatOutput, getEventIcon, getResponseCardStyle, formatResponseData)
-// ... keep these helper functions from your original file (unchanged) ...
+/* ===========================
+   Helpers: rendering results
+   (kept from your original)
+   =========================== */
 
-// Extract the final result from workflow responses
 const getFinalWorkflowResult = (responses: any[]) => {
   const completedEvent = responses.find(r => r.event === "workflow_completed");
 
@@ -1042,7 +1588,6 @@ const formatOutput = (output: any) => {
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 to-slate-100 p-6 flex flex-col gap-6">
       <div className="flex items-start gap-3">
-        {/* <CheckCircle className="w-6 h-6 text-blue-500 mt-1" /> */}
         <div className="flex-1">
           <div className="bg-white p-5 rounded-md border border-blue-100 h-[calc(100vh-80px)] overflow-y-auto">
             <div
@@ -1058,7 +1603,10 @@ const formatOutput = (output: any) => {
   );
 };
 
-// Helper icon + formatting functions
+/* ===========================
+   Small helpers (icons, formatting)
+   =========================== */
+
 function getEventIcon(event: string) {
   switch (event) {
     case "workflow_started":

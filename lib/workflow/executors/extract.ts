@@ -35,13 +35,29 @@ export async function executeExtractNode(
       const contextData = typeof lastOutput === 'string'
         ? lastOutput
         : JSON.stringify(lastOutput, null, 2);
-      fullPrompt = `${fullPrompt}\n\nData to extract from:\n${contextData.substring(0, 10000)}`;
+
+      const maxLength = 10000;
+      const truncated = contextData.substring(0, maxLength);
+      const wasTruncated = contextData.length > maxLength;
+
+      fullPrompt = `${fullPrompt}\n\nData to extract from:\n${truncated}`;
+
+      if (wasTruncated) {
+        const originalLength = contextData.length;
+        console.warn(`[Extract] Input truncated from ${originalLength} to ${maxLength} characters`);
+        fullPrompt += `\n\n[Note: Input was truncated from ${originalLength} to ${maxLength} characters due to length limits]`;
+      }
     }
 
     // Parse JSON schema
-    const schema = typeof data.jsonSchema === 'string'
-      ? JSON.parse(data.jsonSchema)
-      : data.jsonSchema;
+    let schema;
+    try {
+      schema = typeof data.jsonSchema === 'string'
+        ? JSON.parse(data.jsonSchema)
+        : data.jsonSchema;
+    } catch (e) {
+      throw new Error(`Invalid JSON schema: ${e instanceof Error ? e.message : 'Parse error'}`);
+    }
 
     // If MCP tools are configured, use Responses API
     if (data.mcpTools && data.mcpTools.length > 0) {
@@ -49,7 +65,7 @@ export async function executeExtractNode(
         type: 'mcp' as const,
         server_label: mcp.name,
         server_url: mcp.url.includes('{FIRECRAWL_API_KEY}')
-          ? mcp.url.replace('{FIRECRAWL_API_KEY}', apiKeys?.firecrawl || '')
+          ? mcp.url.replace('{FIRECRAWL_API_KEY}', encodeURIComponent(apiKeys?.firecrawl || ''))
           : mcp.url,
         authorization: mcp.accessToken ? `Bearer ${mcp.accessToken}` : undefined,
         require_approval: 'never' as const,
@@ -69,7 +85,13 @@ export async function executeExtractNode(
         },
       });
 
-      const extractedData = JSON.parse(response.output_text || '{}');
+      let extractedData;
+      try {
+        extractedData = JSON.parse(response.output_text || '{}');
+      } catch (e) {
+        console.error('Failed to parse LLM extraction response:', response.output_text);
+        throw new Error(`LLM returned invalid JSON: ${e instanceof Error ? e.message : 'Parse error'}`);
+      }
 
       return {
         extractedData,
@@ -96,7 +118,13 @@ export async function executeExtractNode(
       },
     });
 
-    const extractedData = JSON.parse(completion.choices[0].message.content || '{}');
+    let extractedData;
+    try {
+      extractedData = JSON.parse(completion.choices[0].message.content || '{}');
+    } catch (e) {
+      console.error('Failed to parse LLM extraction response:', completion.choices[0].message.content);
+      throw new Error(`LLM returned invalid JSON: ${e instanceof Error ? e.message : 'Parse error'}`);
+    }
 
     return {
       extractedData,
