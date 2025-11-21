@@ -23,7 +23,12 @@
       "Bash(cmd.exe /c \"taskkill /F /PID 36736\")",
       "Bash(cmd.exe /c \"taskkill /F /PID 16368\")",
       "Bash(npx kill-port:*)",
-      "Bash(dir /s /b D:GitHubopen-agent-builderlibtools 2)"
+      "Bash(dir /s /b D:GitHubopen-agent-builderlibtools 2)",
+      "Bash(cat:*)",
+      "Bash(git diff:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
