@@ -522,3 +522,38 @@ npm run test:headed
 # Use UI mode for interactive debugging
 npm run test:ui
 ```
+
+---
+
+## Adding New Tools
+
+This section explains how to add new tools to the framework in a future-proof way.
+
+### Quick Start
+
+Adding a new tool requires just **3 steps**:
+
+1. **Define the tool** in `lib/tools/registry.ts`
+2. **Implement the tool** in `lib/workflow/executors/tool-factory.ts`
+3. **Test the tool** in a workflow
+
+The framework handles all response formats automatically.
+
+### Tool Architecture
+
+```
+Tool Registry (lib/tools/registry.ts)
+  └─> Defines tool metadata, fields, UI config
+
+Tool Factory (lib/workflow/executors/tool-factory.ts)
+  └─> Creates tool instances with wrapToolFunction()
+
+Tool Utils (lib/workflow/executors/tool-utils.ts)
+  └─> Automatic result normalization & error handling
+
+Agent Executor (lib/workflow/executors/agent.ts)
+  └─> Invokes tools and processes results
+```
+
+For complete details, see `ADDING-NEW-TOOLS.md`.
+

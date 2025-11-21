@@ -112,6 +112,12 @@ export class ToolFactory {
                         // Get text
                         let text = $('body').text();
 
+                        // Safety check: ensure text is a string
+                        if (!text || typeof text !== 'string') {
+                            console.warn('[content-extractor] Failed to extract text from body, returning empty string');
+                            return '';
+                        }
+
                         // Clean up whitespace
                         text = text.replace(/\s+/g, ' ').trim();
 
