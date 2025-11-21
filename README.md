@@ -451,7 +451,7 @@ Open Agent Builder implements enterprise-grade security measures:
 - **AES-256-GCM Encryption** - User API keys encrypted at rest
 - **E2B Sandboxing** - All user code execution runs in isolated cloud environments
 - **SSRF Protection** - HTTP nodes blocked from accessing private IPs and cloud metadata
-- **Rate Limiting** - API abuse prevention (10 workflow executions/min per user)
+- **Distributed Rate Limiting** - Convex-based rate limiting that works across multiple serverless instances (10 workflow executions/min per user)
 - **Authorization** - User ownership verification on all operations
 - **Safe Expression Evaluation** - No `eval()` or `Function()` in conditions/expressions
 - **Prototype Pollution Protection** - Variable substitution secured against attacks

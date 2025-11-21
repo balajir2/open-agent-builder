@@ -12,7 +12,7 @@ import Button from "@/components/shared/button/Button";
 import { Connector } from "@/components/shared/layout/curvy-rect";
 import HeroFlame from "@/components/shared/effects/flame/hero-flame";
 import AsciiExplosion from "@/components/shared/effects/flame/ascii-explosion";
-import { HeaderProvider } from "@/components/shared/header/HeaderContext";
+import { HeaderProvider } from "@/components/layout/header/HeaderContext";
 
 // Import hero section components
 import HomeHeroBackground from "@/components/app/(home)/sections/hero/Background/Background";
@@ -27,10 +27,10 @@ import Step2Placeholder from "@/components/app/(home)/sections/step2/Step2Placeh
 import WorkflowBuilder from "@/components/app/(home)/sections/workflow-builder/WorkflowBuilder";
 
 // Import header components
-import HeaderBrandKit from "@/components/shared/header/BrandKit/BrandKit";
-import HeaderWrapper from "@/components/shared/header/Wrapper/Wrapper";
-import HeaderDropdownWrapper from "@/components/shared/header/Dropdown/Wrapper/Wrapper";
-import GithubIcon from "@/components/shared/header/Github/_svg/GithubIcon";
+import HeaderBrandKit from "@/components/layout/header/BrandKit/BrandKit";
+import HeaderWrapper from "@/components/layout/header/Wrapper/Wrapper";
+import HeaderDropdownWrapper from "@/components/layout/header/Dropdown/Wrapper/Wrapper";
+import GithubIcon from "@/components/layout/header/Github/_svg/GithubIcon";
 import ButtonUI from "@/components/ui/shadcn/button";
 
 function StyleGuidePageContent() {

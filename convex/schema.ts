@@ -232,4 +232,25 @@ export default defineSchema({
     .index("by_userId", ["userId"])
     .index("by_workflow", ["workflowId"])
     .index("by_execution", ["executionId"]),
+
+  // Rate Limits - Distributed rate limiting across instances
+  rateLimits: defineTable({
+    key: v.string(), // e.g., "user:123:workflow-execution"
+    requests: v.array(v.number()), // Array of request timestamps
+    resetAt: v.number(), // When the window resets
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_key", ["key"])
+    .index("by_resetAt", ["resetAt"]), // For cleanup of old records
+
+  // Cache - Distributed caching across instances
+  cache: defineTable({
+    key: v.string(),
+    value: v.string(), // JSON stringified value
+    expiresAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_key", ["key"])
+    .index("by_expiration", ["expiresAt"]), // For cleanup of expired entries
 });
