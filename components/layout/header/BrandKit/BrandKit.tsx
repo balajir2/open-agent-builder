@@ -7,8 +7,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import FirecrawlIcon from "@/components/shared/firecrawl-icon/firecrawl-icon";
-import Logo from "@/components/shared/header/_svg/Logo";
-import { useHeaderContext } from "@/components/shared/header/HeaderContext";
+import Logo from "@/components/layout/header/_svg/Logo";
+import { useHeaderContext } from "@/components/layout/header/HeaderContext";
 import { cn } from "@/utils/cn";
 
 import Download from "./_svg/Download";
@@ -47,7 +47,7 @@ export default function HeaderBrandKit() {
           Research Workflow
         </span>
       </Link>
-  
+
       <AnimatePresence initial={false} mode="popLayout">
         {open && <Menu setOpen={setOpen} />}
       </AnimatePresence>

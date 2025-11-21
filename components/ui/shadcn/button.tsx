@@ -5,7 +5,7 @@ import { cn } from "@/utils/cn";
 import "./button.css";
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary";
+  variant?: "primary" | "secondary" | "outline";
   size?: "default" | "large";
   disabled?: boolean;
   loadingLabel?: string;
@@ -63,7 +63,7 @@ const Button = forwardRef<HTMLButtonElement, Props>(
             "text-accent-white",
             // Hover/active only when interactive
             !isNonInteractive &&
-              "hover:bg-[color:var(--heat-90)] active:[scale:0.995]",
+            "hover:bg-[color:var(--heat-90)] active:[scale:0.995]",
             // Disabled: dim a bit, no hover, dim overlay bg layer if present
             "disabled:opacity-80",
             "disabled:[&_.button-background]:opacity-70",
@@ -79,6 +79,13 @@ const Button = forwardRef<HTMLButtonElement, Props>(
             "disabled:bg-black-alpha-3",
             "disabled:text-black-alpha-48",
             "disabled:hover:bg-black-alpha-3",
+          ],
+
+          // Outline variant
+          variant === "outline" && [
+            "bg-transparent border border-border-base text-accent-black",
+            !isNonInteractive && "hover:bg-black-alpha-2 active:bg-black-alpha-4",
+            "disabled:opacity-50",
           ],
         )}
         disabled={isNonInteractive}

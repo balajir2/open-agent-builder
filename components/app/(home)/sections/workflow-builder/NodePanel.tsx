@@ -89,6 +89,14 @@ export default function NodePanel({
           { id: 'groq/llama-3.3-70b-versatile', name: 'Llama 3.3 70B' },
           { id: 'groq/llama-3.1-8b-instant', name: 'Llama 3.1 8B' },
         ]
+      },
+      {
+        provider: 'Google',
+        hasKey: hasProvider('google'),
+        models: [
+          { id: 'google/gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+          { id: 'google/gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
+        ]
       }
     ];
 

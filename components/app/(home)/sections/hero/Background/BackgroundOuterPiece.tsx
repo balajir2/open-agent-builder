@@ -6,7 +6,7 @@ import { Connector } from "@/components/shared/layout/curvy-rect";
 import {
   useHeaderContext,
   useHeaderHeight,
-} from "@/components/shared/header/HeaderContext";
+} from "@/components/layout/header/HeaderContext";
 import { cn } from "@/utils/cn";
 
 export const BackgroundOuterPiece = () => {
@@ -21,7 +21,7 @@ export const BackgroundOuterPiece = () => {
       setNoRender(true);
       return;
     }
-    
+
     const heroContentHeight = heroContent.clientHeight;
 
     const onScroll = () => {

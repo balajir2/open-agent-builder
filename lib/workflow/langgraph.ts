@@ -12,6 +12,7 @@
 
 import 'server-only';
 import { StateGraph, Annotation, START, END, MemorySaver, Command, Send, interrupt, isInterrupted } from "@langchain/langgraph";
+import { Parser } from "expr-eval";
 import { Workflow, WorkflowState, NodeExecutionResult, WorkflowNode, WorkflowEdge, WorkflowPendingAuth } from './types';
 import { executeAgentNode } from './executors/agent';
 import { executeMCPNode } from './executors/mcp';
@@ -753,27 +754,23 @@ export class LangGraphExecutor {
       if (loopOutput.condition === true && loopOutput.stoppedReason === 'max_iterations') {
         return false;
       }
+
       return Boolean(loopOutput.condition);
     }
 
     const conditionExpr = (node.data as any)?.whileCondition || (node.data as any)?.condition || 'false';
 
     try {
-      const evalFunction = new Function(
-        'input',
-        'state',
-        'lastOutput',
-        'iteration',
-        `return ${conditionExpr}`
-      );
+      const parser = new Parser();
+      const expr = parser.parse(conditionExpr);
 
       return Boolean(
-        evalFunction(
-          state.variables.input,
-          state,
-          state.variables.lastOutput,
-          currentIteration
-        )
+        expr.evaluate({
+          input: state.variables.input,
+          state: state,
+          lastOutput: state.variables.lastOutput,
+          iteration: currentIteration
+        })
       );
     } catch (error) {
       console.error(`ERROR: While loop ${node.id}: condition evaluation error`, error);

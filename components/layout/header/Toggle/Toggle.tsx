@@ -1,7 +1,7 @@
 "use client";
 
 import Button from "@/components/ui/shadcn/button";
-import { useHeaderContext } from "@/components/shared/header/HeaderContext";
+import { useHeaderContext } from "@/components/layout/header/HeaderContext";
 import { cn } from "@/utils/cn";
 
 export default function HeaderToggle({

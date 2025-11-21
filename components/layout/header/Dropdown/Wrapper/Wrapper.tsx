@@ -5,7 +5,7 @@ import { AnimatePresence, cubicBezier, motion } from "motion/react";
 import { useEffect } from "react";
 
 import { Connector } from "@/components/shared/layout/curvy-rect";
-import { useHeaderContext } from "@/components/shared/header/HeaderContext";
+import { useHeaderContext } from "@/components/layout/header/HeaderContext";
 import { lockBody } from "@/components/shared/lockBody";
 import AnimatedHeight from "@/components/shared/layout/animated-height";
 export default function HeaderDropdownWrapper() {

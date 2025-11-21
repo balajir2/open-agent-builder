@@ -2,7 +2,7 @@
  * Model validation and configuration for LLM providers
  */
 
-export type Provider = 'openai' | 'anthropic' | 'groq';
+export type Provider = 'openai' | 'anthropic' | 'groq' | 'google';
 
 export interface ModelConfig {
   provider: Provider;
@@ -17,6 +17,7 @@ export interface ModelConfig {
  * - OpenAI: Responses API
  * - Anthropic: Messages API with MCP beta
  * - Groq: Responses API (OpenAI-compatible)
+ * - Google: Gemini API
  */
 export const SUPPORTED_MODELS = {
   openai: [
@@ -33,6 +34,10 @@ export const SUPPORTED_MODELS = {
     // Only Groq models that support Responses API (per Groq docs)
     'gpt-oss-120b',
   ],
+  google: [
+    'gemini-1.5-pro',
+    'gemini-1.5-flash',
+  ],
 } as const;
 
 /**
@@ -42,6 +47,7 @@ export const DEFAULT_MODELS = {
   openai: 'gpt-4o',
   anthropic: 'claude-sonnet-4-5-20250929', // Claude 4.5 Sonnet
   groq: 'gpt-oss-120b', // Using Responses API model for better MCP support
+  google: 'gemini-1.5-pro',
 } as const;
 
 /**
@@ -59,12 +65,12 @@ export function parseModelString(modelString?: string): { provider: Provider; mo
     const [provider, modelName] = modelString.split('/', 2) as [string, string];
 
     // Validate provider
-    if (provider !== 'openai' && provider !== 'anthropic' && provider !== 'groq') {
+    if (provider !== 'openai' && provider !== 'anthropic' && provider !== 'groq' && provider !== 'google') {
       // Default to openai if provider is unknown
       return { provider: 'openai', modelName: DEFAULT_MODELS.openai };
     }
 
-    return { provider, modelName };
+    return { provider: provider as Provider, modelName };
   }
 
   // No provider prefix, default to openai
@@ -108,7 +114,7 @@ export function getDefaultModel(provider: Provider): string {
  * Check if a provider is supported
  */
 export function isSupportedProvider(provider: string): provider is Provider {
-  return provider === 'openai' || provider === 'anthropic' || provider === 'groq';
+  return provider === 'openai' || provider === 'anthropic' || provider === 'groq' || provider === 'google';
 }
 
 /**
