@@ -40,6 +40,14 @@ Open Agent Builder is a visual workflow builder for creating AI agent pipelines 
 - **10 core node types**: Start, Agent, MCP Tools, Transform, Extract, HTTP, If/Else, While Loop, User Approval, End
 - **Template library** with pre-built workflows
 - **MCP protocol support** for extensible tool integration
+- **Custom tool integration** - Attach standard and MCP tools to AI agents
+- **Multi-LLM support** - Choose from Claude, GPT-4o, Gemini, or Groq
+
+### End-User Workflow Execution
+- **Workflow Runner UI** - Clean, simple interface for executing published workflows
+- **User Workflow Interface** - Allow end users to run workflows without seeing builder complexity
+- **Embedded execution** - Share workflows via direct links
+- **Real-time progress** - Watch workflow execution with live updates
 
 ### Powered by Firecrawl
 - **Native Firecrawl integration** for web scraping and searching
@@ -67,6 +75,7 @@ Open Agent Builder is a visual workflow builder for creating AI agent pipelines 
 | **[React Flow](https://reactflow.dev/)** | Visual workflow builder canvas with drag-and-drop nodes |
 | **[Anthropic](https://www.anthropic.com/)** | Claude AI integration with native MCP support (Claude Haiku 4.5 & Sonnet 4.5) |
 | **[OpenAI](https://platform.openai.com/)** | GPT-4o integration (MCP support in development) |
+| **[Google AI](https://ai.google.dev/)** | Gemini 1.5 Pro & Flash integration (MCP support in development) |
 | **[Groq](https://groq.com/)** | Fast inference for open models (MCP support in development) |
 | **[E2B](https://e2b.dev)** | Sandboxed code execution for secure transform nodes |
 | **[Vercel](https://vercel.com)** | Deployment platform with edge functions |
@@ -212,6 +221,9 @@ ANTHROPIC_API_KEY=sk-ant-...
 # OpenAI GPT-4o (MCP support in development)
 OPENAI_API_KEY=sk-...
 
+# Google Gemini 1.5 Pro & Flash (MCP support in development)
+GOOGLE_API_KEY=AIza...
+
 # Groq (MCP support in development)
 GROQ_API_KEY=gsk_...
 ```
@@ -267,61 +279,110 @@ npm start
 1. **Sign Up/Login** at `http://localhost:3000`
 2. **Add your LLM API key** in Settings → API Keys
    - For MCP tool support: Use Anthropic Claude (Haiku 4.5 or Sonnet 4.5)
-   - For basic workflows: OpenAI or Groq also work
+   - For basic workflows: OpenAI, Google Gemini, or Groq also work
 3. **Click "New Workflow"** or select a template
 4. **Try the "Simple Web Scraper" template:**
    - Pre-configured to scrape any website
    - Uses Firecrawl for extraction
    - AI agent summarizes the content
-5. **Click "Run"** and enter a URL
-6. **Watch real-time execution** with streaming updates
+5. **Attach tools to agents** (optional):
+   - Select an Agent node
+   - Click "Add Tools" in the node panel
+   - Choose from Firecrawl MCP tools or standard tools
+6. **Click "Run"** and enter a URL
+7. **Watch real-time execution** with streaming updates
+
+### End-User Workflow Execution
+
+After building a workflow, share it with end users:
+
+1. **Publish your workflow** - Save and copy the workflow ID
+2. **Share the Workflow Runner link**:
+   ```
+   https://your-domain.com/workflow-runner?workflow=<workflow-id>
+   ```
+3. **End users can execute** without seeing the builder:
+   - Clean, simple input form
+   - Real-time execution progress
+   - Results display
+   - No workflow editing access
+
+**Alternative: User Workflow Interface**
+```
+https://your-domain.com/ui-user-workflows?workflow=<workflow-id>
+```
+Provides a more customizable execution interface with embedded workflow visualization.
 
 ### Understanding Node Types
 
-| Node Type | Purpose | Example Use |
-|-----------|---------|-------------|
-| **Start** | Workflow entry point | Define input variables |
-| **Agent** | AI reasoning with LLMs | Analyze data, make decisions |
-| **MCP Tool** | External tool calls | Firecrawl scraping, APIs |
-| **Transform** | Data manipulation | Parse JSON, filter arrays |
-| **Extract** | LLM-powered extraction | Extract structured data with JSON schema |
-| **HTTP** | HTTP API requests | Call REST APIs with custom headers/auth |
-| **If/Else** | Conditional logic | Route based on conditions |
-| **While Loop** | Iteration | Process multiple pages |
-| **User Approval** | Human-in-the-loop | Review before posting |
-| **End** | Workflow completion | Return final output |
+| Node Type | Purpose | Example Use | Tool Support |
+|-----------|---------|-------------|--------------|
+| **Start** | Workflow entry point | Define input variables | N/A |
+| **Agent** | AI reasoning with LLMs | Analyze data, make decisions | ✅ MCP + Standard Tools |
+| **MCP Tool** | External tool calls | Firecrawl scraping, APIs | N/A |
+| **Transform** | Data manipulation | Parse JSON, filter arrays | N/A |
+| **Extract** | LLM-powered extraction | Extract structured data with JSON schema | N/A |
+| **HTTP** | HTTP API requests | Call REST APIs with custom headers/auth | N/A |
+| **If/Else** | Conditional logic | Route based on conditions | N/A |
+| **While Loop** | Iteration | Process multiple pages | N/A |
+| **User Approval** | Human-in-the-loop | Review before posting | N/A |
+| **End** | Workflow completion | Return final output | N/A |
 
 ---
 
-## MCP Tool Support
+## LLM & Tool Support
 
-### Current Support
-**Anthropic Claude** - Full native MCP support
-- Claude Sonnet 4.5 (Recommended)
-- Claude Haiku 4.5
+### Supported LLM Providers
 
-Anthropic's MCP implementation provides MCP support, other providers are currently in progress.
+| Provider | Models | MCP Support | Standard Tools | Notes |
+|----------|--------|-------------|----------------|-------|
+| **Anthropic Claude** | Haiku 4.5, Sonnet 4.5 | ✅ Native | ✅ Yes | Recommended for MCP |
+| **OpenAI** | GPT-4o, GPT-4o-mini | 🔄 In Dev | ✅ Yes | Function calling |
+| **Google Gemini** | 1.5 Pro, 1.5 Flash | 🔄 In Dev | ✅ Yes | Function calling |
+| **Groq** | GPT-OSS-120B | 🔄 In Dev | ✅ Yes | Fast inference |
 
-### Coming Soon
-- **OpenAI** - MCP support in development
-- **Gemini** - MCP support in development
-- **Open Router** - coming soon...
+### Tool Integration with Agents
 
-### Using MCP Tools
+**Agent nodes can use two types of tools:**
 
-MCP tools enable agents to interact with external services like Firecrawl:
+#### 1. MCP Tools (Model Context Protocol)
+MCP tools enable agents to interact with external services:
 
+- **Firecrawl** (built-in): `scrape`, `search`, `crawl`
+- **Custom MCP servers**: Add your own via Settings → MCP Registry
+
+**How to use:**
 1. Add an **Agent** node to your workflow
-2. In the node settings, select **MCP Tools**
-3. Choose **Firecrawl** or add a custom MCP server
-4. The agent can now call Firecrawl tools like `scrape`, `search`, `crawl`
+2. In the node settings, click **"Add Tools"**
+3. Select **MCP Tools** tab
+4. Choose **Firecrawl** or custom MCP servers
+5. The agent autonomously decides when to use tools
 
-**Example workflow with MCP:**
+#### 2. Standard Tools
+Pre-built tools for common operations:
+
+- **Web Search** - Search the web and get results
+- **Calculator** - Perform mathematical calculations
+- **Date/Time** - Get current date/time information
+- **More coming soon...**
+
+**How to use:**
+1. Add an **Agent** node to your workflow
+2. In the node settings, click **"Add Tools"**
+3. Select **Standard Tools** tab
+4. Choose tools to attach
+5. Agent can call these tools as needed
+
+**Example workflow with tools:**
 ```
-Start → Agent (with Firecrawl MCP) → End
+Start → Agent (with Firecrawl MCP + Calculator) → End
 ```
 
-The agent can intelligently decide when to scrape pages, search the web, or crawl sites based on your instructions.
+The agent can intelligently:
+- Scrape websites when it needs data
+- Search the web for information
+- Calculate numbers when needed
+- Combine multiple tool calls to complete tasks
 
 ---
 
@@ -368,7 +429,7 @@ Output: "Firecrawl is a web scraping API that converts websites into LLM-ready m
 
 Users can add their own API keys via **Settings → API Keys**:
 
-- **LLM Providers:** Anthropic (Recommended for MCP), OpenAI, Groq (Required - add at least one)
+- **LLM Providers:** Anthropic (Recommended for MCP), OpenAI, Google Gemini, Groq (Required - add at least one)
 - **Firecrawl:** Personal API key (Optional - falls back to environment variable)
 - **Custom MCP Servers:** Authentication tokens
 
@@ -437,6 +498,7 @@ Add custom MCP servers in **Settings → MCP Registry**:
 **Optional (can be added in UI instead):**
 - `ANTHROPIC_API_KEY` - Default Claude provider (Recommended for MCP)
 - `OPENAI_API_KEY` - Default GPT-4o provider (MCP in development)
+- `GOOGLE_API_KEY` - Default Gemini provider (MCP in development)
 - `GROQ_API_KEY` - Default Groq provider (MCP in development)
 - `ALLOWED_HTTP_DOMAINS` - Whitelist for HTTP node requests (security)
 
@@ -551,9 +613,16 @@ If you discover a security vulnerability, please email security@your-domain.com 
 ### Specialized Guides
 
 Additional guides are available in [docs/guides/](./docs/guides/):
-- UI Builder documentation (4 guides)
-- Workflow Runner guide
-- Vercel deployment guide
+- **[UI Builder documentation](./docs/guides/)** (4 guides) - Build custom UIs for workflows
+- **[Workflow Runner guide](./docs/guides/WORKFLOW-RUNNER-README.md)** - End-user workflow execution interface
+- **[Vercel deployment guide](./docs/guides/VERCEL_DEPLOYMENT_GUIDE.md)** - Production deployment
+
+### Architecture Documentation
+
+Comprehensive architecture docs in [docs/architecture/](./docs/architecture/):
+- **[System Architecture](./docs/architecture/README.md)** - Complete technical overview
+- **[Database Schema](./docs/architecture/database-schema.md)** - Convex schema documentation
+- **[Execution Engine](./docs/architecture/execution-engine.md)** - LangGraph workflow orchestration
 
 ---
 

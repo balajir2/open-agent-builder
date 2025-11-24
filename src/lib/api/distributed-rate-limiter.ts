@@ -57,7 +57,7 @@ export async function checkRateLimit(
     const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
     // Check rate limit via Convex mutation
-    const result = await convex.mutation(api.rateLimits.check.checkRateLimit, {
+    const result = await convex.mutation(api.functions.rateLimits.check.checkRateLimit, {
       key: identifier,
       limit: config.maxRequests,
       windowMs: config.windowMs,
@@ -136,7 +136,7 @@ export async function resetRateLimit(identifier: string): Promise<void> {
   try {
     const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
-    await convex.mutation(api.rateLimits.check.resetRateLimit, {
+    await convex.mutation(api.functions.rateLimits.check.resetRateLimit, {
       key: identifier,
     });
   } catch (error) {
