@@ -15,7 +15,7 @@ export const generate = action({
   args: {
     name: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ id: any; key: string; keyPrefix: string; name: string }> => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       throw new Error("Not authenticated");
@@ -26,7 +26,7 @@ export const generate = action({
     const keyHash = hashKey(key);
     const keyPrefix = key.substring(0, 15) + "...";
 
-    const apiKeyId = await ctx.runMutation(internal.apiKeys.createApiKey, {
+    const apiKeyId: any = await ctx.runMutation(internal.apiKeys.createApiKey, {
       key: keyHash,
       keyPrefix,
       userId: identity.subject,
@@ -46,7 +46,7 @@ export const generate = action({
 // Verify API key (called by middleware)
 export const verify = action({
   args: { key: v.string() },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<any> => {
     const keyHash = hashKey(args.key);
     return await ctx.runMutation(internal.apiKeys.verifyAndUpdateApiKey, {
       keyHash,
