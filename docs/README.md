@@ -5,35 +5,34 @@ Welcome to the Open Agent Builder documentation! This guide will help you get st
 ## 📚 Documentation Structure
 
 ### Getting Started
-- **[Installation Guide](./getting-started/installation.md)** - Set up your development environment
-- **[Quick Start Tutorial](./getting-started/quick-start.md)** - Build your first workflow in 5 minutes
-- **[Configuration Guide](./getting-started/configuration.md)** - Environment variables and settings
+- **[README.md](../README.md)** - Installation, setup, and quick start guide (start here!)
+- **[User Manual](../USER-MANUAL.md)** - Complete user guide with all features
+- **[CONTRIBUTING.md](../CONTRIBUTING.md)** - How to contribute to the project
 
 ### User Guides
-- **[User Manual](../USER-MANUAL.md)** - Complete user guide with all features
-- **[Workflow Examples](./guides/workflow-examples.md)** - Example workflows and use cases
-- **[MCP Tools Guide](./guides/mcp-tools.md)** - Using MCP protocol tools
-- **[UI Builder Guides](./guides/)** - Visual workflow builder documentation
+- **[Workflow Examples](./guides/workflow-examples.md)** - 7 complete workflow examples
+- **[MCP Tools Guide](./guides/mcp-tools.md)** - Using MCP protocol tools with agents
+- **[Workflow Runner](./guides/WORKFLOW-RUNNER-README.md)** - End-user workflow execution
+- **[UI Builder Guides](./guides/)** - Custom UI builder documentation (4 guides)
 
 ### Architecture & Design
 - **[System Architecture](./architecture/README.md)** - Complete technical architecture
-- **[Database Schema](./architecture/database-schema.md)** - Convex database design
+- **[Database Schema](./architecture/database-schema.md)** - All 13 Convex tables documented
 - **[Execution Engine](./architecture/execution-engine.md)** - LangGraph workflow orchestration
 
 ### Development
-- **[Contributing Guide](./development/CONTRIBUTING.md)** - How to contribute to the project
+- **[Developer Guide (CLAUDE.md)](../CLAUDE.md)** - Complete developer setup & guide (500+ lines)
 - **[Adding New Tools](./development/adding-tools.md)** - Create custom tools and integrations
-- **[Development Setup](./development/development-setup.md)** - Developer environment configuration
 - **[Testing Guide](./development/testing.md)** - Testing guidelines and best practices
 
 ### Security
-- **[Security Overview](./security/README.md)** - Security features and best practices
+- **[Security Overview](./security/README.md)** - All 8 security features explained
 - **[Security Checklist](./security/security-checklist.md)** - Production deployment checklist
 - **[Verification Report](./security/verification-report.md)** - Security audit results
 
 ### API Reference
-- **[REST API Documentation](./api/rest-api.md)** - HTTP API endpoints
-- **[Webhooks](./api/webhooks.md)** - Webhook integration guide
+- **[REST API Documentation](./api/rest-api.md)** - Complete HTTP API reference
+- **[Webhooks](./api/webhooks.md)** - Webhook integration (planned)
 
 ---
 
@@ -41,13 +40,14 @@ Welcome to the Open Agent Builder documentation! This guide will help you get st
 
 | I want to... | Go to... |
 |--------------|----------|
-| **Install the application** | [Installation Guide](./getting-started/installation.md) |
-| **Build my first workflow** | [Quick Start Tutorial](./getting-started/quick-start.md) |
+| **Install the application** | [README.md](../README.md#installation--setup) |
+| **Build my first workflow** | [README.md](../README.md#quick-start-guide) |
 | **Learn all features** | [User Manual](../USER-MANUAL.md) |
 | **Understand the codebase** | [System Architecture](./architecture/README.md) |
-| **Contribute code** | [Contributing Guide](./development/CONTRIBUTING.md) |
+| **Set up development** | [CLAUDE.md](../CLAUDE.md) |
+| **Contribute code** | [CONTRIBUTING.md](../CONTRIBUTING.md) |
 | **Deploy to production** | [Security Checklist](./security/security-checklist.md) |
-| **Use the API** | [REST API Documentation](./api/rest-api.md) |
+| **Use the API** | [REST API](./api/rest-api.md) |
 
 ---
 
