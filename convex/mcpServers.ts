@@ -127,8 +127,8 @@ export const testConnection = action({
   args: {
     id: v.id("mcpServers"),
   },
-  handler: async ({ runMutation, runQuery }, { id }) => {
-    const server = await runQuery(api.mcpServers.getMCPServer, { id });
+  handler: async ({ runMutation, runQuery }, { id }): Promise<{ serverId: any; needsTest: boolean; server: any }> => {
+    const server: any = await runQuery(api.mcpServers.getMCPServer, { id });
 
     if (!server) {
       throw new Error("MCP server not found");

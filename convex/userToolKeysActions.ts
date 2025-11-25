@@ -18,8 +18,8 @@ export const getActiveKey = action({
         userId: v.string(),
         toolId: v.string(),
     },
-    handler: async (ctx, args) => {
-        const key = await ctx.runQuery(internal.userToolKeys.getEncryptedKey, {
+    handler: async (ctx, args): Promise<{ _id: any; toolId: string; apiKey: string } | null> => {
+        const key: any = await ctx.runQuery(internal.userToolKeys.getEncryptedKey, {
             userId: args.userId,
             toolId: args.toolId,
         });
@@ -44,7 +44,7 @@ export const upsertToolKey = action({
         toolId: v.string(),
         apiKey: v.string(),
     },
-    handler: async (ctx, args) => {
+    handler: async (ctx, args): Promise<any> => {
         const encryptedKey = encrypt(args.apiKey);
         const keyPrefix = maskKey(args.apiKey);
 
