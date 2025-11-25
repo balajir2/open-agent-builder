@@ -12,6 +12,24 @@ import {
 } from '@/lib/workflow/storage';
 import { cleanupInvalidEdges } from '@/lib/workflow/edge-cleanup';
 
+// Prevents circular reference errors during JSON serialization
+// by removing problematic properties from React components.
+const getCircularReplacer = () => {
+  const seen = new WeakSet();
+  return (key: string, value: any) => {
+    if (key === 'Provider' || key === '$$typeof' || key === '_owner' || key === '_store') {
+      return undefined;
+    }
+    if (typeof value === 'object' && value !== null) {
+      if (seen.has(value)) {
+        return;
+      }
+      seen.add(value);
+    }
+    return value;
+  };
+};
+
 export function useWorkflow(workflowId?: string) {
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
@@ -27,16 +45,14 @@ export function useWorkflow(workflowId?: string) {
       if (workflowId) {
         // Fetch workflow from API (Redis)
         try {
-          const response = await fetch('/api/workflows');
-          const data = await response.json();
-          const workflows = data.workflows || [];
-          const loaded = workflows.find((w: any) => w.id === workflowId);
+          const response = await fetch(`/api/workflows/${workflowId}`);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch workflow with status: ${response.status}`);
+          }
+          const fullWorkflow = await response.json();
+          let workflowData = fullWorkflow.workflow;
 
-          if (loaded) {
-            // Fetch full workflow details
-            const fullWorkflow = await fetch(`/api/workflows/${workflowId}`).then(r => r.json());
-            let workflowData = fullWorkflow.workflow || loaded;
-
+          if (workflowData) {
             // Clean up any invalid edges before setting the workflow
             const cleaned = cleanupInvalidEdges(workflowData.nodes, workflowData.edges);
             if (cleaned.removedCount > 0) {
@@ -49,9 +65,9 @@ export function useWorkflow(workflowId?: string) {
             }
 
             setWorkflow(workflowData);
-            // Store the Convex ID for future saves
             setConvexId(workflowData._convexId || workflowData._id || null);
           } else {
+            console.error('Workflow not found, creating a new one.');
             createNewWorkflow();
           }
         } catch (error) {
@@ -157,7 +173,7 @@ export function useWorkflow(workflowId?: string) {
         const response = await fetch('/api/workflows', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newWorkflow),
+          body: JSON.stringify(newWorkflow, getCircularReplacer()),
         });
         const data = await response.json();
         console.log('💾 New workflow saved to Convex:', data.success ? 'SUCCESS' : 'FAILED');
@@ -191,7 +207,7 @@ export function useWorkflow(workflowId?: string) {
         const response = await fetch('/api/workflows', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updated),
+          body: JSON.stringify(updated, getCircularReplacer()),
         });
         const data = await response.json();
         console.log('💾 [AUTO-SAVE] Workflow synced to Convex:', data.success ? '✅ SUCCESS' : '❌ FAILED');
@@ -276,7 +292,7 @@ export function useWorkflow(workflowId?: string) {
       const response = await fetch('/api/workflows', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated),
+        body: JSON.stringify(updated, getCircularReplacer()),
       });
       const data = await response.json();
       console.log('💾 [IMMEDIATE SAVE] Workflow saved to Convex:', data.success ? '✅ SUCCESS' : '❌ FAILED');
