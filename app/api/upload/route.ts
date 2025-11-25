@@ -25,14 +25,20 @@ export async function POST(request: Request) {
       body: bodyArrayBuffer,
     });
 
-    const respText = await resp.text();
-    const respHeaders: Record<string,string> = {};
-    resp.headers.forEach((v,k) => { respHeaders[k] = v; });
+    // Forward Convex response directly
+    const respJson = await resp.json();  // ← Convex returns proper JSON
 
-    console.log("[/api/upload] convex status:", resp.status, "body:", respText.slice(0,2000));
-    return NextResponse.json({ status: resp.status, headers: respHeaders, body: respText }, { status: Math.max(200, Math.min(499, resp.status)) });
+    return NextResponse.json(respJson, {
+      status: resp.status,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
   } catch (err: any) {
     console.error("[/api/upload] proxy error:", err);
-    return NextResponse.json({ error: "Proxy fetch failed", message: String(err?.message ?? err) }, { status: 500 });
+    return NextResponse.json(
+      { error: "Proxy fetch failed", message: String(err?.message ?? err) },
+      { status: 500 }
+    );
   }
 }
