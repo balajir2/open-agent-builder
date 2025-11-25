@@ -7,8 +7,9 @@ import * as cheerio from "cheerio";
 import { wrapToolFunction, normalizeToolResult, formatToolResultForLLM } from "./tool-utils";
 
 interface ToolConfig {
-    id: string;
-    name: string;
+    id?: string;
+    toolId?: string;
+    name?: string;
     [key: string]: any;
 }
 
