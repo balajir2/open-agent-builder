@@ -241,44 +241,6 @@ const result = await mcpServer.callTool("firecrawl_scrape", {
 });
 
 // 5. Return
-return result;
-```
-
----
-
-## LLM Support for MCP
-
-Different LLMs have varying levels of MCP support:
-
-| Provider | Models | MCP Support | Status |
-|----------|--------|-------------|--------|
-| **Anthropic** | Claude Haiku 4.5, Sonnet 4.5 | ✅ Full | Native |
-| **OpenAI** | GPT-4o, GPT-4o-mini | 🔄 Partial | Via function calling |
-| **Groq** | Llama 3.1, Mixtral | 🔄 Partial | Via function calling |
-
-**Native MCP Support (Anthropic):**
-- Tools passed directly to Claude
-- Claude decides when to use tools
-- Multi-tool reasoning
-
-**Function Calling (OpenAI, Groq):**
-- MCP tools converted to function definitions
-- LLM returns function call
-- We execute and pass result back
-
----
-
-## Creating Custom MCP Servers
-
-### SSE Server Example
-
-```typescript
-// server.ts
-import { MCPServer } from '@modelcontextprotocol/sdk';
-
-const server = new MCPServer({
-  name: "my-mcp-server",
-  version: "1.0.0"
 });
 
 server.tool("custom_tool", {
