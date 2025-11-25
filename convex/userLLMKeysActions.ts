@@ -18,8 +18,8 @@ export const getActiveKey = action({
     userId: v.string(),
     provider: v.string(),
   },
-  handler: async (ctx, args) => {
-    const key = await ctx.runQuery(internal.userLLMKeys.getEncryptedKey, {
+  handler: async (ctx, args): Promise<{ _id: any; provider: string; apiKey: string; label?: string } | null> => {
+    const key: any = await ctx.runQuery(internal.userLLMKeys.getEncryptedKey, {
       userId: args.userId,
       provider: args.provider,
     });
@@ -46,7 +46,7 @@ export const upsertLLMKey = action({
     apiKey: v.string(),
     label: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<any> => {
     const encryptedKey = encrypt(args.apiKey);
     const keyPrefix = maskKey(args.apiKey);
 
