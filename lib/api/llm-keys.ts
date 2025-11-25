@@ -34,7 +34,8 @@ export async function getLLMApiKey(
   if (userId) {
     try {
       const client = getConvexClient();
-      const userKey = await client.query(api.userLLMKeys.getActiveKey, {
+      // FIX: Call as action, not query, and use userLLMKeysActions
+      const userKey = await client.action(api.userLLMKeysActions.getActiveKey, {
         userId,
         provider,
       });
@@ -111,11 +112,10 @@ export async function initializeLLMClient(
 
   if (!apiKey) {
     throw new Error(
-      `No API key found for ${provider}. Please configure your API key in Settings or set the ${
-        provider === 'anthropic' ? 'ANTHROPIC_API_KEY' :
+      `No API key found for ${provider}. Please configure your API key in Settings or set the ${provider === 'anthropic' ? 'ANTHROPIC_API_KEY' :
         provider === 'openai' ? 'OPENAI_API_KEY' :
-        provider === 'google' ? 'GOOGLE_API_KEY' :
-        'GROQ_API_KEY'
+          provider === 'google' ? 'GOOGLE_API_KEY' :
+            'GROQ_API_KEY'
       } environment variable.`
     );
   }
@@ -140,7 +140,8 @@ export async function getProvidersStatus(userId?: string): Promise<{
     if (userId) {
       try {
         const client = getConvexClient();
-        const userKey = await client.query(api.userLLMKeys.getActiveKey, {
+        // FIX: Call as action, not query, and use userLLMKeysActions
+        const userKey = await client.action(api.userLLMKeysActions.getActiveKey, {
           userId,
           provider,
         });
