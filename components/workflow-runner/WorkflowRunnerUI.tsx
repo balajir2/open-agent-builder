@@ -1,9 +1,10 @@
-// WorkflowRunnerUI.tsx
+// WorkflowRunnerUI.pdf-only.tsx
+// Updated: improved clone sanitization + width/font preservation for html2canvas,
+// and improved text-only fallback using jsPDF.splitTextToSize
+
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Document, Packer, Paragraph } from "docx";
-import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import {
@@ -11,11 +12,7 @@ import {
   FileText, FileDown, Loader, CheckCircle,
   Play, AlertCircle
 } from "lucide-react";
-import {
-  generateDocumentFromResults,
-  downloadDocument,
-  getDocumentSaveLocation
-} from '@/utils/document-export';
+import { getDocumentSaveLocation } from '@/utils/document-export';
 import { FileLocationModal } from '@/components/ui/FileLocationModal';
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -47,7 +44,13 @@ interface FileMeta {
    Utility: color/style helpers
    =========================== */
 
+/*
+ * Patterns we try to neutralize prior to rendering to canvas.
+ * We deliberately match 'color(' and CSS variable usage which html2canvas often fails on.
+ */
 const problematicColorPattern = /\b(?:color|color-mix|lab|lch|device-cmyk)\([^\)]*\)|var\([^\)]+\)/i;
+const problematicColorPatternGlobal = new RegExp(problematicColorPattern.source, "gi");
+const explicitColorFunctionGlobal = /color\([^\)]+\)/gi;
 const gradientPattern = /(linear-gradient|radial-gradient|conic-gradient|repeating-linear-gradient)\([^\)]*\)/i;
 
 function getResolvedColorOrFallback(el: Element | null): string {
@@ -62,6 +65,7 @@ function getResolvedColorOrFallback(el: Element | null): string {
     }
     node = node.parentElement;
   }
+  // prefer a known CSS color format html2canvas supports
   return "rgb(0, 0, 0)";
 }
 
@@ -81,9 +85,15 @@ function inlineBasicComputedStyles(origEl: Element, cloneEl: HTMLElement) {
   try {
     const cs = window.getComputedStyle(origEl as Element);
     if (!cs) return;
+
+    // expanded list includes wrapping / width / box sizing / font shorthand
     const safeProps = [
       "color",
       "background-color",
+      "border-color",
+      "outline-color",
+      "text-decoration-color",
+      "column-rule-color",
       "font-family",
       "font-size",
       "font-weight",
@@ -94,17 +104,53 @@ function inlineBasicComputedStyles(origEl: Element, cloneEl: HTMLElement) {
       "padding",
       "margin",
       "border-radius",
+      "white-space",
+      "word-break",
+      "overflow-wrap",
+      "word-wrap",
+      "width",
+      "max-width",
+      "box-sizing",
+      "display",
+      "font-style",
+      "font-variant",
     ];
+
+    // Also build a font shorthand for better fidelity
+    try {
+      const fontShorthand = `${cs.fontStyle} ${cs.fontVariant} ${cs.fontWeight} ${cs.fontSize}/${cs.lineHeight} ${cs.fontFamily}`;
+      if (fontShorthand && typeof fontShorthand === "string") {
+        safeSetStyle(cloneEl, "font", fontShorthand);
+      }
+    } catch { /* ignore shorthand building errors */ }
+
     for (const p of safeProps) {
       let v = (cs as any).getPropertyValue(p);
       if (v && typeof v === "string") {
-        if (problematicColorPattern.test(v)) {
+        // If the computed value uses a problematic function (color(...), var(...), etc.)
+        if (problematicColorPattern.test(v) || explicitColorFunctionGlobal.test(v)) {
           v = getResolvedColorOrFallback(origEl);
         }
+        // Remove gradients for properties that don't support them in canvas
         if (gradientPattern.test(v)) {
-          if (p === "background-color") continue;
-          v = v.replace(gradientPattern, "none");
+          if (p === "background-color") {
+            // prefer backgroundColor fallback instead of gradient
+            const fallback = cs.backgroundColor || getResolvedColorOrFallback(origEl);
+            v = fallback;
+          } else {
+            v = v.replace(gradientPattern, "none");
+          }
         }
+        // Ensure we replace any remaining problematic color function occurrences globally
+        if (problematicColorPatternGlobal.test(v)) {
+          v = v.replace(problematicColorPatternGlobal, getResolvedColorOrFallback(origEl));
+        }
+        // also remove explicit color(...) invocations
+        if (explicitColorFunctionGlobal.test(v)) {
+          v = v.replace(explicitColorFunctionGlobal, getResolvedColorOrFallback(origEl));
+        }
+
+        // Trim and set
         safeSetStyle(cloneEl, p, v.trim());
       }
     }
@@ -127,11 +173,41 @@ function inlineSvgColorsForPair(orig: Element, clone: Element) {
           if (cs.stroke && !problematicColorPattern.test(cs.stroke)) resolvedStroke = cs.stroke;
         }
       } catch { }
-      try { (cEl as Element).setAttribute("fill", resolvedFill); } catch { }
-      try { (cEl as Element).setAttribute("stroke", resolvedStroke); } catch { }
+      // Replace any problematic color occurrences in attribute values
       try {
+        if ((cEl as Element).getAttribute) {
+          const fillAttr = (cEl as Element).getAttribute("fill");
+          if (fillAttr && (problematicColorPattern.test(fillAttr) || explicitColorFunctionGlobal.test(fillAttr))) {
+            (cEl as Element).setAttribute("fill", getResolvedColorOrFallback(origBase));
+          } else if (!fillAttr) {
+            try { (cEl as Element).setAttribute("fill", resolvedFill); } catch { }
+          }
+        }
+      } catch { }
+      try {
+        if ((cEl as Element).getAttribute) {
+          const strokeAttr = (cEl as Element).getAttribute("stroke");
+          if (strokeAttr && (problematicColorPattern.test(strokeAttr) || explicitColorFunctionGlobal.test(strokeAttr))) {
+            (cEl as Element).setAttribute("stroke", getResolvedColorOrFallback(origBase));
+          } else if (!strokeAttr) {
+            try { (cEl as Element).setAttribute("stroke", resolvedStroke); } catch { }
+          }
+        }
+      } catch { }
+      try {
+        // Also set inline styles for svg subelements where possible
         (cEl as HTMLElement).style && safeSetStyle(cEl as HTMLElement, "fill", resolvedFill);
         (cEl as HTMLElement).style && safeSetStyle(cEl as HTMLElement, "stroke", resolvedStroke);
+        // Ensure no problematic functions remain in style attribute
+        const styleAttr = (cEl as Element).getAttribute && (cEl as Element).getAttribute("style");
+        if (styleAttr && problematicColorPatternGlobal.test(styleAttr)) {
+          const replaced = styleAttr.replace(problematicColorPatternGlobal, getResolvedColorOrFallback(origBase));
+          try { (cEl as Element).setAttribute("style", replaced); } catch { }
+        }
+        if (styleAttr && explicitColorFunctionGlobal.test(styleAttr)) {
+          const replaced = styleAttr.replace(explicitColorFunctionGlobal, getResolvedColorOrFallback(origBase));
+          try { (cEl as Element).setAttribute("style", replaced); } catch { }
+        }
       } catch { }
     });
   } catch (e) {
@@ -156,6 +232,8 @@ function sanitizeCloneForCanvas(cloneRoot: HTMLElement, origRoot: Element) {
 
       safeSetStyle(el as HTMLElement, "background-image", "none");
       safeSetStyle(el as HTMLElement, "box-shadow", "none");
+      safeSetStyle(el as HTMLElement, "text-shadow", "none");
+      safeSetStyle(el as HTMLElement, "border-image", "none");
       safeSetStyle(el as HTMLElement, "filter", "none");
       safeSetStyle(el as HTMLElement, "-webkit-filter", "none");
       safeSetStyle(el as HTMLElement, "backdrop-filter", "none");
@@ -165,15 +243,18 @@ function sanitizeCloneForCanvas(cloneRoot: HTMLElement, origRoot: Element) {
       safeSetStyle(el as HTMLElement, "mask-image", "none");
       safeSetStyle(el as HTMLElement, "mix-blend-mode", "normal");
 
+      // Replace problematic color functions in inline style attribute (global replace)
       const styleAttr = el.getAttribute("style");
-      if (styleAttr && problematicColorPattern.test(styleAttr)) {
+      if (styleAttr && (problematicColorPatternGlobal.test(styleAttr) || explicitColorFunctionGlobal.test(styleAttr))) {
         const resolved = getResolvedColorOrFallback(origEquivalent);
-        const replaced = styleAttr.replace(problematicColorPattern, resolved);
+        let replaced = styleAttr.replace(problematicColorPatternGlobal, resolved);
+        replaced = replaced.replace(explicitColorFunctionGlobal, resolved);
         try {
           el.setAttribute("style", replaced);
         } catch { }
       }
 
+      // Try to replace problematic color usages in computed background values
       try {
         const origCS = window.getComputedStyle(origEquivalent);
         const bg = origCS && (origCS.backgroundImage || origCS.background);
@@ -181,7 +262,7 @@ function sanitizeCloneForCanvas(cloneRoot: HTMLElement, origRoot: Element) {
           const bgColor = origCS.backgroundColor;
           const safe = bgColor && !problematicColorPattern.test(bgColor) ? bgColor : getResolvedColorOrFallback(origEquivalent);
           safeSetStyle(el as HTMLElement, "background", safe);
-        } else if (bg && problematicColorPattern.test(String(bg))) {
+        } else if (bg && (problematicColorPattern.test(String(bg)) || explicitColorFunctionGlobal.test(String(bg)))) {
           const safe = getResolvedColorOrFallback(origEquivalent);
           safeSetStyle(el as HTMLElement, "background", safe);
         }
@@ -212,7 +293,7 @@ function findBestMatchInOriginal(cloneEl: Element, origRoot: Element): Element |
   let depth = 0;
 
   while (cur && depth < maxDepth) {
-    const parent = cur.parentElement;
+    const parent: Element | null = cur.parentElement;
     if (!parent) break;
 
     const siblings = Array.from(parent.children as HTMLCollectionOf<Element>).filter(
@@ -230,7 +311,7 @@ function findBestMatchInOriginal(cloneEl: Element, origRoot: Element): Element |
   let node: Element | null = origRoot;
   for (const step of path) {
     if (!node) break;
-    const candidates = Array.from(node.children as HTMLCollectionOf<Element>).filter(
+    const candidates: Element[] = Array.from(node.children as HTMLCollectionOf<Element>).filter(
       (c: Element) => c.tagName.toLowerCase() === step.tag
     );
     if (candidates.length === 0) {
@@ -260,13 +341,10 @@ export default function WorkflowRunnerUI() {
   const [workflowDetails, setWorkflowDetails] = useState<any>(null);
   const [showDownloadSuccess, setShowDownloadSuccess] = useState(false);
   const [downloadLocation, setDownloadLocation] = useState("");
-  const [showFormatDropdown, setShowFormatDropdown] = useState(false);
-  const [downloadedFormat, setDownloadedFormat] = useState("");
-  const [showLocationModal, setShowLocationModal] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
   const [inputValidation, setInputValidation] = useState<Record<string, InputValidation>>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [showSaveModal, setShowSaveModal] = useState(false);
   const [savedInputPresets, setSavedInputPresets] = useState<Record<string, Record<string, string>>>({});
   const [currentPresetName, setCurrentPresetName] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -301,7 +379,7 @@ export default function WorkflowRunnerUI() {
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (formatDropdownRef.current && !formatDropdownRef.current.contains(event.target as Node)) {
-        setShowFormatDropdown(false);
+        // keep dropdown closed when clicking outside
       }
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         // reserved for future
@@ -312,7 +390,7 @@ export default function WorkflowRunnerUI() {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showFormatDropdown]);
+  }, [isDownloading]);
 
   useEffect(() => {
     const savedPresets = localStorage.getItem('workflowInputPresets');
@@ -383,25 +461,6 @@ export default function WorkflowRunnerUI() {
       validateAllFields();
     }, 0);
   }, [workflowDetails?.requiredInputs]);
-
-  async function handleDownloadResult(content: string) {
-    try {
-      const doc = new Document({
-        sections: [
-          {
-            children: [
-              new Paragraph(content),
-            ],
-          },
-        ],
-      });
-
-      const blob = await Packer.toBlob(doc);
-      saveAs(blob, "workflow-output.docx");
-    } catch (err) {
-      console.error("Error downloading DOCX:", err);
-    }
-  }
 
   const formatBytes = (b = 0) => {
     if (b === 0) return "0 B";
@@ -554,7 +613,6 @@ export default function WorkflowRunnerUI() {
 
       setSavedInputPresets(updatedPresets as Record<string, Record<string, string>>);
       localStorage.setItem('workflowInputPresets', JSON.stringify(updatedPresets));
-      setShowSaveModal(false);
       setCurrentPresetName(presetName);
     } catch (error) {
       console.error('Error saving preset:', error);
@@ -633,7 +691,6 @@ export default function WorkflowRunnerUI() {
             originalFilename: data.originalFilename ?? file.name,
             size: data.size ?? file.size,
             contentType: data.contentType ?? file.type,
-            // fileUrl remains optional (implement server action if you want signed URL)
           };
 
           setInputFields(prev => ({ ...prev, [variableName]: fileMeta }));
@@ -655,14 +712,6 @@ export default function WorkflowRunnerUI() {
     form.append("variableName", variableName);
     form.append("workflowId", selectedWorkflowId || "");
 
-    const uploadUrl = process.env.NEXT_PUBLIC_CONVEX_UPLOAD_ACTION_URL;
-    if (!uploadUrl) {
-      setUploadingFiles(prev => ({ ...prev, [variableName]: false }));
-      setUploadErrors(prev => ({ ...prev, [variableName]: "Upload URL not configured (NEXT_PUBLIC_CONVEX_UPLOAD_ACTION_URL)" }));
-      return;
-    }
-
-    // xhr.open("POST", uploadUrl);
     xhr.open("POST", "/api/upload");
     xhr.send(form);
   };
@@ -810,24 +859,52 @@ export default function WorkflowRunnerUI() {
     return { workflowId, workflowName, nodeResults, variables };
   };
 
-  async function handleDownloadResultAsDocxFromHTML(htmlContent: string, filename = "workflow-output.docx") {
+  /**
+   * Fallback: creates a plain-text PDF from visible text
+   * This uses jsPDF.splitTextToSize to properly wrap paragraphs to page width.
+   */
+  function fallbackPdfFromPlainText(text: string, filename = "workflow-output.pdf") {
     try {
-      const plain = htmlContent.replace(/<[^>]*>/g, "");
-      const doc = new Document({
-        sections: [
-          {
-            children: [new Paragraph(plain)],
-          },
-        ],
-      });
-      const blob = await Packer.toBlob(doc);
-      saveAs(blob, filename);
+      const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 40;
+      const contentWidth = pageWidth - margin * 2;
+      const fontSize = 12;
+      pdf.setFontSize(fontSize);
+
+      const paragraphs = String(text).replace(/\r/g, "").split(/\n{2,}/).map(p => p.trim());
+
+      let y = margin;
+      for (const p of paragraphs) {
+        if (!p) { y += fontSize + 6; continue; }
+        const lines = pdf.splitTextToSize(p, contentWidth);
+        for (const line of lines) {
+          if (y + fontSize + 8 > pageHeight - margin) {
+            pdf.addPage();
+            y = margin;
+            pdf.setFontSize(fontSize);
+          }
+          pdf.text(line, margin, y);
+          y += fontSize + 6;
+        }
+        // paragraph gap
+        y += fontSize;
+      }
+
+      pdf.save(filename);
     } catch (err) {
-      console.error("Error downloading DOCX:", err);
-      alert("Error creating docx: " + (err instanceof Error ? err.message : String(err)));
+      console.error("Fallback PDF creation also failed:", err);
+      throw err;
     }
   }
 
+  /**
+   * downloadResultAsPDF
+   * - preserves computed styles, headings & boldness
+   * - reduces global font scale slightly (configurable)
+   * - adds a border/padding to the "page" for visual framing
+   */
   async function downloadResultAsPDF(filename = "workflow-output.pdf") {
     if (!resultRef.current) {
       alert("Nothing to download");
@@ -839,51 +916,145 @@ export default function WorkflowRunnerUI() {
       const orig = resultRef.current as Element;
       const clone = orig.cloneNode(true) as HTMLElement;
 
+      // --- Page-level visual adjustments (border, padding, background) ---
+      const PAGE_BORDER = "1px solid #e5e7eb"; // subtle gray border
+      const PAGE_PADDING = "28px";
+      const PAGE_BG = "#ffffff";
+
+      // Apply computed width to preserve layout
+      try {
+        const origRect = orig.getBoundingClientRect();
+        clone.style.position = "absolute";
+        clone.style.left = "0px";
+        clone.style.top = "0px";
+        clone.style.transform = `translateX(-10000px)`; // off screen but layoutable
+        clone.style.boxSizing = "border-box";
+        clone.style.width = `${Math.round(origRect.width)}px`;
+        clone.style.maxWidth = `${Math.round(origRect.width)}px`;
+      } catch (e) {
+        // fallback
+        clone.style.position = "absolute";
+        clone.style.left = "0px";
+        clone.style.top = "0px";
+      }
+
+      // Insert a wrapper around the clone so we can add border/padding that html2canvas will capture
+      const wrapper = document.createElement("div");
+      wrapper.style.boxSizing = "border-box";
+      wrapper.style.display = "inline-block";
+      wrapper.style.background = PAGE_BG;
+      wrapper.style.padding = PAGE_PADDING;
+      wrapper.style.border = PAGE_BORDER;
+      wrapper.style.borderRadius = "8px";
+      wrapper.style.width = clone.style.width || "auto";
+
+      // Slight overall scale reduction for the page (reduce overall font-size/spacing)
+      // This keeps headings proportional but slightly smaller; you can tune scaleFactor.
+      const scaleFactor = 0.93;
+
+      // Apply sanitization & inline computed styles first (will inline font-size/font-weight/etc.)
       sanitizeCloneForCanvas(clone, orig);
 
-      clone.style.position = "fixed";
-      clone.style.left = "-9999px";
-      clone.style.top = "0";
-      clone.style.width = `${orig.clientWidth}px`;
-      clone.style.boxSizing = "border-box";
-      clone.style.zIndex = "-9999";
-      document.body.appendChild(clone);
+      // Force strong/b elements to be bold in clone (some font stacks or variable fonts render lighter in canvas)
+      try {
+        const strongEls = clone.querySelectorAll("strong, b");
+        strongEls.forEach((el) => {
+          safeSetStyle(el as HTMLElement, "font-weight", "700");
+        });
+      } catch { /* ignore */ }
 
-      await new Promise((res) => setTimeout(res, 50));
+      // Preserve heading sizes but apply scaleFactor: for each heading in clone, read matching original computed font-size and set scaled size
+      try {
+        const headingTags = ["h1", "h2", "h3", "h4", "h5", "h6"];
+        headingTags.forEach(tag => {
+          const cloneHeadings = Array.from(clone.querySelectorAll(tag));
+          cloneHeadings.forEach((cEl, idx) => {
+            // find best match in original via our helper to acquire original computed size
+            let origMatch = findBestMatchInOriginal(cEl, orig) || orig.querySelector(tag);
+            if (!origMatch) origMatch = orig as Element;
+            try {
+              const cs = window.getComputedStyle(origMatch as Element);
+              if (cs && cs.fontSize) {
+                // parse px value
+                const px = parseFloat(cs.fontSize || "16");
+                const scaled = Math.max(10, Math.round(px * scaleFactor));
+                safeSetStyle(cEl as HTMLElement, "font-size", `${scaled}px`);
+              }
+              // preserve weight explicitly
+              if (cs && cs.fontWeight) {
+                safeSetStyle(cEl as HTMLElement, "font-weight", cs.fontWeight);
+              }
+            } catch { /* ignore per-element */ }
+          });
+        });
+      } catch (e) {
+        // if anything fails, continue — we still inlined the original computed styles earlier
+        console.warn("Heading-size preservation failed:", e);
+      }
 
-      const canvas = await html2canvas(clone, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: null,
-        foreignObjectRendering: true as any,
-      });
+      // Apply a mild global reduction to body-level font size to make the whole page slightly smaller
+      try {
+        // If the computed size is available, scale it; otherwise set a reasonable default
+        const origBody = orig.closest("body") || orig;
+        const bodyCS = window.getComputedStyle(origBody as Element);
+        let baseSize = 14;
+        if (bodyCS && bodyCS.fontSize) baseSize = parseFloat(bodyCS.fontSize || "14");
+        const scaledBase = Math.max(10, Math.round(baseSize * scaleFactor));
+        safeSetStyle(clone as HTMLElement, "font-size", `${scaledBase}px`);
+      } catch { /* ignore */ }
 
-      const imgData = canvas.toDataURL("image/png");
+      // Add an explicit page background for html2canvas (helps with transparent areas)
+      safeSetStyle(clone as HTMLElement, "background-color", PAGE_BG);
+      safeSetStyle(clone as HTMLElement, "color", window.getComputedStyle(orig as Element).color || "rgb(0,0,0)");
 
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "pt",
-        format: "a4",
-      });
+      // Append clone into wrapper
+      wrapper.appendChild(clone);
+      document.body.appendChild(wrapper);
 
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
+      // give browser a bit more time to apply styles
+      await new Promise((res) => setTimeout(res, 150));
 
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
+      try {
+        const canvas = await html2canvas(wrapper, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: null,
+          foreignObjectRendering: true as any,
+        });
 
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-      const renderedWidth = imgWidth * ratio;
-      const renderedHeight = imgHeight * ratio;
+        const imgData = canvas.toDataURL("image/png");
 
-      const marginLeft = (pdfWidth - renderedWidth) / 2;
-      const marginTop = (pdfHeight - renderedHeight) / 2;
+        const pdf = new jsPDF({
+          orientation: "portrait",
+          unit: "pt",
+          format: "a4",
+        });
 
-      pdf.addImage(imgData, "PNG", marginLeft > 0 ? marginLeft : 0, marginTop > 0 ? marginTop : 0, renderedWidth, renderedHeight);
-      pdf.save(filename);
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
 
-      document.body.removeChild(clone);
+        const imgWidth = canvas.width;
+        const imgHeight = canvas.height;
+
+        const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+        const renderedWidth = imgWidth * ratio;
+        const renderedHeight = imgHeight * ratio;
+
+        const marginLeft = (pdfWidth - renderedWidth) / 2;
+        const marginTop = (pdfHeight - renderedHeight) / 2;
+
+        pdf.addImage(imgData, "PNG", marginLeft > 0 ? marginLeft : 0, marginTop > 0 ? marginTop : 0, renderedWidth, renderedHeight);
+        pdf.save(filename);
+
+      } catch (hcErr: any) {
+        // If html2canvas fails due to parsing color() or similar, fall back to plain-text PDF.
+        console.warn("html2canvas render failed, falling back to text-only PDF. Error:", hcErr);
+        const innerText = (orig as HTMLElement).innerText || (orig as HTMLElement).textContent || "";
+        fallbackPdfFromPlainText(innerText, filename);
+      } finally {
+        try { document.body.removeChild(wrapper); } catch { }
+      }
     } catch (err: any) {
       console.error("Error creating PDF:", err);
       alert("Failed to create PDF: " + (err instanceof Error ? err.message : String(err)));
@@ -892,10 +1063,11 @@ export default function WorkflowRunnerUI() {
     }
   }
 
-  const handleDownloadResults = async (format: 'html' | 'docx' | 'ppt' | 'pdf') => {
+  const handleDownloadResults = async () => {
     if (workflowResponses.length === 0) return;
 
     setIsDownloading(true);
+    setShowDownloadSuccess(false);
 
     const { workflowId, workflowName, nodeResults, variables } = getWorkflowData();
 
@@ -903,46 +1075,16 @@ export default function WorkflowRunnerUI() {
     const safeName = (workflowName || 'workflow').replace(/\s+/g, '-').toLowerCase();
 
     try {
-      setDownloadedFormat(format === 'docx' ? 'Word document' : format === 'ppt' ? 'PowerPoint presentation' : format === 'pdf' ? 'PDF document' : 'HTML document');
-
-      if (format === 'pdf') {
-        await downloadResultAsPDF(`workflow-results-${safeName}.pdf`);
-      } else {
-        try {
-          const docBlob = await generateDocumentFromResults(format, workflowId, workflowName, nodeResults, variables);
-          if (docBlob) {
-            const extension = format === 'docx' ? 'docx' : format === 'ppt' ? 'pptx' : 'html';
-            const filename = `workflow-results-${safeName}.${extension}`;
-            downloadDocument(docBlob, filename);
-          } else {
-            const rightPanelHtml = resultRef.current ? resultRef.current.innerHTML : "";
-            if (format === 'docx') {
-              await handleDownloadResultAsDocxFromHTML(rightPanelHtml, `workflow-results-${safeName}.docx`);
-            } else {
-              const blob = new Blob([rightPanelHtml], { type: "text/html;charset=utf-8" });
-              saveAs(blob, `workflow-results-${safeName}.html`);
-            }
-          }
-        } catch (err) {
-          console.warn("generateDocumentFromResults failed — falling back to simple export", err);
-          const rightPanelHtml = resultRef.current ? resultRef.current.innerHTML : "";
-          if (format === 'docx') {
-            await handleDownloadResultAsDocxFromHTML(rightPanelHtml, `workflow-results-${safeName}.docx`);
-          } else {
-            const blob = new Blob([rightPanelHtml], { type: "text/html;charset=utf-8" });
-            saveAs(blob, `workflow-results-${safeName}.html`);
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error generating document:", error);
-      alert(`Failed to generate ${format.toUpperCase()} document: ${error instanceof Error ? error.message : "Unknown error"}`);
-    } finally {
-      setIsDownloading(false);
+      await downloadResultAsPDF(`workflow-results-${safeName}.pdf`);
       setDownloadLocation(getDocumentSaveLocation());
       setShowDownloadSuccess(true);
-      setShowLocationModal(true);
       setTimeout(() => setShowDownloadSuccess(false), 5000);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert(`Failed to generate PDF: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setIsDownloading(false);
+      setShowLocationModal(true);
     }
   };
 
@@ -972,7 +1114,7 @@ export default function WorkflowRunnerUI() {
     <div
       className="flex flex-col h-screen w-full overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 px-32 sm:px-64 lg:px-128"
       style={{
-        backgroundImage: `url('wave-blue.svg')`,
+        backgroundImage: `url('/wave-blue.svg')`,
         backgroundRepeat: 'no-repeat',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
@@ -1053,11 +1195,12 @@ export default function WorkflowRunnerUI() {
                                   handleInputChange(input.name, e.target.value)
                                 }
                                 className={`w-full px-4 py-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${inputValidation[input.name] &&
-                                    !inputValidation[input.name].isValid
-                                    ? "border-red-300 bg-red-50"
-                                    : "border-gray-300"
-                                  }`}
-                              >
+                                  !inputValidation[input.name].isValid
+                                  ? "border-red-300 bg-red-50"
+                                  : "border-gray-300"
+                                  }`}>
+
+
                                 <option value="">-- Select an option --</option>
                                 {input.options.map((option) => (
                                   <option key={option} value={option}>
@@ -1074,11 +1217,10 @@ export default function WorkflowRunnerUI() {
                                 }
                                 placeholder={input.description}
                                 className={`w-full px-4 py-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${inputValidation[input.name] &&
-                                    !inputValidation[input.name].isValid
-                                    ? "border-red-300 bg-red-50"
-                                    : "border-gray-300"
-                                  }`}
-                              />
+                                  !inputValidation[input.name].isValid
+                                  ? "border-red-300 bg-red-50"
+                                  : "border-gray-300"
+                                  }`} />
                             ) : input.type === "textarea" ? (
                               <textarea
                                 value={inputFields[input.name] ?? ""}
@@ -1088,11 +1230,10 @@ export default function WorkflowRunnerUI() {
                                 placeholder={input.description}
                                 rows={4}
                                 className={`w-full px-4 py-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${inputValidation[input.name] &&
-                                    !inputValidation[input.name].isValid
-                                    ? "border-red-300 bg-red-50"
-                                    : "border-gray-300"
-                                  }`}
-                              />
+                                  !inputValidation[input.name].isValid
+                                  ? "border-red-300 bg-red-50"
+                                  : "border-gray-300"
+                                  }`} />
                             ) : input.type === "document" ? (
                               <div className="space-y-3">
                                 <div
@@ -1157,9 +1298,9 @@ export default function WorkflowRunnerUI() {
                                         <div className="flex items-center gap-3">
                                           {(inputFields[input.name] as FileMeta).fileUrl ? (
                                             <a href={(inputFields[input.name] as FileMeta).fileUrl} target="_blank" rel="noreferrer" className="text-sm underline">View</a>
-                                          ) : ( (inputFields[input.name] as FileMeta).storageId ? (
+                                          ) : ((inputFields[input.name] as FileMeta).storageId ? (
                                             <span className="text-sm inline-flex items-center gap-2 px-2 py-1 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">Uploaded</span>
-                                          ) : null )}
+                                          ) : null)}
 
                                           {uploadingFiles[input.name] ? (
                                             <button onClick={() => cancelUpload(input.name)} className="text-sm px-3 py-1 border rounded">Cancel</button>
@@ -1203,11 +1344,10 @@ export default function WorkflowRunnerUI() {
                                 }
                                 placeholder={input.description}
                                 className={`w-full px-4 py-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${inputValidation[input.name] &&
-                                    !inputValidation[input.name].isValid
-                                    ? "border-red-300 bg-red-50"
-                                    : "border-gray-300"
-                                  }`}
-                              />
+                                  !inputValidation[input.name].isValid
+                                  ? "border-red-300 bg-red-50"
+                                  : "border-gray-300"
+                                  }`} />
                             )}
                           </div>
                         ))}
@@ -1271,11 +1411,11 @@ export default function WorkflowRunnerUI() {
 
                 <div className=" flex items-center gap-2 px-5 py-5">
                   <button
-                    onClick={() => handleDownloadResults('docx')}
+                    onClick={() => handleDownloadResults()}
                     disabled={workflowResponses.length === 0 || isDownloading}
-                    title={workflowResponses.length === 0 ? "No results to download" : "Download results as .docx"}
+                    title={workflowResponses.length === 0 ? "No results to download" : "Download results as PDF"}
                     className={`flex items-center gap-2 px-5 py-5 rounded-md text-sm font-medium transition-all focus:outline-none
-                      ${workflowResponses.length > 0 && !isDownloading
+                    ${workflowResponses.length > 0 && !isDownloading
                         ? 'bg-indigo-700 text-white shadow-sm hover:brightness-105 active:scale-95'
                         : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                   >
@@ -1287,10 +1427,11 @@ export default function WorkflowRunnerUI() {
                     ) : (
                       <>
                         <FileDown className="w-15 h-15" />
-                        <span>Download</span>
+                        <span>Download PDF</span>
                       </>
                     )}
                   </button>
+
                 </div>
               </div>
 
@@ -1299,7 +1440,7 @@ export default function WorkflowRunnerUI() {
                   <div className="flex items-start gap-2 p-3 mb-4 bg-green-50 rounded-md border border-green-200">
                     <div>
                       <p className="text-sm font-medium text-green-800">
-                        {downloadedFormat} downloaded successfully!
+                        PDF downloaded successfully!
                       </p>
                     </div>
                   </div>
@@ -1330,7 +1471,7 @@ export default function WorkflowRunnerUI() {
                       </div>
                     ) : (
                       <div ref={resultRef as any}>
-                        {getFinalWorkflowResult(workflowResponses)}
+                        {getFinalWorkflowResult(workflowResponses, workflowDetails)}
                       </div>
                     )}
                   </div>
@@ -1344,7 +1485,7 @@ export default function WorkflowRunnerUI() {
       <FileLocationModal
         isOpen={showLocationModal}
         onClose={() => setShowLocationModal(false)}
-        fileType={downloadedFormat}
+        fileType={"PDF document"}
         location={downloadLocation}
       />
     </div>
@@ -1356,42 +1497,18 @@ export default function WorkflowRunnerUI() {
    (kept from your original)
    =========================== */
 
-const getFinalWorkflowResult = (responses: any[]) => {
-  const completedEvent = responses.find(r => r.event === "workflow_completed");
+const getFinalWorkflowResult = (responses: any[], workflowDetails: any) => {
+  const errorEvent = responses.find(r => r.event === "error" || r.event === "node_failed");
 
-  if (!completedEvent) {
-    const nodeCompletedEvents = responses.filter(r => r.event === "node_completed");
-    const lastNodeCompleted = nodeCompletedEvents[nodeCompletedEvents.length - 1];
-    const errorEvent = responses.find(r => r.event === "error" || r.event === "node_failed");
-
-    if (errorEvent) {
-      return (
-        <div className="p-6 border border-red-200 rounded-lg bg-red-50">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="w-6 h-6 text-red-500 mt-1" />
-            <div>
-              <h3 className="text-lg font-medium text-red-800 mb-2">Workflow Error</h3>
-              <p className="text-sm text-red-700">
-                {errorEvent.data.error || "An error occurred during workflow execution"}
-              </p>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (lastNodeCompleted && lastNodeCompleted.data.result?.output) {
-      return formatOutput(lastNodeCompleted.data.result.output);
-    }
-
+  if (errorEvent) {
     return (
-      <div className="p-6 border border-yellow-200 rounded-lg bg-yellow-50">
+      <div className="p-6 border border-red-200 rounded-lg bg-red-50">
         <div className="flex items-start gap-3">
-          <AlertCircle className="w-6 h-6 text-yellow-500 mt-1" />
+          <AlertCircle className="w-6 h-6 text-red-500 mt-1" />
           <div>
-            <h3 className="text-lg font-medium text-yellow-800 mb-2">No Final Result</h3>
-            <p className="text-sm text-yellow-700">
-              The workflow ran but did not produce a final output.
+            <h3 className="text-lg font-medium text-red-800 mb-2">Workflow Error</h3>
+            <p className="text-sm text-red-700">
+              {errorEvent.data.error || "An error occurred during workflow execution"}
             </p>
           </div>
         </div>
@@ -1399,39 +1516,33 @@ const getFinalWorkflowResult = (responses: any[]) => {
     );
   }
 
-  const results = completedEvent.data.results || {};
-  const nodeIds = Object.keys(results);
-
-  const finalNodeIds = nodeIds.filter(id => {
-    const nodeName = (results[id].nodeName || id).toLowerCase();
-    return nodeName.includes('output') ||
-      nodeName.includes('final') ||
-      nodeName.includes('result') ||
-      nodeName.includes('text') ||
-      nodeName.includes('content');
-  });
-
-  for (const nodeId of finalNodeIds) {
-    const nodeOutput = results[nodeId].output;
-    if (nodeOutput && typeof nodeOutput === 'string') {
-      return formatOutput(nodeOutput);
+  // 1. Check for explicit "End" node output
+  if (workflowDetails && workflowDetails.nodes) {
+    const endNode = workflowDetails.nodes.find((n: any) => n.type === 'end');
+    if (endNode) {
+      const endNodeEvent = responses.find(
+        r => r.event === 'node_completed' && r.data.nodeId === endNode.id
+      );
+      if (endNodeEvent && endNodeEvent.data.result?.output) {
+        return formatOutput(endNodeEvent.data.result.output);
+      }
     }
   }
 
-  for (const nodeId of nodeIds) {
-    const nodeOutput = results[nodeId].output;
-    if (nodeOutput && typeof nodeOutput === 'string') {
-      return formatOutput(nodeOutput);
+  // 2. Prioritize the last completed node that has output
+  const nodeCompletedEvents = responses.filter(r => r.event === "node_completed");
+  for (let i = nodeCompletedEvents.length - 1; i >= 0; i--) {
+    const node = nodeCompletedEvents[i];
+    if (node.data.result?.output) {
+      return formatOutput(node.data.result.output);
     }
   }
 
-  const lastNodeId = nodeIds[nodeIds.length - 1];
-  if (lastNodeId && results[lastNodeId].output) {
-    return formatOutput(results[lastNodeId].output);
-  }
-
-  if (completedEvent.data.variables) {
+  // Fallback: Check for workflow_completed variables
+  const completedEvent = responses.find(r => r.event === "workflow_completed");
+  if (completedEvent && completedEvent.data.variables) {
     const variables = completedEvent.data.variables;
+    // If there's an explicit "output" or "result" variable, use it
     const outputVarName = Object.keys(variables).find(name =>
       name.toLowerCase().includes('output') ||
       name.toLowerCase().includes('result') ||
@@ -1442,6 +1553,7 @@ const getFinalWorkflowResult = (responses: any[]) => {
       return formatOutput(variables[outputVarName]);
     }
 
+    // Otherwise show all variables
     return (
       <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 to-slate-100 p-6 flex flex-col gap-6">
         <div className="flex items-start gap-3">
@@ -1457,14 +1569,32 @@ const getFinalWorkflowResult = (responses: any[]) => {
     );
   }
 
+  // If workflow is completed but no output found
+  if (completedEvent) {
+    return (
+      <div className="p-6 border border-green-200 rounded-lg bg-green-50">
+        <div className="flex items-start gap-3">
+          <CheckCircle className="w-6 h-6 text-green-500 mt-1" />
+          <div>
+            <h3 className="text-lg font-medium text-green-800 mb-2">Workflow Completed Successfully</h3>
+            <p className="text-sm text-green-700">
+              The workflow has completed, but no specific output format was detected.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // If still running or no result yet
   return (
-    <div className="p-6 border border-green-200 rounded-lg bg-green-50">
+    <div className="p-6 border border-yellow-200 rounded-lg bg-yellow-50">
       <div className="flex items-start gap-3">
-        <CheckCircle className="w-6 h-6 text-green-500 mt-1" />
+        <AlertCircle className="w-6 h-6 text-yellow-500 mt-1" />
         <div>
-          <h3 className="text-lg font-medium text-green-800 mb-2">Workflow Completed Successfully</h3>
-          <p className="text-sm text-green-700">
-            The workflow has completed, but no specific output format was detected.
+          <h3 className="text-lg font-medium text-yellow-800 mb-2">No Final Result</h3>
+          <p className="text-sm text-yellow-700">
+            The workflow ran but did not produce a final output.
           </p>
         </div>
       </div>
@@ -1474,8 +1604,22 @@ const getFinalWorkflowResult = (responses: any[]) => {
 
 const formatOutput = (output: any) => {
   const displayAsText = (content: any): string => {
-    if (typeof content === 'string') return content;
+    if (typeof content === 'string') {
+      try {
+        // Try to parse JSON strings to check for finalOutput
+        if (content.trim().startsWith('{') && content.trim().endsWith('}')) {
+          const parsed = JSON.parse(content);
+          if (parsed.finalOutput) return displayAsText(parsed.finalOutput);
+          // If it's the specific format user mentioned: { message: "...", finalOutput: "..." }
+          if (parsed.message && parsed.finalOutput) return parsed.finalOutput;
+        }
+      } catch (e) {
+        // Not JSON, continue
+      }
+      return content;
+    }
     if (typeof content === 'object') {
+      if (content.finalOutput) return displayAsText(content.finalOutput);
       if (content.text) return content.text;
       if (content.output) return displayAsText(content.output);
       if (content.result) return displayAsText(content.result);
@@ -1547,6 +1691,7 @@ const formatOutput = (output: any) => {
           .split("|")
           .slice(1, -1)
           .map((cell) => `<th>${cell.trim()}</th>`)
+
           .join("");
 
         const rows = lines
