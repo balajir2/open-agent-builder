@@ -6,6 +6,7 @@ import { ToolFactory } from './tool-factory';
 import { APIKeys } from '@/lib/api/config';
 import { convertToOpenAITool } from '@langchain/core/utils/function_calling';
 import { parseToolCallResult } from './tool-utils';
+import { prefetchFileContents } from '../file-utils';
 
 // Helper to unwrap MCP responses
 function unwrapMCPResponse(response: any, serverName: string = 'MCP'): any {
@@ -26,22 +27,132 @@ function unwrapMCPResponse(response: any, serverName: string = 'MCP'): any {
 
     // Handle direct result property (common in some implementations)
     if (response.result) {
-      return unwrapMCPResponse(response.result, serverName);
+      return response.result;
     }
   }
   return response;
 }
 
-/**
- * Execute Agent Node - Calls LLM with instructions and tools
- * Server-side only - called from API routes
- */
 export async function executeAgentNode(
   node: WorkflowNode,
   state: WorkflowState,
-  apiKeys?: APIKeys
+  apiKeys?: { anthropic?: string; groq?: string; openai?: string; firecrawl?: string; arcade?: string; google?: string }
 ): Promise<any> {
   const { data } = node;
+  const migratedData = migrateMCPData(data);
+  let mcpTools = await resolveMCPServers(migratedData.mcpServerIds);
+
+  // Prefetch file contents if needed
+  await prefetchFileContents(migratedData.instructions || '', state); // Fix type error
+
+  const instructions = substituteVariables(migratedData.instructions || '', state);
+
+  // Instantiate standard tools
+  const standardTools: any[] = [];
+  if (data.selectedTools && Array.isArray(data.selectedTools)) {
+    for (const toolConfig of data.selectedTools) {
+      try {
+        const tool = await ToolFactory.createTool(toolConfig, apiKeys || {});
+        if (tool) {
+          standardTools.push(tool);
+        }
+      } catch (error) {
+        console.error(`Failed to instantiate tool ${(toolConfig as any).toolId || (toolConfig as any).id}:`, error);
+      }
+    }
+  }
+  // Debug logging (only in development)
+  if (process.env.DEBUG_TOOLS || process.env.NODE_ENV === 'development') {
+    console.log(`[Tools] Created ${standardTools.length} tools:`, standardTools.map(t => t?.name || 'unnamed'));
+    console.log(`[Tools] Selected tools config:`, data.selectedTools);
+  }
+
+
+  // Validate API keys are provided
+  if (!apiKeys) {
+    throw new Error('API keys are required for server-side execution');
+  }
+
+  // Server-side execution only
+  if (process.env.MOCK_AGENT_RESPONSE) {
+    type MockConfig = string | Record<string, unknown>;
+    let mockConfig: MockConfig = process.env.MOCK_AGENT_RESPONSE;
+    try {
+      mockConfig = JSON.parse(process.env.MOCK_AGENT_RESPONSE);
+    } catch (e) {
+      // Keep raw string if parsing fails
+    }
+
+    let mockOutput: unknown = mockConfig;
+    if (mockConfig && typeof mockConfig === 'object') {
+      const nodeKey = node.id;
+      const nodeName = node.data.nodeName as string | undefined;
+      mockOutput = mockConfig[nodeKey] ?? (nodeName ? mockConfig[nodeName] : undefined) ?? mockConfig.default ?? mockOutput;
+    }
+
+    if (mockOutput !== undefined) {
+      const mockChatUpdates = data.includeChatHistory
+        ? [
+          { role: 'user', content: data.instructions || '' },
+          { role: 'assistant', content: typeof mockOutput === 'string' ? mockOutput : JSON.stringify(mockOutput) },
+        ]
+        : [];
+
+      return {
+        __agentValue: mockOutput,
+        __agentToolCalls: [],
+        __chatHistoryUpdates: mockChatUpdates,
+        __variableUpdates: { lastOutput: mockOutput },
+      };
+    }
+  }
+
+  // Use the already-substituted instructions
+  const contextualPrompt = instructions;
+
+  // Prepare messages
+  const messages = data.includeChatHistory && state.chatHistory.length > 0
+    ? [
+      ...state.chatHistory,
+      { role: 'user' as const, content: contextualPrompt },
+    ]
+    : [{ role: 'user' as const, content: contextualPrompt }];
+
+  // Parse model string (handle models with slashes like groq/openai/gpt-oss-120b)
+  const modelString = data.model || 'anthropic/claude-sonnet-4-5-20250929';
+  let provider: string;
+  let modelName: string;
+
+  if (modelString.includes('/')) {
+    const firstSlashIndex = modelString.indexOf('/');
+    provider = modelString.substring(0, firstSlashIndex);
+    modelName = modelString.substring(firstSlashIndex + 1);
+  } else {
+    provider = 'openai';
+    modelName = modelString;
+  }
+
+  // Use native SDKs for better MCP support
+  let responseText = '';
+  interface LLMUsage {
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    [key: string]: unknown;
+  }
+  let usage: LLMUsage = {
+    input_tokens: 0,
+    output_tokens: 0,
+    total_tokens: 0,
+    prompt_tokens: 0,
+    completion_tokens: 0,
+  };
+  let toolCalls: any[] = [];
+
+  // Check if MCP tools are configured
+  const hasMcpTools = mcpTools.length > 0;
 
   try {
     // Substitute variables in instructions
@@ -740,7 +851,7 @@ export async function executeAgentNode(
         // Gemini with tools
         const model = new ChatGoogleGenerativeAI({
           apiKey: apiKeys.google,
-          modelName: modelName,
+          model: modelName,
         });
 
         // Convert both MCP and standard tools to OpenAI format
@@ -864,7 +975,7 @@ export async function executeAgentNode(
         // Regular Gemini call without tools
         const model = new ChatGoogleGenerativeAI({
           apiKey: apiKeys.google,
-          modelName: modelName,
+          model: modelName,
         });
 
         const response = await model.invoke(messages);

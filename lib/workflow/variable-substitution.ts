@@ -32,6 +32,20 @@ export function substituteVariables(text: string, state: WorkflowState): string 
       }
 
       if (typeof value === 'object') {
+        // Special handling for file objects - use content/text instead of JSON
+        if (value.storageId) {
+          if (value.content) {
+            console.log(`[VarSub] Substituting file content for ${cleanExpr}, content length: ${value.content.length}`);
+            return value.content;
+          } else if (value.text) {
+            console.log(`[VarSub] Substituting file text for ${cleanExpr}, text length: ${value.text.length}`);
+            return value.text;
+          } else {
+            console.warn(`[VarSub] File object ${cleanExpr} has no content or text property, returning JSON`);
+            return JSON.stringify(value);
+          }
+        }
+        // For non-file objects, return JSON
         return JSON.stringify(value);
       }
 
@@ -47,7 +61,7 @@ export function substituteVariables(text: string, state: WorkflowState): string 
  * Safely evaluate expression like "state.variables.node_1.price" or simpler "node_1.price"
  * WITH PROTOTYPE POLLUTION PROTECTION
  */
-function evaluateExpression(expression: string, state: WorkflowState): any {
+export function evaluateExpression(expression: string, state: WorkflowState): any {
   // Support both patterns:
   // 1. Full: "state.variables.node_1.price"
   // 2. Simple: "node_1.price" (auto-adds state.variables prefix)
