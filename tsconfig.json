@@ -13,6 +13,7 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
@@ -24,6 +25,10 @@
         "./*"
       ]
     },
+    "typeRoots": [
+      "./node_modules/@types",
+      "./types"
+    ],
     "incremental": true,
     "plugins": [
       {
