@@ -96,19 +96,6 @@ Before you begin, you'll need:
 ---
 
 ## Installation & Setup
-
-### 1. Clone the Repository
-
-```bash
-git clone https://github.com/firecrawl/open-agent-builder.git
-cd open-agent-builder
-npm install
-```
-
-### 2. Set Up Convex (Database)
-
-Convex handles all workflow and execution data persistence.
-
 ```bash
 # Install Convex CLI globally
 npm install -g convex

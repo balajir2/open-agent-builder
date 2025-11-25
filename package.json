@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/check-dependencies.js",
     "dev": "next dev",
     "dev:all": "concurrently \"npx convex dev\" \"npm run dev\"",
     "build": "next build",

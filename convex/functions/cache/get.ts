@@ -34,8 +34,7 @@ export const get = query({
 
     // Expired
     if (record.expiresAt <= now) {
-      // Delete expired record (cleanup)
-      await ctx.db.delete(record._id);
+      // Return null for expired items (cleanup handled by cron)
       return null;
     }
 
@@ -44,8 +43,6 @@ export const get = query({
       return JSON.parse(record.value);
     } catch (error) {
       console.error(`[Cache] Failed to parse cached value for key: ${key}`, error);
-      // Delete corrupted record
-      await ctx.db.delete(record._id);
       return null;
     }
   },

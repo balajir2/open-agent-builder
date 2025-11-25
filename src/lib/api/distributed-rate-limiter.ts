@@ -24,15 +24,15 @@ import { api } from "@/convex/_generated/api";
 export const RATE_LIMITS = {
   WORKFLOW_EXECUTION: {
     windowMs: 60 * 1000,      // 1 minute
-    maxRequests: 10,           // 10 executions per minute
+    maxRequests: 100,          // Increased for dev
   },
   API_GENERAL: {
     windowMs: 60 * 1000,      // 1 minute
-    maxRequests: 60,           // 60 requests per minute
+    maxRequests: 600,          // Increased for dev
   },
   API_HEAVY: {
     windowMs: 60 * 1000,      // 1 minute
-    maxRequests: 10,           // 10 heavy requests per minute
+    maxRequests: 100,          // Increased for dev
   },
 } as const;
 

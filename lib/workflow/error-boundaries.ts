@@ -44,6 +44,11 @@ export function getUserFriendlyError(error: Error): string {
     return 'Missing API key. Please add your LLM provider key in Settings.';
   }
 
+  // Token limit errors (Request too large)
+  if (message.includes('Request too large') || message.includes('tokens per min')) {
+    return 'Document too large for the selected model. Please try a model with a larger context window (like Claude 3.5 Sonnet or Gemini 1.5 Pro) or shorten your document.';
+  }
+
   // Rate limit errors
   if (message.includes('rate limit') || message.includes('429')) {
     return 'Rate limited. Please wait a moment and try again.';

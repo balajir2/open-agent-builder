@@ -1,4 +1,3 @@
-import 'server-only';
 import { WorkflowNode, WorkflowState } from '../types';
 import { substituteVariables } from '../variable-substitution';
 import { resolveMCPServers, migrateMCPData } from '@/lib/mcp/resolver';
@@ -15,180 +14,55 @@ export async function executeAgentNode(
   apiKeys?: { anthropic?: string; groq?: string; openai?: string; firecrawl?: string; arcade?: string; google?: string }
 ): Promise<any> {
   const { data } = node;
-  const migratedData = migrateMCPData(data);
-  let mcpTools = await resolveMCPServers(migratedData.mcpServerIds);
-
-  // Prefetch file contents if needed
-  await prefetchFileContents(migratedData.instructions || '', state);
-
-  const instructions = substituteVariables(migratedData.instructions || '', state);
-
-  // Instantiate standard tools
-  const standardTools: any[] = [];
-  if (data.selectedTools && Array.isArray(data.selectedTools)) {
-    for (const toolConfig of data.selectedTools) {
-      try {
-        const tool = await ToolFactory.createTool(toolConfig, apiKeys || {});
-        if (tool) {
-          standardTools.push(tool);
-        }
-      } catch (error) {
-        console.error(`Failed to instantiate tool ${(toolConfig as any).toolId || (toolConfig as any).id}:`, error);
-      }
-    }
-  }
-  // Debug logging (only in development)
-  if (process.env.DEBUG_TOOLS || process.env.NODE_ENV === 'development') {
-    console.log(`[Tools] Created ${standardTools.length} tools:`, standardTools.map(t => t?.name || 'unnamed'));
-    console.log(`[Tools] Selected tools config:`, data.selectedTools);
-  }
-
-
-  // Validate API keys are provided
-  if (!apiKeys) {
-    throw new Error('API keys are required for server-side execution');
-  }
-
-  // Server-side execution only
-  if (process.env.MOCK_AGENT_RESPONSE) {
-    type MockConfig = string | Record<string, unknown>;
-    let mockConfig: MockConfig = process.env.MOCK_AGENT_RESPONSE;
-    try {
-      mockConfig = JSON.parse(process.env.MOCK_AGENT_RESPONSE);
-    } catch (e) {
-      // Keep raw string if parsing fails
-    }
-
-    let mockOutput: unknown = mockConfig;
-    if (mockConfig && typeof mockConfig === 'object') {
-      const nodeKey = node.id;
-      const nodeName = node.data.nodeName as string | undefined;
-      mockOutput = mockConfig[nodeKey] ?? (nodeName ? mockConfig[nodeName] : undefined) ?? mockConfig.default ?? mockOutput;
-    }
-
-    if (mockOutput !== undefined) {
-      const mockChatUpdates = data.includeChatHistory
-        ? [
-          { role: 'user', content: data.instructions || '' },
-          { role: 'assistant', content: typeof mockOutput === 'string' ? mockOutput : JSON.stringify(mockOutput) },
-        ]
-        : [];
-
-      return {
-        __agentValue: mockOutput,
-        __agentToolCalls: [],
-        __chatHistoryUpdates: mockChatUpdates,
-        __variableUpdates: { lastOutput: mockOutput },
-      };
-    }
-  }
-
-  // Use the already-substituted instructions
-  const contextualPrompt = instructions;
-
-  // Prepare messages
-  const messages = data.includeChatHistory && state.chatHistory.length > 0
-    ? [
-      ...state.chatHistory,
-      { role: 'user' as const, content: contextualPrompt },
-    ]
-    : [{ role: 'user' as const, content: contextualPrompt }];
-
-  // Parse model string (handle models with slashes like groq/openai/gpt-oss-120b)
-  const modelString = data.model || 'anthropic/claude-sonnet-4-5-20250929';
-  let provider: string;
-  let modelName: string;
-
-  if (modelString.includes('/')) {
-    const firstSlashIndex = modelString.indexOf('/');
-    provider = modelString.substring(0, firstSlashIndex);
-    modelName = modelString.substring(firstSlashIndex + 1);
-  } else {
-    provider = 'openai';
-    modelName = modelString;
-  }
-
-  // Use native SDKs for better MCP support
-  let responseText = '';
-  interface LLMUsage {
-    input_tokens?: number;
-    output_tokens?: number;
-    total_tokens?: number;
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    [key: string]: unknown;
-  }
-  let usage: LLMUsage = {
-    input_tokens: 0,
-    output_tokens: 0,
-    total_tokens: 0,
-    prompt_tokens: 0,
-    completion_tokens: 0,
-  };
-  let toolCalls: any[] = [];
-
-  // Check if MCP tools are configured
-  const hasMcpTools = mcpTools.length > 0;
 
   try {
-    // Substitute variables in instructions
-    const originalInstructions = data.instructions || 'Process the input';
-    const instructions = substituteVariables(originalInstructions, state);
-
-    // Build context from previous node output
-    const lastOutput = state.variables?.lastOutput;
-
-    // Migrate data if using old format
+    // 1. Migrate MCP Data
     const migratedData = migrateMCPData(data);
 
-    // Resolve MCP server IDs to full configurations
-    let mcpTools = migratedData.mcpTools || [];
-    if (migratedData.mcpServerIds && migratedData.mcpServerIds.length > 0) {
-      // Fetch MCP configurations from registry
-      mcpTools = await resolveMCPServers(migratedData.mcpServerIds);
-    }
+    // 2. Resolve MCP Servers
+    let mcpTools = await resolveMCPServers(migratedData.mcpServerIds);
 
-    // Filter out invalid MCP tool entries (null, undefined, or missing required properties)
+    // Filter out invalid MCP tool entries
     mcpTools = mcpTools.filter((mcp: any) => {
-      if (!mcp) {
-        console.warn('[Agent] Filtered out null/undefined MCP tool');
-        return false;
-      }
-      if (!mcp.name && !mcp.toolName) {
-        console.warn('[Agent] Filtered out MCP tool without name:', mcp);
-        return false;
-      }
+      if (!mcp) return false;
+      if (!mcp.name && !mcp.toolName) return false;
       return true;
     });
 
-    // Instantiate standard tools
+    // 3. Prefetch file contents
+    await prefetchFileContents(migratedData.instructions || '', state);
+
+    // 4. Substitute Variables
+    const instructions = substituteVariables(migratedData.instructions || '', state);
+
+    // 5. Instantiate Standard Tools
     const standardTools: any[] = [];
     if (data.selectedTools && Array.isArray(data.selectedTools)) {
       for (const toolConfig of data.selectedTools) {
         try {
-          const tool = await ToolFactory.createTool(toolConfig, apiKeys);
+          const tool = await ToolFactory.createTool(toolConfig, apiKeys || {});
           if (tool) {
             standardTools.push(tool);
           }
         } catch (error) {
-          console.error(`Failed to instantiate tool ${toolConfig.id}:`, error);
+          // Fix: Handle both id and toolId
+          console.error(`Failed to instantiate tool ${(toolConfig as any).toolId || (toolConfig as any).id}:`, error);
         }
       }
     }
-    // Debug logging (only in development)
+
+    // Debug logging
     if (process.env.DEBUG_TOOLS || process.env.NODE_ENV === 'development') {
       console.log(`[Tools] MCP tools count: ${mcpTools.length}`, mcpTools.map((m: any) => ({ name: m?.name, hasUrl: !!m?.url })));
       console.log(`[Tools] Created ${standardTools.length} standard tools:`, standardTools.map(t => t?.name || 'unnamed'));
-      console.log(`[Tools] Selected tools config:`, data.selectedTools);
     }
 
-
-    // Validate API keys are provided
+    // 6. Validate API Keys
     if (!apiKeys) {
       throw new Error('API keys are required for server-side execution');
     }
 
-    // Server-side execution only
+    // 7. Mock Response Check (Server-side execution only)
     if (process.env.MOCK_AGENT_RESPONSE) {
       type MockConfig = string | Record<string, unknown>;
       let mockConfig: MockConfig = process.env.MOCK_AGENT_RESPONSE;
@@ -222,10 +96,8 @@ export async function executeAgentNode(
       }
     }
 
-    // Use the already-substituted instructions
+    // 8. Prepare Execution Context
     const contextualPrompt = instructions;
-
-    // Prepare messages
     const messages = data.includeChatHistory && state.chatHistory.length > 0
       ? [
         ...state.chatHistory,
@@ -233,7 +105,7 @@ export async function executeAgentNode(
       ]
       : [{ role: 'user' as const, content: contextualPrompt }];
 
-    // Parse model string (handle models with slashes like groq/openai/gpt-oss-120b)
+    // Parse model string
     const modelString = data.model || 'anthropic/claude-sonnet-4-5-20250929';
     let provider: string;
     let modelName: string;
@@ -247,8 +119,7 @@ export async function executeAgentNode(
       modelName = modelString;
     }
 
-    // Use native SDKs for better MCP support
-    let responseText = '';
+    // Initialize usage and toolCalls
     interface LLMUsage {
       input_tokens?: number;
       output_tokens?: number;
@@ -265,12 +136,13 @@ export async function executeAgentNode(
       completion_tokens: 0,
     };
     let toolCalls: any[] = [];
+    let responseText = '';
 
-    // Check if MCP tools are configured
     const hasMcpTools = mcpTools.length > 0;
 
+    // 9. Execute based on Provider
     if (provider === 'anthropic' && apiKeys?.anthropic) {
-      // Use native Anthropic SDK for MCP support
+      // --- Anthropic Implementation ---
       const Anthropic = (await import('@anthropic-ai/sdk')).default;
       const client = new Anthropic({ apiKey: apiKeys.anthropic });
 
@@ -282,7 +154,6 @@ export async function executeAgentNode(
           console.warn('⚠️ Arcade tools detected in MCP config - these will be skipped');
         }
 
-        // Build MCP servers configuration
         const mcpServers = realMcpTools.map((mcp: any) => ({
           type: 'url' as const,
           url: mcp.url && mcp.url.includes('{FIRECRAWL_API_KEY}')
@@ -323,7 +194,7 @@ export async function executeAgentNode(
           responseText = textBlocks.map((item: any) => item.text).join('\n');
           usage = (response.usage as any) || {};
 
-          // Check if we need to execute standard tools
+          // Handle standard tools manually if Anthropic didn't execute them (mixed mode)
           const standardToolUses = toolUses.filter((tu: any) => standardTools.some(st => st.name === tu.name));
           let extraToolResults: any[] = [];
 
@@ -350,10 +221,8 @@ export async function executeAgentNode(
               return null;
             }));
 
-            // Filter out nulls
             extraToolResults = extraToolResults.filter(Boolean);
 
-            // Call Anthropic again with results
             if (extraToolResults.length > 0) {
               const finalResponse = await client.beta.messages.create({
                 model: modelName,
@@ -390,8 +259,6 @@ export async function executeAgentNode(
               tool_use_id: item.id,
             };
 
-            // Include tool result if available
-            // Check existing toolResults (from MCP SDK) or extraToolResults (from standard tools)
             const existingResult = toolResults.find((tr: any) => tr.tool_use_id === item.id);
             const extraResult = extraToolResults.find((tr: any) => tr.tool_use_id === item.id);
             const result = existingResult || extraResult;
@@ -411,8 +278,6 @@ export async function executeAgentNode(
         } catch (err: any) {
           anthropicError = err;
           useManualToolCalling = true;
-
-          // Check if this is an MCP-related error
           const errorMsg = err.message || '';
           const isMCPError = errorMsg.includes('Input should be an object') ||
             errorMsg.includes('input_type=list') ||
@@ -420,31 +285,26 @@ export async function executeAgentNode(
             err.status === 500;
 
           if (!isMCPError) {
-            throw err; // Re-throw if it's not MCP-related
+            throw err;
           }
-
           console.warn('⚠️ Anthropic MCP failed, falling back to manual tool execution. Error:', errorMsg.substring(0, 200));
         }
 
         if (useManualToolCalling) {
-          // Manual fallback logic omitted for brevity as it's complex and we want to rely on native SDK mostly.
-          // If native fails, we might need to implement full manual loop similar to OpenAI below.
-          // For now, rethrow if native fails unless we want to duplicate the manual logic.
-          throw anthropicError;
+          throw anthropicError; // Fallback not fully implemented, re-throwing
         }
       } else {
-        // Regular Anthropic call without MCP
         const response = await client.messages.create({
           model: modelName,
           max_tokens: 4096,
           messages: messages as any,
         });
-
         responseText = response.content[0].type === 'text' ? response.content[0].text : '';
         usage = (response.usage as any) || {};
       }
+
     } else if ((provider === 'openai' && apiKeys?.openai) || (provider === 'groq' && apiKeys?.groq)) {
-      // Unified OpenAI/Groq implementation
+      // --- OpenAI / Groq Implementation ---
       const OpenAI = (await import('openai')).default;
       const client = new OpenAI({
         apiKey: provider === 'groq' ? apiKeys.groq : apiKeys.openai,
@@ -452,13 +312,11 @@ export async function executeAgentNode(
       });
 
       if (hasMcpTools || standardTools.length > 0) {
-        // Convert tools to OpenAI format
         const tools = [
           ...mcpTools.map(convertMcpToOpenAiTool),
           ...standardTools.map(tool => convertToOpenAITool(tool))
         ];
 
-        // First call with tools
         const response = await client.chat.completions.create({
           model: modelName,
           messages: messages as any,
@@ -473,7 +331,6 @@ export async function executeAgentNode(
           const toolResults = await Promise.all(
             message.tool_calls.map(async (call: any) => {
               try {
-                // Check MCP tools
                 const mcpServer = mcpTools.find((m: any) =>
                   (m.name || m.toolName) === call.function.name
                 );
@@ -481,7 +338,6 @@ export async function executeAgentNode(
                 if (mcpServer) {
                   const args = JSON.parse(call.function.arguments);
                   const result = await executeMcpTool(mcpServer, call.function.name, args, apiKeys);
-
                   return {
                     tool_call_id: call.id,
                     role: "tool" as const,
@@ -489,7 +345,6 @@ export async function executeAgentNode(
                   };
                 }
 
-                // Check standard tools
                 const standardTool = standardTools.find(t => t.name === call.function.name);
                 if (standardTool) {
                   const args = JSON.parse(call.function.arguments);
@@ -539,7 +394,6 @@ export async function executeAgentNode(
           responseText = message.content || '';
         }
       } else {
-        // Regular call without tools
         const response = await client.chat.completions.create({
           model: modelName,
           messages: messages as any,
@@ -547,19 +401,17 @@ export async function executeAgentNode(
         responseText = response.choices[0].message.content || '';
         usage = (response.usage as unknown as LLMUsage) || ({} as LLMUsage);
       }
+
     } else if (provider === 'google' && apiKeys?.google) {
-      // Google Gemini implementation
+      // --- Google Gemini Implementation ---
       const { ChatGoogleGenerativeAI } = await import('@langchain/google-genai');
 
       if (hasMcpTools || standardTools.length > 0) {
-        // Gemini with tools
         const model = new ChatGoogleGenerativeAI({
           apiKey: apiKeys.google,
           model: modelName,
         });
 
-        // Convert both MCP and standard tools to OpenAI format
-        // LangChain will handle the conversion to Gemini's format internally
         const tools = [
           ...mcpTools.map(convertMcpToOpenAiTool),
           ...standardTools.map(tool => convertToOpenAITool(tool))
@@ -571,12 +423,10 @@ export async function executeAgentNode(
 
         usage = response.response_metadata?.usage || {};
 
-        // Check for tool calls
         if (response.tool_calls && response.tool_calls.length > 0) {
           const toolResults = await Promise.all(
             response.tool_calls.map(async (call: any) => {
               try {
-                // Check MCP tools first
                 const mcpServer = mcpTools.find((m: any) =>
                   (m.name || m.toolName) === call.name
                 );
@@ -590,7 +440,6 @@ export async function executeAgentNode(
                   };
                 }
 
-                // Check standard tools
                 const standardTool = standardTools.find(t => t.name === call.name);
                 if (standardTool) {
                   const result = await standardTool.invoke(call.args);
@@ -616,7 +465,6 @@ export async function executeAgentNode(
             })
           );
 
-          // Get final response with tool results
           const finalResponse = await model.invoke([
             ...messages as any,
             response,
@@ -641,20 +489,20 @@ export async function executeAgentNode(
           responseText = response.content as string;
         }
       } else {
-        // Regular Gemini call without tools
         const model = new ChatGoogleGenerativeAI({
           apiKey: apiKeys.google,
           model: modelName,
         });
-
         const response = await model.invoke(messages);
         responseText = response.content as string;
         usage = response.response_metadata?.usage || {};
       }
+
     } else {
       throw new Error(`No API key available for provider: ${provider}`);
     }
 
+    // 10. Return Result
     const serverChatUpdates = data.includeChatHistory
       ? [
         { role: 'user', content: data.instructions || '' },
@@ -677,23 +525,11 @@ export async function executeAgentNode(
       __chatHistoryUpdates: serverChatUpdates,
       __variableUpdates: { lastOutput: output },
     };
+
   } catch (error) {
     console.error('Agent execution error:', error);
 
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-    if (errorMessage.includes('API key') || errorMessage.includes('api_key')) {
-      throw new Error('Missing API key. Please add your LLM provider key in Settings.');
-    }
-
-    if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
-      throw new Error('Rate limited. Please wait a moment and try again.');
-    }
-
-    if (errorMessage.includes('No API key available')) {
-      throw new Error('No API key configured. Please add an Anthropic, OpenAI, or Groq API key in your .env.local file.');
-    }
-
     throw new Error(`Agent execution failed: ${errorMessage}`);
   }
 }

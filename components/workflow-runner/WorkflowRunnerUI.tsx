@@ -771,33 +771,45 @@ export default function WorkflowRunnerUI() {
 
       const reader = response.body!.getReader();
       const decoder = new TextDecoder();
+      let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split("\n\n");
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
 
-        for (const line of lines) {
-          if (line.trim().startsWith("event:")) {
-            const eventMatch = line.match(/event:\s*(\w+)/);
-            const dataMatch = line.match(/data:\s*(.+)/);
+        // Keep the last part in the buffer as it might be incomplete
+        buffer = parts.pop() || '';
 
-            if (eventMatch && dataMatch) {
-              try {
-                const event = eventMatch[1];
-                const data = JSON.parse(dataMatch[1]);
+        for (const part of parts) {
+          const lines = part.split('\n');
+          let event = 'message';
+          let data = '';
 
-                const responseData = {
-                  event,
-                  data,
-                  timestamp: data.timestamp || new Date().toISOString(),
-                };
+          for (const line of lines) {
+            if (line.startsWith('event:')) {
+              event = line.substring(6).trim();
+            } else if (line.startsWith('data:')) {
+              data = line.substring(5).trim();
+            }
+          }
 
-                setWorkflowResponses((prev) => [...prev, responseData]);
-              } catch (parseError) {
-                console.error('Error parsing SSE data:', parseError);
+          if (data) {
+            try {
+              const parsedData = JSON.parse(data);
+              const responseData = {
+                event,
+                data: parsedData,
+                timestamp: parsedData.timestamp || new Date().toISOString(),
+              };
+
+              setWorkflowResponses((prev) => [...prev, responseData]);
+            } catch (parseError) {
+              console.error('Error parsing SSE data:', parseError, 'Raw data:', data);
+              // Only show error if it's not just an empty keep-alive or similar
+              if (data.length > 0) {
                 setWorkflowResponses((prev) => [...prev, {
                   event: 'error',
                   data: { error: 'Failed to parse server response' },
