@@ -42,7 +42,12 @@ export async function handler(buffer: Buffer): Promise<string> {
                                         for (const run of textItem.R) {
                                             if (run.T) {
                                                 // Decode URI-encoded text
-                                                fullText += decodeURIComponent(run.T) + ' ';
+                                                try {
+                                                    fullText += decodeURIComponent(run.T) + ' ';
+                                                } catch (e) {
+                                                    // Fallback for malformed URIs
+                                                    fullText += run.T + ' ';
+                                                }
                                             }
                                         }
                                     }

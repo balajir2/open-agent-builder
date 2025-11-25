@@ -35,8 +35,8 @@ export const SUPPORTED_MODELS = {
     'gpt-oss-120b',
   ],
   google: [
-    'gemini-1.5-pro',
-    'gemini-1.5-flash',
+    'gemini-2.0-flash-exp',
+    'gemini-2.0-pro-exp',
   ],
 } as const;
 
@@ -47,7 +47,7 @@ export const DEFAULT_MODELS = {
   openai: 'gpt-4o',
   anthropic: 'claude-sonnet-4-5-20250929', // Claude 4.5 Sonnet
   groq: 'gpt-oss-120b', // Using Responses API model for better MCP support
-  google: 'gemini-1.5-pro',
+  google: 'gemini-2.0-flash-exp',
 } as const;
 
 /**

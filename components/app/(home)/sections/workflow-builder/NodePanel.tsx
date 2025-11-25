@@ -94,8 +94,8 @@ export default function NodePanel({
         provider: 'Google',
         hasKey: hasProvider('google'),
         models: [
-          { id: 'google/gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
-          { id: 'google/gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
+          { id: 'google/gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash (Exp)' },
+          { id: 'google/gemini-2.0-pro-exp', name: 'Gemini 2.0 Pro (Exp)' },
         ]
       }
     ];
