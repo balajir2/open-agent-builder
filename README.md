@@ -73,7 +73,7 @@ Open Agent Builder is a visual workflow builder for creating AI agent pipelines 
 | **[Clerk](https://clerk.com)** | Authentication and user management with JWT integration |
 | **[Tailwind CSS](https://tailwindcss.com/)** | Utility-first CSS framework for responsive UI |
 | **[React Flow](https://reactflow.dev/)** | Visual workflow builder canvas with drag-and-drop nodes |
-| **[Anthropic](https://www.anthropic.com/)** | Claude AI integration with native MCP support (Claude Haiku 4.5 & Sonnet 4.5) |
+| **[Anthropic](https://www.anthropic.com/)** | Claude AI integration with native MCP support (Claude 3.5 Haiku & Sonnet 3.5) |
 | **[OpenAI](https://platform.openai.com/)** | GPT-4o integration (MCP support in development) |
 | **[Google AI](https://ai.google.dev/)** | Gemini 1.5 Pro & Flash integration (MCP support in development) |
 | **[Groq](https://groq.com/)** | Fast inference for open models (MCP support in development) |
@@ -91,7 +91,7 @@ Before you begin, you'll need:
 3. **Convex account** - [Sign up free](https://convex.dev)
 4. **Clerk account** - [Sign up free](https://clerk.com)
 
-> **Note:** LLM API keys can be added directly in the UI via Settings → API Keys after setup. For MCP tool support, Anthropic Claude (Haiku 4.5 or Sonnet 4.5) is currently recommended as the default option.
+> **Note:** LLM API keys can be added directly in the UI via Settings → API Keys after setup. For MCP tool support, Anthropic Claude (3.5 Haiku or Sonnet 3.5) is currently recommended as the default option.
 
 ---
 
@@ -202,7 +202,7 @@ While users can add their own LLM API keys through the UI (Settings → API Keys
 ```bash
 # Optional: Choose one as default
 
-# Anthropic Claude (Recommended - Native MCP support with Haiku 4.5 & Sonnet 4.5)
+# Anthropic Claude (Recommended - Native MCP support with 3.5 Haiku & Sonnet 3.5)
 ANTHROPIC_API_KEY=sk-ant-...
 
 # OpenAI GPT-4o (MCP support in development)
@@ -265,7 +265,7 @@ npm start
 
 1. **Sign Up/Login** at `http://localhost:3000`
 2. **Add your LLM API key** in Settings → API Keys
-   - For MCP tool support: Use Anthropic Claude (Haiku 4.5 or Sonnet 4.5)
+   - For MCP tool support: Use Anthropic Claude (3.5 Haiku or Sonnet 3.5)
    - For basic workflows: OpenAI, Google Gemini, or Groq also work
 3. **Click "New Workflow"** or select a template
 4. **Try the "Simple Web Scraper" template:**
@@ -323,8 +323,8 @@ Provides a more customizable execution interface with embedded workflow visualiz
 
 | Provider | Models | MCP Support | Standard Tools | Notes |
 |----------|--------|-------------|----------------|-------|
-| **Anthropic Claude** | Haiku 4.5, Sonnet 4.5 | ✅ Native | ✅ Yes | Recommended for MCP |
-| **OpenAI** | GPT-4o, GPT-4o-mini | 🔄 In Dev | ✅ Yes | Function calling |
+| **Anthropic Claude** | 3.5 Haiku, Sonnet 3.5 | ✅ Native | ✅ Yes | Recommended for MCP |
+| **OpenAI** | GPT-4o, GPT-4o Mini | 🔄 In Dev | ✅ Yes | Function calling |
 | **Google Gemini** | 1.5 Pro, 1.5 Flash | 🔄 In Dev | ✅ Yes | Function calling |
 | **Groq** | GPT-OSS-120B | 🔄 In Dev | ✅ Yes | Fast inference |
 

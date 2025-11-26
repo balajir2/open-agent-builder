@@ -90,14 +90,118 @@ export class ToolFactory {
                 if (!apiKeys.browserless) return null;
                 return new DynamicTool({
                     name: "browserless",
-                    description: "Scrape a webpage using Browserless (Headless Chrome).",
+                    description: "Advanced web scraping using Browserless (Headless Chrome/Playwright). Supports JavaScript execution, screenshots, PDF generation, and custom selectors. Input should be a valid URL.",
                     func: wrapToolFunction(async (url: string) => {
-                        const response = await fetch(`https://chrome.browserless.io/content?token=${apiKeys.browserless}`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ url }),
-                        });
-                        return await response.text();
+                        const {
+                            waitForSelector,
+                            executeScript,
+                            screenshot,
+                            pdf,
+                            timeout = 30000
+                        } = toolConfig;
+
+                        // Build the request payload for Browserless
+                        const payload: any = {
+                            url,
+                            gotoOptions: {
+                                waitUntil: 'networkidle2',
+                                timeout,
+                            },
+                        };
+
+                        // Add wait for selector if specified
+                        if (waitForSelector) {
+                            payload.waitForSelector = {
+                                selector: waitForSelector,
+                                timeout,
+                            };
+                        }
+
+                        // Add JavaScript execution if specified
+                        if (executeScript) {
+                            payload.waitForFunction = {
+                                fn: executeScript,
+                                timeout,
+                            };
+                        }
+
+                        const results: any = {
+                            url,
+                            timestamp: new Date().toISOString(),
+                        };
+
+                        // Handle screenshot request
+                        if (screenshot) {
+                            const screenshotResponse = await fetch(
+                                `https://chrome.browserless.io/screenshot?token=${apiKeys.browserless}`,
+                                {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                        ...payload,
+                                        options: {
+                                            fullPage: true,
+                                            type: 'png',
+                                        },
+                                    }),
+                                }
+                            );
+
+                            if (screenshotResponse.ok) {
+                                const buffer = await screenshotResponse.arrayBuffer();
+                                const base64 = Buffer.from(buffer).toString('base64');
+                                results.screenshot = `data:image/png;base64,${base64}`;
+                                results.screenshotSize = buffer.byteLength;
+                            } else {
+                                results.screenshotError = `Failed to capture screenshot: ${screenshotResponse.status}`;
+                            }
+                        }
+
+                        // Handle PDF request
+                        if (pdf) {
+                            const pdfResponse = await fetch(
+                                `https://chrome.browserless.io/pdf?token=${apiKeys.browserless}`,
+                                {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                        ...payload,
+                                        options: {
+                                            printBackground: true,
+                                            format: 'A4',
+                                        },
+                                    }),
+                                }
+                            );
+
+                            if (pdfResponse.ok) {
+                                const buffer = await pdfResponse.arrayBuffer();
+                                const base64 = Buffer.from(buffer).toString('base64');
+                                results.pdf = `data:application/pdf;base64,${base64}`;
+                                results.pdfSize = buffer.byteLength;
+                            } else {
+                                results.pdfError = `Failed to generate PDF: ${pdfResponse.status}`;
+                            }
+                        }
+
+                        // Always fetch the content
+                        const contentResponse = await fetch(
+                            `https://chrome.browserless.io/content?token=${apiKeys.browserless}`,
+                            {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify(payload),
+                            }
+                        );
+
+                        if (contentResponse.ok) {
+                            results.content = await contentResponse.text();
+                        } else {
+                            results.contentError = `Failed to fetch content: ${contentResponse.status}`;
+                        }
+
+                        // Return structured results
+                        return results;
                     }, { name: "browserless" }),
                 });
 

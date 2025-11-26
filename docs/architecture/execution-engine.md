@@ -283,7 +283,7 @@ sequenceDiagram
 ```
 
 **Supported Providers:**
-- **Anthropic:** Claude Haiku 4.5, Sonnet 4.5 (full MCP support)
+- **Anthropic:** Claude 3.5 Haiku, Sonnet 3.5 (full MCP support)
 - **OpenAI:** GPT-4o, GPT-4o-mini
 - **Groq:** Llama 3.1, Mixtral
 

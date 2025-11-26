@@ -4,6 +4,7 @@ import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import type { Node } from "@xyflow/react";
+import { llmProviders } from "@/lib/config/llm-config";
 
 interface ToolsNodePanelProps {
   node: Node | null;
@@ -29,7 +30,7 @@ export default function ToolsNodePanel({ node, onClose, onDelete, onUpdate }: To
   const [moderationEnabled, setModerationEnabled] = useState(nodeData?.moderationEnabled ?? false);
   const [jailbreakEnabled, setJailbreakEnabled] = useState(nodeData?.jailbreakEnabled ?? false);
   const [hallucinationEnabled, setHallucinationEnabled] = useState(nodeData?.hallucinationEnabled ?? false);
-  const [guardrailModel, setGuardrailModel] = useState(nodeData?.guardrailModel || 'openai/gpt-5-mini');
+  const [guardrailModel, setGuardrailModel] = useState(nodeData?.guardrailModel || llmProviders[0]?.defaultModel || 'openai/gpt-4o-mini');
   const [actionOnViolation, setActionOnViolation] = useState(nodeData?.actionOnViolation || 'block');
   const [customRules, setCustomRules] = useState<string>(nodeData?.customRules?.join('\n') || '');
 
@@ -123,8 +124,8 @@ export default function ToolsNodePanel({ node, onClose, onDelete, onUpdate }: To
             </div>
             <p className="text-body-small text-black-alpha-48">
               {nodeType.includes('file') ? 'Search through files and code' :
-               nodeType.includes('guardrail') ? 'Add safety checks and content filtering' :
-               'Configure tool'}
+                nodeType.includes('guardrail') ? 'Add safety checks and content filtering' :
+                  'Configure tool'}
             </p>
           </div>
 
@@ -180,9 +181,8 @@ export default function ToolsNodePanel({ node, onClose, onDelete, onUpdate }: To
                   </label>
                   <button
                     onClick={() => setIncludeContent(!includeContent)}
-                    className={`w-44 h-24 rounded-full transition-colors relative ${
-                      includeContent ? 'bg-heat-100' : 'bg-black-alpha-12'
-                    }`}
+                    className={`w-44 h-24 rounded-full transition-colors relative ${includeContent ? 'bg-heat-100' : 'bg-black-alpha-12'
+                      }`}
                   >
                     <motion.div
                       className="w-20 h-20 bg-white rounded-full absolute top-2 shadow-sm"
@@ -240,9 +240,8 @@ export default function ToolsNodePanel({ node, onClose, onDelete, onUpdate }: To
                       </div>
                       <button
                         onClick={() => setPiiEnabled(!piiEnabled)}
-                        className={`w-44 h-24 rounded-full transition-colors relative ${
-                          piiEnabled ? 'bg-heat-100' : 'bg-black-alpha-12'
-                        }`}
+                        className={`w-44 h-24 rounded-full transition-colors relative ${piiEnabled ? 'bg-heat-100' : 'bg-black-alpha-12'
+                          }`}
                       >
                         <motion.div
                           className="w-20 h-20 bg-white rounded-full absolute top-2 shadow-sm"
@@ -305,9 +304,8 @@ export default function ToolsNodePanel({ node, onClose, onDelete, onUpdate }: To
                       </div>
                       <button
                         onClick={() => setModerationEnabled(!moderationEnabled)}
-                        className={`w-44 h-24 rounded-full transition-colors relative ${
-                          moderationEnabled ? 'bg-heat-100' : 'bg-black-alpha-12'
-                        }`}
+                        className={`w-44 h-24 rounded-full transition-colors relative ${moderationEnabled ? 'bg-heat-100' : 'bg-black-alpha-12'
+                          }`}
                       >
                         <motion.div
                           className="w-20 h-20 bg-white rounded-full absolute top-2 shadow-sm"
@@ -359,9 +357,8 @@ export default function ToolsNodePanel({ node, onClose, onDelete, onUpdate }: To
                       </div>
                       <button
                         onClick={() => setJailbreakEnabled(!jailbreakEnabled)}
-                        className={`w-44 h-24 rounded-full transition-colors relative ${
-                          jailbreakEnabled ? 'bg-heat-100' : 'bg-black-alpha-12'
-                        }`}
+                        className={`w-44 h-24 rounded-full transition-colors relative ${jailbreakEnabled ? 'bg-heat-100' : 'bg-black-alpha-12'
+                          }`}
                       >
                         <motion.div
                           className="w-20 h-20 bg-white rounded-full absolute top-2 shadow-sm"
@@ -413,9 +410,8 @@ export default function ToolsNodePanel({ node, onClose, onDelete, onUpdate }: To
                       </div>
                       <button
                         onClick={() => setHallucinationEnabled(!hallucinationEnabled)}
-                        className={`w-44 h-24 rounded-full transition-colors relative ${
-                          hallucinationEnabled ? 'bg-heat-100' : 'bg-black-alpha-12'
-                        }`}
+                        className={`w-44 h-24 rounded-full transition-colors relative ${hallucinationEnabled ? 'bg-heat-100' : 'bg-black-alpha-12'
+                          }`}
                       >
                         <motion.div
                           className="w-20 h-20 bg-white rounded-full absolute top-2 shadow-sm"
@@ -468,18 +464,15 @@ export default function ToolsNodePanel({ node, onClose, onDelete, onUpdate }: To
                         onChange={(e) => setGuardrailModel(e.target.value)}
                         className="w-full px-12 py-10 bg-background-base border border-border-faint rounded-8 text-body-medium text-accent-black focus:outline-none focus:border-heat-100 transition-colors cursor-pointer"
                       >
-                        <optgroup label="OpenAI (Recommended)">
-                          <option value="openai/gpt-5-mini">GPT-5 Mini (Fast & Cheap)</option>
-                          <option value="openai/gpt-5">GPT-5</option>
-                        </optgroup>
-                        <optgroup label="Groq (Fastest)">
-                          <option value="groq/openai/gpt-oss-20b">GPT OSS 20B</option>
-                          <option value="groq/openai/gpt-oss-120b">GPT OSS 120B</option>
-                        </optgroup>
-                        <optgroup label="Anthropic">
-                          <option value="anthropic/claude-sonnet-4-5-20250929">Claude Sonnet 4.5</option>
-                          <option value="anthropic/claude-sonnet-4-20250514">Claude Sonnet 4</option>
-                        </optgroup>
+                        {llmProviders.map((provider) => (
+                          <optgroup key={provider.id} label={provider.name}>
+                            {provider.models.map((model) => (
+                              <option key={model.id} value={`${provider.id}/${model.id}`}>
+                                {model.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
                       </select>
                       <p className="text-body-small text-black-alpha-48 mt-8">
                         LLM used to analyze content for violations

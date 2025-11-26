@@ -118,7 +118,7 @@ Every workflow begins with a Start node:
 2. Connect the MCP Tool to the Agent
 3. Configure the Agent:
    - **Provider:** Anthropic (or your preferred LLM)
-   - **Model:** Claude Sonnet 4.5
+   - **Model:** Claude Sonnet 3.5
    - **Instructions:** "Summarize the following website content in 3-5 bullet points"
    - **Input:** `{{lastOutput.markdown}}` (from Firecrawl scrape)
 
@@ -179,7 +179,7 @@ Required: true
 
 **Configuration:**
 - **Provider:** LLM provider (Anthropic, OpenAI, Groq)
-- **Model:** Specific model (Claude Sonnet 4.5, GPT-4o, etc.)
+- **Model:** Specific model (Claude Sonnet 3.5, GPT-4o, etc.)
 - **Instructions:** What you want the AI to do
 - **Input:** Data for the AI to process
 - **Temperature:** Creativity (0.0 - 1.0)
@@ -797,7 +797,7 @@ Watch workflows execute in real-time:
 
 **Solutions:**
 1. **Check API Key:** Verify in Settings → API Keys
-2. **Check Model:** Ensure model is available (e.g., Claude Sonnet 4.5)
+2. **Check Model:** Ensure model is available (e.g., Claude Sonnet 3.5)
 3. **Check Input:** Verify input data is valid
 4. **Check Prompt:** Simplify instructions if too complex
 5. **Check Token Limit:** Reduce max tokens if needed

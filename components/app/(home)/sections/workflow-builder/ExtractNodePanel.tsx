@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 import type { Node } from "@xyflow/react";
+import { llmProviders } from "@/lib/config/llm-config";
 
 interface ExtractNodePanelProps {
   node: Node | null;
@@ -21,7 +22,7 @@ export default function ExtractNodePanel({
 }: ExtractNodePanelProps) {
   const nodeData = node?.data as any;
   const [instructions, setInstructions] = useState(nodeData?.instructions || 'Extract information from the input');
-  const [model, setModel] = useState(nodeData?.model || 'gpt-4o');
+  const [model, setModel] = useState(nodeData?.model || llmProviders[0]?.defaultModel || 'openai/gpt-4o');
   const [customModel, setCustomModel] = useState('');
   const [jsonSchema, setJsonSchema] = useState(
     nodeData?.jsonSchema || JSON.stringify({
@@ -110,122 +111,75 @@ export default function ExtractNodePanel({
             </p>
           </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-20 space-y-24">
-          {/* Instructions */}
-          <div>
-            <label className="block text-label-small text-black-alpha-48 mb-8">
-              Extraction Instructions
-            </label>
-            <textarea
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              placeholder="What information should be extracted?"
-              rows={4}
-              className="w-full px-12 py-10 bg-background-base border border-border-faint rounded-8 text-body-medium text-accent-black focus:outline-none focus:border-heat-100 transition-colors resize-none"
-            />
-            <p className="text-body-small text-black-alpha-32 mt-6">
-              The LLM will extract data matching the schema below
-            </p>
-          </div>
-
-          {/* Model Selection */}
-          <div>
-            <label className="block text-label-small text-black-alpha-48 mb-8">
-              Model
-            </label>
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="w-full px-12 py-10 bg-background-base border border-border-faint rounded-8 text-body-medium text-accent-black focus:outline-none focus:border-heat-100 transition-colors"
-            >
-              <optgroup label="Anthropic">
-                <option value="anthropic/claude-sonnet-4-5-20250929">Claude Sonnet 4.5</option>
-                <option value="anthropic/claude-haiku-4-5-20251001">Claude Haiku 4.5</option>
-              </optgroup>
-              <optgroup label="OpenAI">
-                <option value="openai/gpt-4o">GPT-4o</option>
-                <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
-              </optgroup>
-              <optgroup label="Groq">
-                <option value="groq/llama-3.3-70b-versatile">Llama 3.3 70B</option>
-                <option value="groq/llama-3.1-8b-instant">Llama 3.1 8B</option>
-              </optgroup>
-            </select>
-          </div>
-
-          {/* JSON Schema */}
-          <div>
-            <label className="block text-label-small text-black-alpha-48 mb-8">
-              Output Schema (JSON Schema)
-            </label>
-            <textarea
-              value={jsonSchema}
-              onChange={(e) => setJsonSchema(e.target.value)}
-              rows={12}
-              className={`w-full px-12 py-10 bg-background-base border rounded-8 text-body-small text-accent-black font-mono focus:outline-none focus:border-heat-100 transition-colors resize-none ${
-                schemaError ? 'border-red-500' : 'border-border-faint'
-              }`}
-            />
-            {schemaError && (
-              <p className="text-body-small text-accent-black mt-6">{schemaError}</p>
-            )}
-            <p className="text-body-small text-black-alpha-32 mt-6">
-              Define the structure of data to extract
-            </p>
-          </div>
-
-          {/* MCP Tools - Hidden for now since Extract nodes don't use MCP */}
-          {/* <div>
-            <div className="flex items-center justify-between mb-8">
-              <label className="block text-label-small text-black-alpha-48">
-                MCP Tools (Optional)
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-20 space-y-24">
+            {/* Instructions */}
+            <div>
+              <label className="block text-label-small text-black-alpha-48 mb-8">
+                Extraction Instructions
               </label>
+              <textarea
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value)}
+                placeholder="What information should be extracted?"
+                rows={4}
+                className="w-full px-12 py-10 bg-background-base border border-border-faint rounded-8 text-body-medium text-accent-black focus:outline-none focus:border-heat-100 transition-colors resize-none"
+              />
+              <p className="text-body-small text-black-alpha-32 mt-6">
+                The LLM will extract data matching the schema below
+              </p>
             </div>
 
-            {nodeData?.mcpTools && nodeData.mcpTools.length > 0 ? (
-              <div className="space-y-8">
-                {nodeData.mcpTools.map((mcp: any, index: number) => (
-                  <div key={index} className="p-12 bg-background-base rounded-8 border border-border-faint">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <p className="text-body-small text-accent-black font-medium">{mcp.name}</p>
-                        <p className="text-body-small text-black-alpha-48 font-mono text-xs truncate mt-4">
-                          {mcp.url}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          const newTools = nodeData.mcpTools.filter((_: any, i: number) => i !== index);
-                          onUpdate(nodeData.id, { mcpTools: newTools });
-                        }}
-                        className="w-24 h-24 rounded-4 hover:bg-black-alpha-4 transition-colors flex items-center justify-center group"
-                      >
-                        <svg className="w-12 h-12 text-black-alpha-48 group-hover:text-accent-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
+            {/* Model Selection */}
+            <div>
+              <label className="block text-label-small text-black-alpha-48 mb-8">
+                Model
+              </label>
+              <select
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                className="w-full px-12 py-10 bg-background-base border border-border-faint rounded-8 text-body-medium text-accent-black focus:outline-none focus:border-heat-100 transition-colors"
+              >
+                {llmProviders.map((provider) => (
+                  <optgroup key={provider.id} label={provider.name}>
+                    {provider.models.map((model) => (
+                      <option key={model.id} value={`${provider.id}/${model.id}`}>
+                        {model.name}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
-              </div>
-            ) : (
-              <div className="p-16 bg-background-base rounded-8 border border-border-faint text-center">
-                <p className="text-body-small text-black-alpha-48">
-                  No MCP tools - the agent will only use the LLM
-                </p>
-              </div>
-            )}
-          </div> */}
+              </select>
+            </div>
 
-          {/* Info Box */}
-          <div className="p-16 bg-accent-white rounded-12 border border-border-faint">
-            <p className="text-body-small text-accent-black">
-              <strong>How it works:</strong> The LLM analyzes the input and extracts data matching your JSON schema.
-            </p>
+            {/* JSON Schema */}
+            <div>
+              <label className="block text-label-small text-black-alpha-48 mb-8">
+                Output Schema (JSON Schema)
+              </label>
+              <textarea
+                value={jsonSchema}
+                onChange={(e) => setJsonSchema(e.target.value)}
+                rows={12}
+                className={`w-full px-12 py-10 bg-background-base border rounded-8 text-body-small text-accent-black font-mono focus:outline-none focus:border-heat-100 transition-colors resize-none ${schemaError ? 'border-red-500' : 'border-border-faint'
+                  }`}
+              />
+              {schemaError && (
+                <p className="text-body-small text-accent-black mt-6">{schemaError}</p>
+              )}
+              <p className="text-body-small text-black-alpha-32 mt-6">
+                Define the structure of data to extract
+              </p>
+            </div>
+
+            {/* Info Box */}
+            <div className="p-16 bg-accent-white rounded-12 border border-border-faint">
+              <p className="text-body-small text-accent-black">
+                <strong>How it works:</strong> The LLM analyzes the input and extracts data matching your JSON schema.
+              </p>
+            </div>
           </div>
-        </div>
-      </motion.aside>
+        </motion.aside>
       )}
     </AnimatePresence>
   );

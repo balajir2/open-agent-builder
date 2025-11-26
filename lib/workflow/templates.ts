@@ -1,4 +1,5 @@
 import { Workflow } from './types';
+import { DEFAULT_MODELS } from '@/lib/api/models';
 
 /**
  * Yahoo Finance Template
@@ -141,7 +142,7 @@ Example for Tesla:
   "company": "Tesla",
   "ticker": "TSLA"
 }`,
-          model: 'groq/openai/gpt-oss-120b',
+          model: DEFAULT_MODELS.groq,
           outputFormat: 'JSON',
           jsonOutputSchema: JSON.stringify({
             type: 'object',
@@ -171,7 +172,7 @@ Example for Tesla:
 Use Firecrawl MCP to search and scrape Yahoo Finance.
 
 Format as a brief summary (3-4 sentences).`,
-          model: 'anthropic/claude-sonnet-4-20250514',
+          model: DEFAULT_MODELS.anthropic,
           outputFormat: 'Text',
           mcpTools: [
             {
@@ -282,7 +283,7 @@ Format the report as:
 (Which company looks strongest/weakest and why - 2-3 sentences)
 
 Make it professional and well-formatted.`,
-          model: 'groq/openai/gpt-oss-120b',
+          model: DEFAULT_MODELS.groq,
           outputFormat: 'Text',
           includeChatHistory: true,
         },
@@ -365,7 +366,7 @@ Simple 4-node workflow!`,
           label: 'Research Stock',
           nodeName: 'Research Stock',
           instructions: 'Search Yahoo Finance for ticker ' + '{{input.ticker}}' + ' and gather:\n- Current price\n- Daily change ($ and %)\n- Market cap\n- P/E ratio\n- 52-week high/low\n- Top 2 recent news headlines\n\nUse Firecrawl MCP to search and scrape the data.',
-          model: 'anthropic/claude-sonnet-4-20250514',
+          model: DEFAULT_MODELS.anthropic,
           outputFormat: 'Text',
           mcpTools: [
             {
@@ -386,7 +387,7 @@ Simple 4-node workflow!`,
           label: 'Write Report',
           nodeName: 'Write Report',
           instructions: 'Write a professional stock analysis report for ' + '{{input.ticker}}' + ' using this research:\n\n' + '{{lastOutput}}' + '\n\nInclude:\n- Executive Summary (3 sentences)\n- Key Metrics table\n- Performance Analysis\n- Recent News Summary\n- Investment Recommendation\n\nMake it professional and well-formatted.',
-          model: 'anthropic/claude-sonnet-4-20250514',
+          model: DEFAULT_MODELS.anthropic,
           outputFormat: 'Text',
         },
       },
@@ -704,7 +705,7 @@ Great for: Shopping decisions, price research`,
    - Top 3-5 customer review summaries
 
 Return all extracted data in a clear format.`,
-          model: 'anthropic/claude-sonnet-4-20250514',
+          model: DEFAULT_MODELS.anthropic,
           outputFormat: 'Text',
           mcpTools: [
             {
@@ -749,7 +750,7 @@ Clear BUY or SKIP recommendation with reasoning (2-3 sentences).
 
 ## Best For
 Who would benefit most from this product?`,
-          model: 'anthropic/claude-sonnet-4-20250514',
+          model: DEFAULT_MODELS.anthropic,
           outputFormat: 'Text',
         },
       },
@@ -846,28 +847,28 @@ Intermediate complexity with loops!`,
           label: 'Search Zillow',
           nodeName: 'Search Zillow',
           instructions: 'Search Zillow for properties matching:\n' +
-'- Location: {{input.location}}\n' +
-'- Max Price: ${{input.max_price}}\n' +
-'- Min Bedrooms: {{input.min_beds}}\n' +
-'\n' +
-'Use firecrawl_search to find properties on Zillow.\n' +
-'Then use firecrawl_scrape on the Zillow search results page.\n' +
-'\n' +
-'Extract and return a JSON array of the top 5 properties with:\n' +
-'{\n' +
-'  "properties": [\n' +
-'    {\n' +
-'      "address": "123 Main St",\n' +
-'      "price": 450000,\n' +
-'      "beds": 3,\n' +
-'      "baths": 2,\n' +
-'      "sqft": 1800,\n' +
-'      "zillow_url": "https://www.zillow.com/..."\n' +
-'    }\n' +
-'  ]\n' +
-'}\n' +
-'\n' +
-'Return ONLY the JSON, no other text.',
+            '- Location: {{input.location}}\n' +
+            '- Max Price: ${{input.max_price}}\n' +
+            '- Min Bedrooms: {{input.min_beds}}\n' +
+            '\n' +
+            'Use firecrawl_search to find properties on Zillow.\n' +
+            'Then use firecrawl_scrape on the Zillow search results page.\n' +
+            '\n' +
+            'Extract and return a JSON array of the top 5 properties with:\n' +
+            '{\n' +
+            '  "properties": [\n' +
+            '    {\n' +
+            '      "address": "123 Main St",\n' +
+            '      "price": 450000,\n' +
+            '      "beds": 3,\n' +
+            '      "baths": 2,\n' +
+            '      "sqft": 1800,\n' +
+            '      "zillow_url": "https://www.zillow.com/..."\n' +
+            '    }\n' +
+            '  ]\n' +
+            '}\n' +
+            '\n' +
+            'Return ONLY the JSON, no other text.',
           model: 'anthropic/claude-sonnet-4-20250514',
           outputFormat: 'JSON',
           jsonOutputSchema: JSON.stringify({
@@ -978,28 +979,28 @@ return {
           label: 'Analyze Property',
           nodeName: 'Analyze Property',
           instructions: 'Analyze this property:\n' +
-'\n' +
-'Address: {{lastOutput.address}}\n' +
-'Price: ${{lastOutput.price}}\n' +
-'Beds: {{lastOutput.beds}} | Baths: {{lastOutput.baths}}\n' +
-'Square Feet: {{lastOutput.sqft}}\n' +
-'URL: {{lastOutput.zillow_url}}\n' +
-'\n' +
-'Use firecrawl_scrape to get more details from the Zillow URL if needed.\n' +
-'\n' +
-'Provide analysis:\n' +
-'\n' +
-'**Value Assessment:**\n' +
-'- Price per sqft: $[calculate]\n' +
-'- Value rating: [Good/Fair/Poor Deal]\n' +
-'\n' +
-'**Property Highlights:**\n' +
-'- [2-3 key features or concerns]\n' +
-'\n' +
-'**Investment Potential:**\n' +
-'- [Brief assessment for rental/resale]\n' +
-'\n' +
-'Keep it concise (3-4 sentences total).',
+            '\n' +
+            'Address: {{lastOutput.address}}\n' +
+            'Price: ${{lastOutput.price}}\n' +
+            'Beds: {{lastOutput.beds}} | Baths: {{lastOutput.baths}}\n' +
+            'Square Feet: {{lastOutput.sqft}}\n' +
+            'URL: {{lastOutput.zillow_url}}\n' +
+            '\n' +
+            'Use firecrawl_scrape to get more details from the Zillow URL if needed.\n' +
+            '\n' +
+            'Provide analysis:\n' +
+            '\n' +
+            '**Value Assessment:**\n' +
+            '- Price per sqft: $[calculate]\n' +
+            '- Value rating: [Good/Fair/Poor Deal]\n' +
+            '\n' +
+            '**Property Highlights:**\n' +
+            '- [2-3 key features or concerns]\n' +
+            '\n' +
+            '**Investment Potential:**\n' +
+            '- [Brief assessment for rental/resale]\n' +
+            '\n' +
+            'Keep it concise (3-4 sentences total).',
           model: 'groq/openai/gpt-oss-120b',
           outputFormat: 'Text',
           mcpTools: [

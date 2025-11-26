@@ -2,6 +2,8 @@
  * Model validation and configuration for LLM providers
  */
 
+import { llmProviders } from '@/lib/config/llm-config';
+
 export type Provider = 'openai' | 'anthropic' | 'groq' | 'google';
 
 export interface ModelConfig {
@@ -13,41 +15,24 @@ export interface ModelConfig {
 
 /**
  * Supported models by provider (MCP-compatible only)
- * These models support MCP through their respective APIs:
- * - OpenAI: Responses API
- * - Anthropic: Messages API with MCP beta
- * - Groq: Responses API (OpenAI-compatible)
- * - Google: Gemini API
+ * Derived from llm-config.ts
  */
 export const SUPPORTED_MODELS = {
-  openai: [
-    // OpenAI models that support Responses API
-    'gpt-4o',
-    'gpt-4o-mini',
-  ],
-  anthropic: [
-    // Claude 4 models that support Messages API with MCP
-    'claude-sonnet-4-5-20250929',
-    'claude-haiku-4-5', // Latest Haiku 4.5
-  ],
-  groq: [
-    // Only Groq models that support Responses API (per Groq docs)
-    'gpt-oss-120b',
-  ],
-  google: [
-    'gemini-2.0-flash-exp',
-    'gemini-2.0-pro-exp',
-  ],
+  openai: llmProviders.find(p => p.id === 'openai')?.models.map(m => m.id) || [],
+  anthropic: llmProviders.find(p => p.id === 'anthropic')?.models.map(m => m.id) || [],
+  groq: llmProviders.find(p => p.id === 'groq')?.models.map(m => m.id) || [],
+  google: llmProviders.find(p => p.id === 'google')?.models.map(m => m.id) || [],
 } as const;
 
 /**
  * Default models for each provider
+ * Derived from llm-config.ts
  */
 export const DEFAULT_MODELS = {
-  openai: 'gpt-4o',
-  anthropic: 'claude-sonnet-4-5-20250929', // Claude 4.5 Sonnet
-  groq: 'gpt-oss-120b', // Using Responses API model for better MCP support
-  google: 'gemini-2.0-flash-exp',
+  openai: llmProviders.find(p => p.id === 'openai')?.defaultModel || 'gpt-4o',
+  anthropic: llmProviders.find(p => p.id === 'anthropic')?.defaultModel || 'claude-3-5-sonnet-20241022',
+  groq: llmProviders.find(p => p.id === 'groq')?.defaultModel || 'gpt-oss-120b',
+  google: llmProviders.find(p => p.id === 'google')?.defaultModel || 'gemini-1.5-pro',
 } as const;
 
 /**

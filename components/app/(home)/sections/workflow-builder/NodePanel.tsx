@@ -12,6 +12,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import FirecrawlLogo from "@/components/icons/FirecrawlLogo";
 import { toolRegistry, getToolsByCategory } from "@/lib/tools/registry";
 import { ToolConfig } from "@/lib/tools/types";
+import { llmProviders } from "@/lib/config/llm-config";
 
 interface NodePanelProps {
   nodeData: {
@@ -65,43 +66,38 @@ export default function NodePanel({
     const hasProvider = (provider: string) => activeKeys.some(key => key.provider === provider);
 
     // Always show all providers - they work with environment variables as fallback
-    const allModels: { provider: string; models: Array<{ id: string; name: string }>; hasKey: boolean }[] = [
-      {
-        provider: 'Anthropic',
-        hasKey: hasProvider('anthropic'),
-        models: [
-          { id: 'anthropic/claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5' },
-          { id: 'anthropic/claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' },
-        ]
-      },
-      {
-        provider: 'OpenAI',
-        hasKey: hasProvider('openai'),
-        models: [
-          { id: 'openai/gpt-4o', name: 'GPT-4o' },
-          { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' },
-        ]
-      },
-      {
-        provider: 'Groq',
-        hasKey: hasProvider('groq'),
-        models: [
-          { id: 'groq/llama-3.3-70b-versatile', name: 'Llama 3.3 70B' },
-          { id: 'groq/llama-3.1-8b-instant', name: 'Llama 3.1 8B' },
-        ]
-      },
-      {
-        provider: 'Google',
-        hasKey: hasProvider('google'),
-        models: [
-          { id: 'google/gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash (Exp)' },
-          { id: 'google/gemini-2.0-pro-exp', name: 'Gemini 2.0 Pro (Exp)' },
-        ]
-      }
-    ];
-
-    return allModels;
+    return llmProviders.map(provider => ({
+      provider: provider.name,
+      hasKey: hasProvider(provider.id),
+      models: provider.models.map(model => ({
+        id: `${provider.id}/${model.id}`,
+        name: model.name
+      }))
+    }));
   };
+
+  // Initialize from nodeData if available
+  const [name, setName] = useState(nodeData?.label || "My agent");
+  const [instructions, setInstructions] = useState((nodeData as any)?.instructions || "");
+  const [includeChatHistory, setIncludeChatHistory] = useState(true);
+  const [model, setModel] = useState("anthropic/claude-3-5-sonnet-20241022");
+  const [outputFormat, setOutputFormat] = useState("Text");
+  const [customModel, setCustomModel] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showSearchSources, setShowSearchSources] = useState(false);
+  const [jsonOutputSchema, setJsonOutputSchema] = useState(`{
+  "type": "object",
+  "properties": {
+    "result": { "type": "string" }
+  }
+}`);
+  const [schemaFields, setSchemaFields] = useState<
+    Array<{ name: string; type: string; required: boolean }>
+  >([{ name: "result", type: "string", required: false }]);
+  const [selectedTools, setSelectedTools] = useState<ToolConfig[]>([]);
+  const [showStandardTools, setShowStandardTools] = useState(false);
+  const lastLoadedNodeId = useRef<string | null>(null);
+  const lastSyncedInstructionsRef = useRef<string | null>(null);
 
   // Helper to update JSON schema from fields array
   const updateSchemaFromFields = (
@@ -179,29 +175,6 @@ export default function NodePanel({
     }
   }, [nodeData?.id, nodes, mcpServers]);
 
-  // Initialize from nodeData if available
-  const [name, setName] = useState(nodeData?.label || "My agent");
-  const [instructions, setInstructions] = useState((nodeData as any)?.instructions || "");
-  const [includeChatHistory, setIncludeChatHistory] = useState(true);
-  const [model, setModel] = useState("anthropic/claude-sonnet-4-5-20250929");
-  const [outputFormat, setOutputFormat] = useState("Text");
-  const [customModel, setCustomModel] = useState("");
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [showSearchSources, setShowSearchSources] = useState(false);
-  const [jsonOutputSchema, setJsonOutputSchema] = useState(`{
-  "type": "object",
-  "properties": {
-    "result": { "type": "string" }
-  }
-}`);
-  const [schemaFields, setSchemaFields] = useState<
-    Array<{ name: string; type: string; required: boolean }>
-  >([{ name: "result", type: "string", required: false }]);
-  const [selectedTools, setSelectedTools] = useState<ToolConfig[]>([]);
-  const [showStandardTools, setShowStandardTools] = useState(false);
-  const lastLoadedNodeId = useRef<string | null>(null);
-  const lastSyncedInstructionsRef = useRef<string | null>(null);
-
   // Load actual node data when panel opens
   useEffect(() => {
     if (!nodeData || !nodes) return;
@@ -219,7 +192,7 @@ export default function NodePanel({
       setName(data.name || data.nodeName || nodeData.label);
       setInstructions(incomingInstructions);
       setIncludeChatHistory(data.includeChatHistory ?? true);
-      setModel(data.model || "anthropic/claude-sonnet-4-5-20250929");
+      setModel(data.model || "anthropic/claude-3-5-sonnet-20241022");
       setOutputFormat(data.outputFormat || "Text");
       setShowSearchSources(data.showSearchSources ?? false);
       setSelectedTools(data.selectedTools || []);
@@ -329,7 +302,7 @@ export default function NodePanel({
                 id: server._id,
                 name: server.name,
                 url: server.url,
-                label: server.label || server.name,
+                label: server.name,
                 authType: server.authType,
               };
             }
