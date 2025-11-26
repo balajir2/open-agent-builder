@@ -11,6 +11,7 @@ import {
   getMCPServers,
 } from '@/lib/workflow/storage';
 import { cleanupInvalidEdges } from '@/lib/workflow/edge-cleanup';
+import { DEFAULT_MODELS } from '@/lib/api/models';
 
 // Prevents circular reference errors during JSON serialization
 // by removing problematic properties from React components.
@@ -120,7 +121,7 @@ export function useWorkflow(workflowId?: string) {
             label: 'Agent',
             name: 'My agent',
             instructions: 'You are a helpful assistant.',
-            model: 'gpt-4.1',
+            model: DEFAULT_MODELS.openai,
             includeChatHistory: true,
             tools: [],
             outputFormat: 'Text',

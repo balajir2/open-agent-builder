@@ -323,7 +323,7 @@ MCP servers provide tools to agents (e.g., Firecrawl for web scraping):
 4. **Agent Integration** - Agents can use MCP tools via `tools` property
 
 **Currently Supported:**
-- **Anthropic Claude** - Full native MCP support (Haiku 4.5, Sonnet 4.5)
+- **Anthropic Claude** - Full native MCP support (3.5 Haiku, Sonnet 3.5)
 - **OpenAI, Groq** - MCP support in development
 
 ## Configuration

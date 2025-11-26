@@ -1,6 +1,7 @@
 /**
  * Utility functions for exporting workflow results to document format
  */
+// @ts-ignore
 import htmlDocx from 'html-docx-js/dist/html-docx';
 import { marked } from "marked";
 /**
@@ -18,9 +19,9 @@ function createResultsHtml(
   nodeResults: Record<string, any>,
   variables: Record<string, any>
 ): string {
-const finalOutput = Object.values(nodeResults).find(n => n.nodeName === "End")?.output.finalOutput || "";
+  const finalOutput = Object.values(nodeResults).find(n => n.nodeName === "End")?.output.finalOutput || "";
 
-const finalOutputHTML = marked(finalOutput);
+  const finalOutputHTML = marked(finalOutput);
 
   // Create HTML content for the document
   const htmlContent = `
@@ -144,7 +145,7 @@ export function generateDocxFromResults(
 //       const nodeName = result.nodeName || nodeId;
 //       const status = result.status;
 //       const isCompleted = status === 'completed';
-      
+
 //       // Node result slide
 //       const nodeSlide = {
 //         type: 'content',
@@ -158,7 +159,7 @@ export function generateDocxFromResults(
 //         nodeSlide.content.push({
 //           text: `Started: ${result.startedAt ? new Date(result.startedAt).toLocaleString() : 'N/A'}`
 //         });
-        
+
 //         if (result.completedAt) {
 //           nodeSlide.content.push({
 //             text: `Completed: ${new Date(result.completedAt).toLocaleString()}`
@@ -187,7 +188,7 @@ export function generateDocxFromResults(
 //     // Add a summary slide
 //     const completedNodes = Object.values(nodeResults).filter(node => node.status === 'completed').length;
 //     const failedNodes = Object.values(nodeResults).filter(node => node.status === 'failed').length;
-    
+
 //     presentationContent.slides.push({
 //       type: 'chart',
 //       title: 'Execution Summary',
@@ -320,9 +321,8 @@ export async function generatePptFromResults(
       // Add timing information
       if (result.startedAt || result.completedAt) {
         nodeSlide.content?.push({
-          text: `Started: ${
-            result.startedAt ? new Date(result.startedAt).toLocaleString() : "N/A"
-          }`,
+          text: `Started: ${result.startedAt ? new Date(result.startedAt).toLocaleString() : "N/A"
+            }`,
         });
 
         if (result.completedAt) {
@@ -462,15 +462,15 @@ export function downloadDocument(blob: Blob, filename: string, showSaveDialog: b
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
-  
+
   // If showSaveDialog is true, we don't set download attribute to let browser show file dialog
   if (showSaveDialog) {
     a.target = '_blank';
   }
-  
+
   document.body.appendChild(a);
   a.click();
-  
+
   // Clean up
   setTimeout(() => {
     document.body.removeChild(a);
@@ -488,7 +488,7 @@ export function getDocumentSaveLocation(): string {
   const isFirefox = navigator.userAgent.indexOf('Firefox') !== -1;
   const isSafari = navigator.userAgent.indexOf('Safari') !== -1 && navigator.userAgent.indexOf('Chrome') === -1;
   const isEdge = navigator.userAgent.indexOf('Edg') !== -1;
-  
+
   if (isChrome || isEdge) {
     // return 'Downloads folder (unless you changed the default download location in your browser settings)';
     return ''

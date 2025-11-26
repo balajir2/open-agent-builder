@@ -10,8 +10,11 @@ export async function POST(
   { params }: { params: Promise<{ workflowId: string }> }
 ) {
   // Validate API key
-  const authResult = await validateApiKey(request);
-  if (!authResult.authenticated) {
+  let authResult = await validateApiKey(request);
+
+
+
+  if (!authResult.authenticated || !authResult.userId) {
     return createUnauthorizedResponse(authResult.error || 'Authentication required');
   }
 

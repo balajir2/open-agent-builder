@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerAPIKeys } from '@/lib/api/config';
 import { executeExtractNode } from '@/lib/workflow/executors/extract';
 import { WorkflowNode, WorkflowState } from '@/lib/workflow/types';
+import { DEFAULT_MODELS } from '@/lib/api/models';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
         label: 'Extract',
         nodeType: 'extract',  // Specify the actual node type in data
         instructions: instructions || 'Extract information from the input',
-        model: model || 'gpt-5-mini',
+        model: model || DEFAULT_MODELS.openai,
         jsonSchema: jsonSchema,
         mcpTools: mcpTools,
       },

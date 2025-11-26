@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
+import { hashString } from "./lib/encryption";
 
 /**
  * API Key Management for Secure Workflow API Access
@@ -100,3 +101,5 @@ export const verifyAndUpdateApiKey = internalMutation({
     };
   },
 });
+
+

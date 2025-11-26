@@ -1,6 +1,7 @@
 import 'server-only';
 import { WorkflowNode, WorkflowState } from '../types';
 import { substituteVariables } from '../variable-substitution';
+import { DEFAULT_MODELS } from '@/lib/api/models';
 
 /**
  * Execute Extract Node - Uses LLM with JSON schema to extract structured data
@@ -72,7 +73,7 @@ export async function executeExtractNode(
       }));
 
       const response = await client.responses.create({
-        model: 'gpt-4.1',
+        model: DEFAULT_MODELS.openai,
         tools,
         input: fullPrompt,
         text: {
@@ -95,7 +96,7 @@ export async function executeExtractNode(
 
       return {
         extractedData,
-        model: 'gpt-4.1',
+        model: DEFAULT_MODELS.openai,
         tokensUsed: response.usage?.total_tokens || 0,
         mcpToolsUsed: response.output.filter((item: any) => item.type === 'mcp_call').length,
         __variableUpdates: { lastOutput: extractedData }, // Return as separate field for reducer
@@ -104,7 +105,7 @@ export async function executeExtractNode(
 
     // No MCP - use regular Chat Completions with JSON mode
     const completion = await client.chat.completions.create({
-      model: data.model || 'gpt-5-mini',
+      model: data.model || DEFAULT_MODELS.openai,
       messages: [
         { role: 'user', content: fullPrompt },
       ],

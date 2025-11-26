@@ -148,7 +148,7 @@ export const toolRegistry: ToolDefinition[] = [
         id: "browserless",
         name: "browserless",
         label: "Browserless / Playwright",
-        description: "Headless Chrome as a service for scraping and automation.",
+        description: "Headless Chrome as a service for scraping, automation, screenshots, and PDF generation.",
         category: "scraping",
         icon: Globe,
         fields: [
@@ -158,8 +158,45 @@ export const toolRegistry: ToolDefinition[] = [
                 type: "secret",
                 required: true,
                 placeholder: "Enter your Browserless API Key",
-                description: "Get it from browserless.io",
+                description: "Get it from browserless.io or use local Playwright",
                 global: true
+            },
+            {
+                name: "waitForSelector",
+                label: "Wait for Selector",
+                type: "text",
+                required: false,
+                placeholder: "e.g., .content, #main",
+                description: "CSS selector to wait for before scraping"
+            },
+            {
+                name: "executeScript",
+                label: "Execute JavaScript",
+                type: "text",
+                required: false,
+                placeholder: "e.g., window.scrollTo(0, document.body.scrollHeight)",
+                description: "JavaScript to execute on the page"
+            },
+            {
+                name: "screenshot",
+                label: "Take Screenshot",
+                type: "boolean",
+                defaultValue: false,
+                description: "Capture a screenshot of the page"
+            },
+            {
+                name: "pdf",
+                label: "Generate PDF",
+                type: "boolean",
+                defaultValue: false,
+                description: "Generate a PDF of the page"
+            },
+            {
+                name: "timeout",
+                label: "Timeout (ms)",
+                type: "number",
+                defaultValue: 30000,
+                description: "Maximum wait time in milliseconds"
             }
         ]
     },

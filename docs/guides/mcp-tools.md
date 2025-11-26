@@ -146,7 +146,7 @@ AI agent that can autonomously use tools.
 {
   "type": "agent",
   "data": {
-    "model": "claude-sonnet-4-5",
+    "model": "claude-3-5-sonnet-20241022",
     "provider": "anthropic",
     "systemPrompt": "You are a research assistant.",
     "userPrompt": "Research {{topic}} using web search and scraping.",

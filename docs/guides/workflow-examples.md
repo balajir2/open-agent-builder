@@ -115,7 +115,7 @@ Start (query) → MCP (Firecrawl Search) → Agent (Summarize) → End
 **3. Agent Node - Summarize**
 ```json
 {
-  "model": "claude-sonnet-4-5",
+  "model": "claude-3-5-sonnet-20241022",
   "provider": "anthropic",
   "systemPrompt": "You are a research assistant that summarizes web search results.",
   "userPrompt": "Summarize these search results about {{query}}:\n\n{{searchResults}}",
@@ -223,7 +223,7 @@ If-Else (price < threshold) →
 **6. Agent Node - Send Alert**
 ```json
 {
-  "model": "claude-haiku-4-5",
+  "model": "claude-3-5-haiku-20241022",
   "provider": "anthropic",
   "systemPrompt": "You are a price alert assistant.",
   "userPrompt": "The product at {{productUrl}} is now ${{price}}, which is below your threshold of ${{threshold}}. Create a short alert message.",
@@ -279,7 +279,7 @@ Start (topic) → Agent (Research with Tools) → End
 **2. Agent Node - Research Agent**
 ```json
 {
-  "model": "claude-sonnet-4-5",
+  "model": "claude-3-5-sonnet-20241022",
   "provider": "anthropic",
   "systemPrompt": "You are a research assistant. Use the available tools to search and scrape relevant information, then provide a comprehensive summary.",
   "userPrompt": "Research {{topic}} and provide a detailed summary with sources.",
@@ -422,7 +422,7 @@ If-Else (needs_more_data) →
 **2. Agent Node - Analyze**
 ```json
 {
-  "model": "claude-sonnet-4-5",
+  "model": "claude-3-5-sonnet-20241022",
   "provider": "anthropic",
   "systemPrompt": "Analyze data and determine if more information is needed.",
   "userPrompt": "Analyze: {{initialData}}\n\nReturn JSON: {\"complete\": true/false, \"reasoning\": \"...\"}",

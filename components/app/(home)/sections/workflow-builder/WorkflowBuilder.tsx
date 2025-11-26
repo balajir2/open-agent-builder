@@ -587,26 +587,9 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
         // Reset node ID counter based on loaded nodes to prevent duplicates
         resetNodeIdCounter(layoutedNodes as any);
 
-        // Save template as a new workflow with all node data intact
-        // Ensure nodes have proper nodeType for LangGraph compatibility
-        const workflowNodes = template.nodes.map((n: any) => ({
-          ...n,
-          data: {
-            ...n.data,
-            nodeType: n.data.nodeType || n.type, // Ensure nodeType is set
-          }
-        }));
-
-        // Generate a unique workflow ID for this template instance
-        const workflowId = `workflow_${Date.now()}_${template.id}`;
-
-        saveWorkflow({
-          id: workflowId,
-          name: template.name,
-          description: template.description,
-          nodes: workflowNodes,
-          edges: template.edges,
-        });
+        // DON'T automatically save template as workflow - only save when user clicks Save button
+        // This prevents creating duplicate workflows every time a template is viewed
+        // The template will be saved as a new workflow only when user makes changes or clicks Save
 
         setInitialized(true);
       }

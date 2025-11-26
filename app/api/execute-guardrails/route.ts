@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerAPIKeys } from '@/lib/api/config';
-import { parseModelString } from '@/lib/api/models';
+import { parseModelString, DEFAULT_MODELS } from '@/lib/api/models';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       checks = {},
       piiEntities = [],
       customRules = [],
-      model = 'openai/gpt-5-mini',
+      model = DEFAULT_MODELS.openai,
       actionOnViolation = 'block',
     } = body;
 
