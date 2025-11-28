@@ -45,11 +45,12 @@ export class ToolFactory {
                     console.warn('[ToolFactory] Missing Serper API key');
                     return null;
                 }
+                console.log('[ToolFactory] Creating serper_search tool');
                 // Wrap LangChain's Serper tool for consistent error handling
                 const serperTool = new Serper(apiKeys.serper);
                 return new DynamicTool({
-                    name: serperTool.name,
-                    description: serperTool.description,
+                    name: "serper_search",
+                    description: "Search the web using Serper (Google Search API). Input should be a search query string.",
                     func: wrapToolFunction(async (input: string) => {
                         return await serperTool.call(input);
                     }, { name: "serper_search" }),

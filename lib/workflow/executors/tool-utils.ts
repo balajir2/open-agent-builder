@@ -193,6 +193,28 @@ export function formatToolResultForLLM(result: NormalizedToolResult): string {
  *   return response.text(); // Can return text or JSON - will be normalized
  * });
  */
+/**
+ * Truncate content to a safe token limit (approximation)
+ * 1 token ~= 4 characters
+ */
+export function truncateContent(content: string, maxTokens: number = 15000): string {
+  if (!content) return '';
+  const maxLength = maxTokens * 4;
+  if (content.length <= maxLength) return content;
+
+  return content.substring(0, maxLength) + `\n...[Content truncated. Original size: ${content.length} chars. Showing first ${maxLength} chars]`;
+}
+
+/**
+ * Wrap a tool function with automatic result normalization
+ * Use this when creating new tools to ensure consistent behavior
+ *
+ * @example
+ * const myTool = wrapTool(async (input) => {
+ *   const response = await fetch(url);
+ *   return response.text(); // Can return text or JSON - will be normalized
+ * });
+ */
 export function wrapToolFunction<TInput = any, TOutput = any>(
   toolFn: (input: TInput) => Promise<TOutput> | TOutput,
   options: {
@@ -200,11 +222,11 @@ export function wrapToolFunction<TInput = any, TOutput = any>(
     name?: string;
     /** Normalize the result */
     normalize?: boolean;
-    /** Maximum response size in bytes (default: 10MB) */
+    /** Maximum response size in bytes (default: 50KB ~ 12.5k tokens) */
     maxSize?: number;
   } = {}
 ): (input: TInput) => Promise<string> {
-  const { name = 'unknown', normalize = true, maxSize = 10 * 1024 * 1024 } = options;
+  const { name = 'unknown', normalize = true, maxSize = 50 * 1024 } = options;
 
   return async (input: TInput): Promise<string> => {
     try {
@@ -219,13 +241,17 @@ export function wrapToolFunction<TInput = any, TOutput = any>(
         stringResult = formatToolResultForLLM(normalized);
       }
 
-      // Check response size
+      // Check response size and truncate if necessary
       const sizeInBytes = Buffer.byteLength(stringResult, 'utf8');
       if (sizeInBytes > maxSize) {
-        const sizeMB = (sizeInBytes / (1024 * 1024)).toFixed(2);
-        const maxSizeMB = (maxSize / (1024 * 1024)).toFixed(2);
-        console.error(`[Tool: ${name}] Response too large: ${sizeMB}MB (max: ${maxSizeMB}MB)`);
-        return `Error: Tool response too large (${sizeMB}MB). Maximum allowed: ${maxSizeMB}MB. Please refine your query to get a smaller result.`;
+        const sizeKB = (sizeInBytes / 1024).toFixed(2);
+        const maxKB = (maxSize / 1024).toFixed(2);
+        console.warn(`[Tool: ${name}] Response large: ${sizeKB}KB (max: ${maxKB}KB). Truncating...`);
+
+        // Truncate to maxSize
+        // Note: Buffer.byteLength is accurate but substring works on chars.
+        // We'll approximate by chars for simplicity/speed.
+        return stringResult.substring(0, maxSize) + `\n...[Content truncated. Original size: ${sizeKB}KB. Showing first ${maxKB}KB]`;
       }
 
       return stringResult;
