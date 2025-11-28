@@ -75,6 +75,7 @@ export async function getLLMApiKey(
 
 /**
  * Get the API key for a specific tool (e.g., 'firecrawl', 'serper')
+ * Checks user keys first, then falls back to environment variables
  */
 export async function getToolApiKey(
   toolId: string,

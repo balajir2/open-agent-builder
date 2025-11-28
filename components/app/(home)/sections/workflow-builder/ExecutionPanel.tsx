@@ -118,8 +118,8 @@ export default function ExecutionPanel({
 
         // Check if this is a Google Docs creation result
         const isGoogleDocResult = outputObj?.result?.output?.value?.documentUrl ||
-                                 outputStr.includes('documentUrl') ||
-                                 outputStr.includes('Executive Summary');
+          outputStr.includes('documentUrl') ||
+          outputStr.includes('Executive Summary');
 
         if (isGoogleDocResult) {
           let docUrl: string | null = null;
@@ -215,7 +215,7 @@ export default function ExecutionPanel({
         nodes: Object.entries(nodeResults).map(([nodeId, result]) => {
           const node = workflow?.nodes.find(n => n.id === nodeId);
           const nodeName = (node?.data as any)?.nodeName ||
-                          (typeof node?.data?.label === 'string' ? node.data.label : nodeId);
+            (typeof node?.data?.label === 'string' ? node.data.label : nodeId);
 
           // Find incoming connections (edges where this node is the target)
           const incomingEdges = workflow?.edges.filter(e => e.target === nodeId) || [];
@@ -289,8 +289,8 @@ export default function ExecutionPanel({
 
   const hasMissingRequiredInputs = inputVariables.length > 0
     ? inputVariables.some((variable: any) =>
-        variable.required &&
-        (inputValues[variable.name] === undefined || inputValues[variable.name] === '' || inputValues[variable.name] === null))
+      variable.required &&
+      (inputValues[variable.name] === undefined || inputValues[variable.name] === '' || inputValues[variable.name] === null))
     : false;
 
   const canTriggerShortcut = showInput && !isRunning && !hasMissingRequiredInputs;
@@ -314,9 +314,9 @@ export default function ExecutionPanel({
     setInputValues(
       inputVariables.length > 0
         ? inputVariables.reduce((acc: any, v: any) => {
-            acc[v.name] = v.defaultValue || '';
-            return acc;
-          }, {})
+          acc[v.name] = v.defaultValue || '';
+          return acc;
+        }, {})
         : { input: '' }
     );
   };
@@ -404,7 +404,7 @@ export default function ExecutionPanel({
         try {
           const parsed = JSON.parse(xhr.responseText);
           if (parsed?.error) message = parsed.error;
-        } catch {}
+        } catch { }
         setUploadErrors(prev => ({ ...prev, [variableName]: message }));
       }
     };
@@ -421,7 +421,7 @@ export default function ExecutionPanel({
   const cancelUploadForVariable = (variableName: string) => {
     const xhr = uploadXhrs.current[variableName];
     if (xhr) {
-      try { xhr.abort(); } catch {}
+      try { xhr.abort(); } catch { }
       uploadXhrs.current[variableName] = null;
     }
     setUploadingFiles(prev => ({ ...prev, [variableName]: false }));
@@ -495,7 +495,7 @@ export default function ExecutionPanel({
                           nodes: Object.entries(nodeResults).map(([nodeId, result]) => {
                             const node = workflow?.nodes.find(n => n.id === nodeId);
                             const nodeName = (node?.data as any)?.nodeName ||
-                                            (typeof node?.data?.label === 'string' ? node.data.label : nodeId);
+                              (typeof node?.data?.label === 'string' ? node.data.label : nodeId);
                             const incomingEdges = workflow?.edges.filter(e => e.target === nodeId) || [];
                             const outgoingEdges = workflow?.edges.filter(e => e.source === nodeId) || [];
                             return {
@@ -939,15 +939,14 @@ export default function ExecutionPanel({
                         key={nodeId}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className={`rounded-12 p-16 border transition-all ${
-                          isActive
-                            ? 'border-border-faint bg-accent-white shadow-sm'
-                            : result.status === 'completed'
+                        className={`rounded-12 p-16 border transition-all ${isActive
+                          ? 'border-border-faint bg-accent-white shadow-sm'
+                          : result.status === 'completed'
                             ? 'border-heat-100 bg-accent-white'
                             : result.status === 'failed'
-                            ? 'border-border-faint bg-accent-white'
-                            : 'border-border-faint bg-accent-white'
-                        }`}
+                              ? 'border-border-faint bg-accent-white'
+                              : 'border-border-faint bg-accent-white'
+                          }`}
                       >
                         {/* Node Header */}
                         <div className="flex items-center justify-between mb-12">
@@ -1004,11 +1003,10 @@ export default function ExecutionPanel({
                               Schema
                             </button>
                             {result.status !== 'completed' && (
-                              <span className={`text-body-small px-8 py-4 rounded-6 border ${
-                                result.status === 'running' ? 'bg-accent-white text-black-alpha-64 border-border-faint' :
+                              <span className={`text-body-small px-8 py-4 rounded-6 border ${result.status === 'running' ? 'bg-accent-white text-black-alpha-64 border-border-faint' :
                                 result.status === 'failed' ? 'bg-accent-white text-accent-black border-border-faint' :
-                                'bg-accent-white text-gray-600 border-gray-200'
-                              }`}>
+                                  'bg-accent-white text-gray-600 border-gray-200'
+                                }`}>
                                 {statusLabel}
                               </span>
                             )}
@@ -1267,8 +1265,8 @@ export default function ExecutionPanel({
 
                               // Check if this is a Google Docs creation result
                               const isGoogleDocResult = outputObj?.result?.output?.value?.documentUrl ||
-                                                       outputStr.includes('documentUrl') ||
-                                                       outputStr.includes('Executive Summary');
+                                outputStr.includes('documentUrl') ||
+                                outputStr.includes('Executive Summary');
 
                               if (isGoogleDocResult) {
                                 let docUrl: string | null = null;
@@ -1400,20 +1398,31 @@ export default function ExecutionPanel({
                           </div>
                         )}
                         {/* Timing */}
-                        {result.startedAt && (
-                          <div className="flex items-center gap-8 mt-12 text-body-small text-black-alpha-48">
-                            <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            {result.completedAt ? (
-                              <span>
-                                {Math.round((new Date(result.completedAt).getTime() - new Date(result.startedAt).getTime()) / 1000)}s
-                              </span>
-                            ) : (
-                              <span className="animate-pulse">Running...</span>
-                            )}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-12 mt-12">
+                          {result.startedAt && (
+                            <div className="flex items-center gap-8 text-body-small text-black-alpha-48">
+                              <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {result.completedAt ? (
+                                <span>
+                                  {Math.round((new Date(result.completedAt).getTime() - new Date(result.startedAt).getTime()) / 1000)}s
+                                </span>
+                              ) : (
+                                <span className="animate-pulse">Running...</span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Token Usage */}
+                          {result.usage && (
+                            <div className="flex items-center gap-8 text-body-small text-black-alpha-48 border-l border-border-faint pl-12">
+                              <span title="Input Tokens">In: {result.usage.input_tokens}</span>
+                              <span title="Output Tokens">Out: {result.usage.output_tokens}</span>
+                              <span title="Total Tokens" className="font-medium text-accent-black">Token Usage: {result.usage.total_tokens}</span>
+                            </div>
+                          )}
+                        </div>
                       </motion.div>
                     );
                   })}

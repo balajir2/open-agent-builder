@@ -1,4 +1,4 @@
-import { WorkflowNode, WorkflowState } from '../types';
+﻿import { WorkflowNode, WorkflowState } from '../types';
 import { substituteVariables } from '../variable-substitution';
 import { resolveMCPServers, migrateMCPData } from '@/lib/mcp/resolver';
 import { ToolFactory } from './tool-factory';
@@ -190,6 +190,7 @@ export async function executeAgentNode(
     let responseText = '';
 
     const hasMcpTools = mcpTools.length > 0;
+    const maxTokens = data.tokenLimit || 4096;
 
     // 9. Execute based on Provider
     if (provider === 'anthropic' && apiKeys?.anthropic) {
@@ -211,7 +212,11 @@ export async function executeAgentNode(
               ? mcp.url.replace('{FIRECRAWL_API_KEY}', encodeURIComponent(apiKeys.firecrawl || ''))
               : (mcp.url || '');
 
-            if (!url || !mcp.name) return null;
+            // Validate that we have required fields
+            if (!url || !mcp.name) {
+              console.warn(`⚠️ Skipping invalid MCP server: ${mcp.name || 'unnamed'} - missing URL or name`);
+              return null;
+            }
 
             const server: any = {
               type: 'url' as const,
@@ -219,6 +224,7 @@ export async function executeAgentNode(
               name: mcp.name,
             };
 
+            // Only include authorization_token if it exists (some MCP servers don't require auth)
             if (mcp.accessToken) {
               server.authorization_token = mcp.accessToken;
             }
@@ -259,7 +265,7 @@ export async function executeAgentNode(
         try {
           const response = await client.beta.messages.create({
             model: modelName,
-            max_tokens: 4096,
+            max_tokens: maxTokens,
             messages: messages as any,
             mcp_servers: mcpServers.length > 0 ? mcpServers as any : undefined,
             tools: finalTools,
@@ -391,7 +397,7 @@ export async function executeAgentNode(
             if (extraToolResults.length > 0) {
               const finalResponse = await client.beta.messages.create({
                 model: modelName,
-                max_tokens: 4096,
+                max_tokens: maxTokens,
                 messages: [
                   ...messages as any,
                   { role: 'assistant', content: response.content },
@@ -455,7 +461,7 @@ export async function executeAgentNode(
       } else {
         const response = await client.messages.create({
           model: modelName,
-          max_tokens: 4096,
+          max_tokens: maxTokens,
           messages: messages as any,
         });
         responseText = response.content[0].type === 'text' ? response.content[0].text : '';
@@ -480,7 +486,8 @@ export async function executeAgentNode(
           model: modelName,
           messages: messages as any,
           tools,
-          tool_choice: "auto"
+          tool_choice: "auto",
+          ...(data.tokenLimit ? { max_tokens: maxTokens } : {}),
         });
 
         const message = response.choices[0].message;
@@ -535,14 +542,14 @@ export async function executeAgentNode(
             })
           );
 
-
           const finalResponse = await client.chat.completions.create({
             model: modelName,
             messages: [
               ...messages as any,
               message,
               ...toolResults
-            ]
+            ],
+            ...(data.tokenLimit ? { max_tokens: maxTokens } : {}),
           });
 
           responseText = finalResponse.choices[0].message.content || '';
@@ -566,6 +573,7 @@ export async function executeAgentNode(
         const response = await client.chat.completions.create({
           model: modelName,
           messages: messages as any,
+          ...(data.tokenLimit ? { max_tokens: maxTokens } : {}),
         });
         responseText = response.choices[0].message.content || '';
         usage = (response.usage as unknown as LLMUsage) || ({} as LLMUsage);
@@ -579,6 +587,7 @@ export async function executeAgentNode(
         const model = new ChatGoogleGenerativeAI({
           apiKey: apiKeys.google,
           model: modelName,
+          maxOutputTokens: data.tokenLimit,
         });
 
         const tools = [
@@ -670,6 +679,7 @@ export async function executeAgentNode(
         const model = new ChatGoogleGenerativeAI({
           apiKey: apiKeys.google,
           model: modelName,
+          maxOutputTokens: data.tokenLimit,
         });
         const response = await model.invoke(messages);
         responseText = response.content as string;
@@ -702,7 +712,11 @@ export async function executeAgentNode(
       __agentToolCalls: toolCalls,
       __chatHistoryUpdates: serverChatUpdates,
       __variableUpdates: { lastOutput: output },
-      __agentUsage: usage,
+      __usage: {
+        input_tokens: usage.input_tokens || usage.prompt_tokens || 0,
+        output_tokens: usage.output_tokens || usage.completion_tokens || 0,
+        total_tokens: usage.total_tokens || ((usage.input_tokens || usage.prompt_tokens || 0) + (usage.output_tokens || usage.completion_tokens || 0)),
+      },
     };
 
   } catch (error) {
