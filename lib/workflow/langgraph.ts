@@ -106,16 +106,12 @@ export class LangGraphExecutor {
     onNodeUpdate?: (nodeId: string, result: NodeExecutionResult) => void,
     apiKeys?: { anthropic?: string; groq?: string; openai?: string; firecrawl?: string; arcade?: string }
   ) {
-
     this.workflow = workflow;
     this.onNodeUpdate = onNodeUpdate;
     this.apiKeys = apiKeys;
 
-    // Checkpointing ENABLED for interrupt support
-    // Required for:
-    // - Human-in-the-loop approvals (interrupt/resume)
-    // - Arcade auth pauses
-    // - Resuming workflows after server restarts
+    // Initialize checkpointer for state persistence
+    // - Required for human-in-the-loop (interrupts)
     // - Time-travel debugging
     // Note: MemorySaver is lightweight and doesn't impact performance
     this.checkpointer = new MemorySaver();
@@ -411,7 +407,7 @@ export class LangGraphExecutor {
             toolCalls: toolCalls,
             chatHistoryUpdates: chatHistoryUpdates.length,
             variableUpdates: Object.keys(variableUpdates),
-            usage: usage,
+            usage: usage
           });
         }
 
@@ -796,479 +792,489 @@ export class LangGraphExecutor {
     if (parsed > ABSOLUTE_MAX) {
       console.warn(`While loop max iterations ${parsed} exceeds limit, capping at ${ABSOLUTE_MAX}`);
       return ABSOLUTE_MAX;
-    }
 
-    return parsed;
+      // Execute the if-else condition
+      const tempState: WorkflowState = {
+        variables: state.variables,
+        chatHistory: state.chatHistory,
+      };
+
+      const result = await executeLogicNode(node, tempState);
+
+      // Return the branch handle ('if' or 'else')
+      return result.branch || 'else';
+    };
   }
 
   private async executeWhileNode(
-    node: WorkflowNode,
-    state: WorkflowState,
-    langGraphState: typeof WorkflowStateAnnotation.State
-  ) {
-    const data: any = node.data || {};
-    const ABSOLUTE_MAX = 100; // Hard safety limit
-    const conditionExpr = data.whileCondition || data.condition || 'false';
-    const maxIterations = Math.min(this.parseMaxIterations(data.maxIterations), ABSOLUTE_MAX);
-    const iterationKey = `${node.id}__iterationCount`;
-    const previousIteration = Number(langGraphState.variables?.[iterationKey] || 0);
+  node: WorkflowNode,
+  state: WorkflowState,
+  langGraphState: typeof WorkflowStateAnnotation.State
+) {
+  const data: any = node.data || {};
+  const ABSOLUTE_MAX = 100; // Hard safety limit
+  const conditionExpr = data.whileCondition || data.condition || 'false';
+  const maxIterations = Math.min(this.parseMaxIterations(data.maxIterations), ABSOLUTE_MAX);
 
-    // Add absolute safety check
-    if (previousIteration > ABSOLUTE_MAX) {
-      console.error(`While loop ${node.id} exceeded absolute limit of ${ABSOLUTE_MAX}`);
-      return {
-        condition: false,
-        iteration: previousIteration,
-        nextIteration: previousIteration,
-        maxIterations: ABSOLUTE_MAX,
-        stoppedReason: 'absolute_limit_exceeded',
-        error: `Loop terminated: exceeded absolute limit of ${ABSOLUTE_MAX} iterations`,
-        timestamp: new Date().toISOString(),
-      };
-    }
+  const iterationKey = `${node.id}__iterationCount`;
+  const previousIteration = Number(langGraphState.variables?.[iterationKey] || 0);
 
-    if (previousIteration > maxIterations) {
-      return {
-        condition: false,
-        iteration: previousIteration,
-        nextIteration: previousIteration,
-        maxIterations,
-        stoppedReason: 'max_iterations',
-        timestamp: new Date().toISOString(),
-      };
-    }
-
-    try {
-      const evaluationIteration = previousIteration + 1;
-      const evalFunction = new Function(
-        'input',
-        'state',
-        'lastOutput',
-        'iteration',
-        `return ${conditionExpr}`
-      );
-
-      const shouldContinue = Boolean(
-        evalFunction(
-          state.variables.input,
-          langGraphState,
-          state.variables.lastOutput,
-          evaluationIteration
-        )
-      );
-
-      const nextIteration = shouldContinue ? evaluationIteration : previousIteration;
-
-      // Get accumulated loop results
-      // NOTE: We return immutable updates - the reducer will merge [iterationKey] into state.variables
-      const loopResultsKey = `${node.id}__loopResults`;
-      const accumulatedResults = langGraphState.variables[loopResultsKey] || [];
-
-      if (!shouldContinue) {
-        console.log(`Loop breaking, passing ${accumulatedResults.length} results to next node`);
-      }
-
-      return {
-        condition: shouldContinue,
-        iteration: shouldContinue ? evaluationIteration : previousIteration,
-        previousIteration,
-        nextIteration,
-        maxIterations,
-        stoppedReason: shouldContinue ? 'condition_true' : 'condition_false',
-        timestamp: new Date().toISOString(),
-        conditionExpression: conditionExpr,
-        evaluationIteration,
-        [iterationKey]: nextIteration,
-        loopResults: accumulatedResults, // Include accumulated results in output
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`ERROR: While loop ${node.id}: condition evaluation failed`, error);
-      throw new Error(`While loop ${node.id} condition evaluation failed: ${message}`);
-    }
+  // Add absolute safety check
+  if (previousIteration > ABSOLUTE_MAX) {
+    console.error(`While loop ${node.id} exceeded absolute limit of ${ABSOLUTE_MAX}`);
+    return {
+      condition: false,
+      iteration: previousIteration,
+      nextIteration: previousIteration,
+      maxIterations: ABSOLUTE_MAX,
+      stoppedReason: 'absolute_limit_exceeded',
+      error: `Loop terminated: exceeded absolute limit of ${ABSOLUTE_MAX} iterations`,
+      timestamp: new Date().toISOString(),
+    };
   }
+
+  if (previousIteration > maxIterations) {
+    return {
+      condition: false,
+      iteration: previousIteration,
+      nextIteration: previousIteration,
+      maxIterations,
+      stoppedReason: 'max_iterations',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  try {
+    const evaluationIteration = previousIteration + 1;
+    const evalFunction = new Function(
+      'input',
+      'state',
+      'lastOutput',
+      'iteration',
+      `return ${conditionExpr}`
+    );
+
+    const shouldContinue = Boolean(
+      evalFunction(
+        state.variables.input,
+        langGraphState,
+        state.variables.lastOutput,
+        evaluationIteration
+      )
+    );
+
+    const nextIteration = shouldContinue ? evaluationIteration : previousIteration;
+
+    // Get accumulated loop results
+    // NOTE: We return immutable updates - the reducer will merge [iterationKey] into state.variables
+    const loopResultsKey = `${node.id}__loopResults`;
+    const accumulatedResults = langGraphState.variables[loopResultsKey] || [];
+
+    if (!shouldContinue) {
+      console.log(`Loop breaking, passing ${accumulatedResults.length} results to next node`);
+    }
+
+    return {
+      condition: shouldContinue,
+      iteration: shouldContinue ? evaluationIteration : previousIteration,
+      previousIteration,
+      nextIteration,
+      maxIterations,
+      stoppedReason: shouldContinue ? 'condition_true' : 'condition_false',
+      timestamp: new Date().toISOString(),
+      conditionExpression: conditionExpr,
+      evaluationIteration,
+      [iterationKey]: nextIteration,
+      loopResults: accumulatedResults, // Include accumulated results in output
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`ERROR: While loop ${node.id}: condition evaluation failed`, error);
+    throw new Error(`While loop ${node.id} condition evaluation failed: ${message}`);
+  }
+}
 
   private async handleArcadePendingAuth(
-    node: WorkflowNode,
-    result: NodeExecutionResult,
-    pending: ArcadePendingResponse,
-    state: WorkflowState,
-  ) {
-    const message = pending.message ?? `Authorization required for ${pending.toolName}`;
-    const pendingAuth: WorkflowPendingAuth = {
-      authId: pending.authId,
-      nodeId: node.id,
-      toolName: pending.toolName,
-      authUrl: pending.authUrl,
-      status: 'pending',
-      userId: pending.userId,
-      message,
-      threadId: this.activeThreadId,
-      executionId: this.activeExecutionId,
-    };
+  node: WorkflowNode,
+  result: NodeExecutionResult,
+  pending: ArcadePendingResponse,
+  state: WorkflowState,
+) {
+  const message = pending.message ?? `Authorization required for ${pending.toolName}`;
+  const pendingAuth: WorkflowPendingAuth = {
+    authId: pending.authId,
+    nodeId: node.id,
+    toolName: pending.toolName,
+    authUrl: pending.authUrl,
+    status: 'pending',
+    userId: pending.userId,
+    message,
+    threadId: this.activeThreadId,
+    executionId: this.activeExecutionId,
+  };
 
-    result.status = 'pending-authorization';
-    result.output = message;
-    result.pendingAuth = pendingAuth;
-    result.completedAt = new Date().toISOString();
+  result.status = 'pending-authorization';
+  result.output = message;
+  result.pendingAuth = pendingAuth;
+  result.completedAt = new Date().toISOString();
 
-    this.pendingAuth = pendingAuth;
-    this.onNodeUpdate?.(node.id, result);
+  this.pendingAuth = pendingAuth;
+  this.onNodeUpdate?.(node.id, result);
 
-    const executionRef = this.activeExecutionId ?? this.activeThreadId ?? `exec_${Date.now()}`;
+  const executionRef = this.activeExecutionId ?? this.activeThreadId ?? `exec_${Date.now()}`;
 
-    await createOrUpdateArcadeAuthRecord({
-      authId: pending.authId,
-      executionId: executionRef,
-      workflowId: this.workflow.id,
-      nodeId: node.id,
-      toolName: pending.toolName,
-      authUrl: pending.authUrl,
-      status: 'pending',
-      userId: pending.userId,
-      pendingInput: pending.pendingInput,
-    });
+  await createOrUpdateArcadeAuthRecord({
+    authId: pending.authId,
+    executionId: executionRef,
+    workflowId: this.workflow.id,
+    nodeId: node.id,
+    toolName: pending.toolName,
+    authUrl: pending.authUrl,
+    status: 'pending',
+    userId: pending.userId,
+    pendingInput: pending.pendingInput,
+  });
 
-    // TODO: Save arcade auth state to database when running on server
-    // This should be handled by the API route that calls this executor
+  // TODO: Save arcade auth state to database when running on server
+  // This should be handled by the API route that calls this executor
 
-    const resumeValue = interrupt({
-      type: 'arcade-auth',
-      workflowId: this.workflow.id,
-      nodeId: node.id,
-      pendingAuth,
-    }) as any;
+  const resumeValue = interrupt({
+    type: 'arcade-auth',
+    workflowId: this.workflow.id,
+    nodeId: node.id,
+    pendingAuth,
+  }) as any;
 
-    if (resumeValue && typeof resumeValue === 'object' && 'status' in resumeValue) {
-      const normalized = String(resumeValue.status).toLowerCase();
-      if (normalized !== 'completed' && normalized !== 'authorized' && normalized !== 'approved') {
-        throw new Error('Arcade authorization not completed yet. Please finish authorization before resuming.');
-      }
+  if (resumeValue && typeof resumeValue === 'object' && 'status' in resumeValue) {
+    const normalized = String(resumeValue.status).toLowerCase();
+    if (normalized !== 'completed' && normalized !== 'authorized' && normalized !== 'approved') {
+      throw new Error('Arcade authorization not completed yet. Please finish authorization before resuming.');
     }
-
-    this.pendingAuth = null;
-    result.status = 'running';
-    result.pendingAuth = undefined;
-    result.output = undefined;
-    delete result.completedAt;
-    this.onNodeUpdate?.(node.id, result);
-
-    return await executeArcadeNode(node, state, this.apiKeys?.arcade);
   }
+
+  this.pendingAuth = null;
+  result.status = 'running';
+  result.pendingAuth = undefined;
+  result.output = undefined;
+  delete result.completedAt;
+  this.onNodeUpdate?.(node.id, result);
+
+  return await executeArcadeNode(node, state, this.apiKeys?.arcade);
+}
 
   private async handlePendingApproval(
-    node: WorkflowNode,
-    result: NodeExecutionResult,
-    pending: ApprovalPendingResponse,
-  ) {
-    const message = pending.message || 'Approval required';
-    const pendingAuth: WorkflowPendingAuth = {
-      authId: pending.approvalId,
-      nodeId: node.id,
-      toolName: 'user-approval',
-      status: 'pending',
-      message,
-      threadId: this.activeThreadId,
-      executionId: this.activeExecutionId,
-    };
+  node: WorkflowNode,
+  result: NodeExecutionResult,
+  pending: ApprovalPendingResponse,
+) {
+  const message = pending.message || 'Approval required';
+  const pendingAuth: WorkflowPendingAuth = {
+    authId: pending.approvalId,
+    nodeId: node.id,
+    toolName: 'user-approval',
+    status: 'pending',
+    message,
+    threadId: this.activeThreadId,
+    executionId: this.activeExecutionId,
+  };
 
-    result.status = 'pending-approval';
-    result.output = message;
-    result.pendingAuth = pendingAuth;
-    result.completedAt = new Date().toISOString();
+  result.status = 'pending-approval';
+  result.output = message;
+  result.pendingAuth = pendingAuth;
+  result.completedAt = new Date().toISOString();
 
-    this.pendingAuth = pendingAuth;
-    this.onNodeUpdate?.(node.id, result);
+  this.pendingAuth = pendingAuth;
+  this.onNodeUpdate?.(node.id, result);
 
-    const executionRef = this.activeExecutionId ?? this.activeThreadId ?? `exec_${Date.now()}`;
+  const executionRef = this.activeExecutionId ?? this.activeThreadId ?? `exec_${Date.now()}`;
 
-    // TODO: Save approval state to database
-    // This should be handled by the API route that calls this executor
-    // The API route should save to Convex/Redis as needed
+  // TODO: Save approval state to database
+  // This should be handled by the API route that calls this executor
+  // The API route should save to Convex/Redis as needed
 
-    const resumeValue = interrupt({
-      type: 'user-approval',
-      workflowId: this.workflow.id,
-      nodeId: node.id,
-      pendingAuth,
-    });
+  const resumeValue = interrupt({
+    type: 'user-approval',
+    workflowId: this.workflow.id,
+    nodeId: node.id,
+    pendingAuth,
+  });
 
-    this.pendingAuth = null;
-    result.status = 'running';
-    result.pendingAuth = undefined;
-    result.output = undefined;
-    delete result.completedAt;
-    this.onNodeUpdate?.(node.id, result);
+  this.pendingAuth = null;
+  result.status = 'running';
+  result.pendingAuth = undefined;
+  result.output = undefined;
+  delete result.completedAt;
+  this.onNodeUpdate?.(node.id, result);
 
-    return resumeValue ?? { approved: true };
-  }
+  return resumeValue ?? { approved: true };
+}
 
   /**
    * Execute individual node using existing executors
    */
-  private async executeNode(node: WorkflowNode, state: WorkflowState): Promise<any> {
-    const nodeType = (node.data as any).nodeType || node.type;
+  private async executeNode(node: WorkflowNode, state: WorkflowState): Promise < any > {
+  const nodeType = (node.data as any).nodeType || node.type;
 
-    switch (nodeType) {
+  switch(nodeType) {
       case 'start':
-        await new Promise(resolve => setTimeout(resolve, 500));
-        // Pass through the initial input variables so they're available to next nodes
-        return {
-          message: 'Workflow started',
-          ...(state.variables.input || {})
-        };
+  await new Promise(resolve => setTimeout(resolve, 500));
+  // Pass through the initial input variables so they're available to next nodes
+  return {
+    message: 'Workflow started',
+    ...(state.variables.input || {})
+  };
 
-      case 'agent':
-        return await executeAgentNode(node, state, this.apiKeys);
+  case 'agent':
+  return await executeAgentNode(node, state, this.apiKeys);
 
-      case 'extract':
-        return await executeExtractNode(node, state, this.apiKeys);
+  case 'extract':
+  return await executeExtractNode(node, state, this.apiKeys);
 
-      case 'arcade':
-        return await executeArcadeNode(node, state, this.apiKeys?.arcade);
+  case 'arcade':
+  return await executeArcadeNode(node, state, this.apiKeys?.arcade);
 
-      case 'mcp':
-        return await executeMCPNode(node, state, this.apiKeys?.firecrawl);
+  case 'mcp':
+  return await executeMCPNode(node, state, this.apiKeys?.firecrawl);
 
-      case 'if-else':
-      case 'if / else':
-      case 'while':
-      case 'user-approval':
-      case 'user approval':
-      case 'approval':
-        return await executeLogicNode(node, state);
+  case 'if-else':
+  case 'if / else':
+  case 'while':
+  case 'user-approval':
+  case 'user approval':
+  case 'approval':
+  return await executeLogicNode(node, state);
 
-      case 'transform':
-      case 'data-transform':
-      case 'set-state':
-      case 'set state':
-        return await executeDataNode(node, state);
+  case 'transform':
+  case 'data-transform':
+  case 'set-state':
+  case 'set state':
+  return await executeDataNode(node, state);
 
-      case 'file-search':
-      case 'file search':
-      case 'guardrails':
-      case 'guardrail':
-        return await executeToolsNode(node, state);
+  case 'file-search':
+  case 'file search':
+  case 'guardrails':
+  case 'guardrail':
+  return await executeToolsNode(node, state);
 
-      case 'http':
-      case 'http-request':
-        return await executeHTTPNode(node, state);
+  case 'http':
+  case 'http-request':
+  return await executeHTTPNode(node, state);
 
-      case 'note':
-        return { message: 'Note node (visual only)' };
+  case 'note':
+  return { message: 'Note node (visual only)' };
 
-      case 'end':
-        return { message: 'Workflow completed' };
+  case 'end':
+  return { message: 'Workflow completed' };
 
-      default:
+  default:
         return await executeAgentNode(node, state);
-    }
+}
   }
 
   /**
    * Execute workflow with streaming support
    */
-  async executeStream(input: any, config?: { threadId?: string; executionId?: string }) {
-    const threadId = config?.threadId || `thread_${Date.now()}`;
-    this.activeThreadId = threadId;
-    if (config?.executionId) {
-      this.activeExecutionId = config.executionId;
-    }
-    this.pendingAuth = null;
+  async executeStream(input: any, config ?: { threadId?: string; executionId?: string }) {
+  const threadId = config?.threadId || `thread_${Date.now()}`;
+  this.activeThreadId = threadId;
+  if (config?.executionId) {
+    this.activeExecutionId = config.executionId;
+  }
+  this.pendingAuth = null;
 
-    const initialState = {
-      variables: {
-        input: typeof input === 'string' ? input : input,
-        lastOutput: typeof input === 'string' ? input : '',
-      },
-      chatHistory: [],
-      currentNodeId: '',
-      nodeResults: {},
-      pendingAuth: null,
-    };
+  const initialState = {
+    variables: {
+      input: typeof input === 'string' ? input : input,
+      lastOutput: typeof input === 'string' ? input : '',
+    },
+    chatHistory: [],
+    currentNodeId: '',
+    nodeResults: {},
+    pendingAuth: null,
+  };
 
-    this.lastStreamState = initialState;
+  this.lastStreamState = initialState;
 
-    const rawStream = await this.graph.stream(initialState, {
-      configurable: { thread_id: threadId },
-      streamMode: "values" as const,
-      recursionLimit: 100, // Support up to 100 graph steps (default: 25)
-    });
+  const rawStream = await this.graph.stream(initialState, {
+    configurable: { thread_id: threadId },
+    streamMode: "values" as const,
+    recursionLimit: 100, // Support up to 100 graph steps (default: 25)
+  });
 
-    return this.wrapStreamWithInterruptHandling(rawStream, initialState);
+  return this.wrapStreamWithInterruptHandling(rawStream, initialState);
+}
+
+  async resumeFromAuth(threadId: string, resumeValue ?: any, options ?: { executionId?: string }) {
+  this.activeThreadId = threadId;
+  if (options?.executionId) {
+    this.activeExecutionId = options.executionId;
   }
 
-  async resumeFromAuth(threadId: string, resumeValue?: any, options?: { executionId?: string }) {
-    this.activeThreadId = threadId;
-    if (options?.executionId) {
-      this.activeExecutionId = options.executionId;
-    }
+  const command = new Command({ resume: resumeValue });
+  const rawStream = await this.graph.stream(command, {
+    configurable: { thread_id: threadId },
+    streamMode: "values" as const,
+    recursionLimit: 100, // Support up to 100 graph steps (default: 25)
+  });
 
-    const command = new Command({ resume: resumeValue });
-    const rawStream = await this.graph.stream(command, {
-      configurable: { thread_id: threadId },
-      streamMode: "values" as const,
-      recursionLimit: 100, // Support up to 100 graph steps (default: 25)
-    });
+  const fallback = this.lastStreamState ?? {
+    variables: {},
+    nodeResults: {},
+    pendingAuth: null,
+    currentNodeId: '',
+  };
 
-    const fallback = this.lastStreamState ?? {
-      variables: {},
-      nodeResults: {},
-      pendingAuth: null,
-      currentNodeId: '',
-    };
-
-    return this.wrapStreamWithInterruptHandling(rawStream, fallback);
-  }
+  return this.wrapStreamWithInterruptHandling(rawStream, fallback);
+}
 
   /**
    * Execute workflow (non-streaming)
    */
-  async execute(input: any, config?: { threadId?: string }) {
-    const threadId = config?.threadId || `thread_${Date.now()}`;
+  async execute(input: any, config ?: { threadId?: string }) {
+  const threadId = config?.threadId || `thread_${Date.now()}`;
 
-    const initialState = {
-      variables: {
-        input: typeof input === 'string' ? input : input,
-        lastOutput: typeof input === 'string' ? input : '',
-      },
-      chatHistory: [],
-      currentNodeId: '',
-      nodeResults: {},
-    };
+  const initialState = {
+    variables: {
+      input: typeof input === 'string' ? input : input,
+      lastOutput: typeof input === 'string' ? input : '',
+    },
+    chatHistory: [],
+    currentNodeId: '',
+    nodeResults: {},
+  };
 
-    const result = await this.graph.invoke(initialState, {
-      configurable: { thread_id: threadId },
-      recursionLimit: 100, // Support up to 100 graph steps (default: 25)
-    });
+  const result = await this.graph.invoke(initialState, {
+    configurable: { thread_id: threadId },
+    recursionLimit: 100, // Support up to 100 graph steps (default: 25)
+  });
 
-    return {
-      id: `exec_${Date.now()}`,
-      workflowId: this.workflow.id,
-      status: 'completed' as const,
-      nodeResults: result.nodeResults || {},
-      startedAt: new Date().toISOString(),
-      completedAt: new Date().toISOString(),
-    };
-  }
+  return {
+    id: `exec_${Date.now()}`,
+    workflowId: this.workflow.id,
+    status: 'completed' as const,
+    nodeResults: result.nodeResults || {},
+    startedAt: new Date().toISOString(),
+    completedAt: new Date().toISOString(),
+  };
+}
 
   private wrapStreamWithInterruptHandling(rawStream: AsyncIterable<any>, fallbackState: any) {
-    const self = this;
+  const self = this;
 
-    return (async function* () {
-      let latestState = fallbackState;
+  return (async function* () {
+    let latestState = fallbackState;
 
-      try {
-        for await (const chunk of rawStream) {
-          if (isInterrupted(chunk)) {
-            const interruptRecord = (chunk as any).__interrupt__?.[0] ?? null;
-            const pendingAuth = self.pendingAuth ?? interruptRecord?.value?.pendingAuth ?? null;
-            const pauseState = {
-              ...(latestState ?? {}),
-              pendingAuth,
-              currentNodeId: interruptRecord?.value?.nodeId ?? latestState?.currentNodeId ?? '',
-              nodeResults: latestState?.nodeResults ?? {},
-            };
-
-            self.lastStreamState = pauseState;
-            yield pauseState;
-            return;
-          }
-
-          const enrichedChunk = {
-            ...chunk,
-            pendingAuth: self.pendingAuth,
+    try {
+      for await (const chunk of rawStream) {
+        if (isInterrupted(chunk)) {
+          const interruptRecord = (chunk as any).__interrupt__?.[0] ?? null;
+          const pendingAuth = self.pendingAuth ?? interruptRecord?.value?.pendingAuth ?? null;
+          const pauseState = {
+            ...(latestState ?? {}),
+            pendingAuth,
+            currentNodeId: interruptRecord?.value?.nodeId ?? latestState?.currentNodeId ?? '',
+            nodeResults: latestState?.nodeResults ?? {},
           };
 
-          latestState = enrichedChunk;
-          self.lastStreamState = enrichedChunk;
-          yield enrichedChunk;
+          self.lastStreamState = pauseState;
+          yield pauseState;
+          return;
         }
-      } catch (streamError) {
-        console.error('ERROR: Stream iteration error in wrapStreamWithInterruptHandling:', streamError);
-        // Yield error state instead of throwing
-        const errorState = {
-          ...(latestState ?? {}),
-          error: streamError instanceof Error ? streamError.message : 'Stream error',
-          status: 'failed'
+
+        const enrichedChunk = {
+          ...chunk,
+          pendingAuth: self.pendingAuth,
         };
-        self.lastStreamState = errorState;
-        yield errorState;
-        return;
+
+        latestState = enrichedChunk;
+        self.lastStreamState = enrichedChunk;
+        yield enrichedChunk;
       }
+    } catch (streamError) {
+      console.error('ERROR: Stream iteration error in wrapStreamWithInterruptHandling:', streamError);
+      // Yield error state instead of throwing
+      const errorState = {
+        ...(latestState ?? {}),
+        error: streamError instanceof Error ? streamError.message : 'Stream error',
+        status: 'failed'
+      };
+      self.lastStreamState = errorState;
+      yield errorState;
+      return;
+    }
 
-      self.pendingAuth = null;
-      self.lastStreamState = latestState;
-    })();
-  }
+    self.pendingAuth = null;
+    self.lastStreamState = latestState;
+  })();
+}
 
-  /**
-   * Export workflow as LangGraph JSON
-   */
-  exportToLangGraph(): any {
-    return {
-      nodes: this.workflow.nodes.map(node => ({
-        id: node.id,
-        type: (node.data as any)?.nodeType || node.type,
-        data: node.data,
-      })),
-      edges: this.workflow.edges.map(edge => ({
-        source: edge.source,
-        target: edge.target,
-        sourceHandle: edge.sourceHandle,
-      })),
-      state: {
-        schema: {
-          variables: 'object',
-          chatHistory: 'array',
-          currentNodeId: 'string',
-          nodeResults: 'object',
-        },
+/**
+ * Export workflow as LangGraph JSON
+ */
+exportToLangGraph(): any {
+  return {
+    nodes: this.workflow.nodes.map(node => ({
+      id: node.id,
+      type: (node.data as any)?.nodeType || node.type,
+      data: node.data,
+    })),
+    edges: this.workflow.edges.map(edge => ({
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceHandle,
+    })),
+    state: {
+      schema: {
+        variables: 'object',
+        chatHistory: 'array',
+        currentNodeId: 'string',
+        nodeResults: 'object',
       },
-    };
-  }
+    },
+  };
+}
 
   /**
    * Get LangGraph mermaid diagram
    */
-  async getMermaidDiagram(): Promise<string> {
-    try {
-      const graphDrawable = this.graph.getGraph();
-      return graphDrawable.drawMermaid();
-    } catch (error) {
-      console.error('Failed to generate Mermaid diagram:', error);
-      return '';
-    }
+  async getMermaidDiagram(): Promise < string > {
+  try {
+    const graphDrawable = this.graph.getGraph();
+    return graphDrawable.drawMermaid();
+  } catch(error) {
+    console.error('Failed to generate Mermaid diagram:', error);
+    return '';
   }
+}
 
   /**
    * Get state checkpoints for a thread
    */
   async getCheckpoints(threadId: string) {
-    const config = { configurable: { thread_id: threadId } };
-    const checkpoints: any[] = [];
+  const config = { configurable: { thread_id: threadId } };
+  const checkpoints: any[] = [];
 
-    for await (const checkpoint of this.checkpointer.list(config)) {
-      checkpoints.push(checkpoint);
-    }
-
-    return checkpoints;
+  for await (const checkpoint of this.checkpointer.list(config)) {
+    checkpoints.push(checkpoint);
   }
+
+  return checkpoints;
+}
 
   /**
    * Resume from a specific checkpoint
    */
   async resumeFromCheckpoint(threadId: string, checkpointId: string, input: any) {
-    const config = {
-      configurable: {
-        thread_id: threadId,
-        checkpoint_id: checkpointId,
-      },
-      recursionLimit: 100, // Support up to 100 graph steps (default: 25)
-    };
+  const config = {
+    configurable: {
+      thread_id: threadId,
+      checkpoint_id: checkpointId,
+    },
+    recursionLimit: 100, // Support up to 100 graph steps (default: 25)
+  };
 
-    return await this.graph.invoke(input, config);
-  }
+  return await this.graph.invoke(input, config);
+}
 }
 
 /**

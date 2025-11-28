@@ -74,6 +74,27 @@ export async function getLLMApiKey(
 }
 
 /**
+ * Get the API key for a specific tool (e.g., 'firecrawl', 'serper')
+    'serper-search': 'SERPER_API_KEY',
+    'serpapi': 'SERPAPI_API_KEY',
+    'serpapi-search': 'SERPAPI_API_KEY',
+    'tavily': 'TAVILY_API_KEY',
+    'tavily-search': 'TAVILY_API_KEY',
+    'scraperapi': 'SCRAPERAPI_API_KEY',
+    'browserless': 'BROWSERLESS_API_KEY',
+    'arcade': 'ARCADE_API_KEY',
+    'e2b': 'E2B_API_KEY',
+  };
+
+  const envKey = envKeyMap[toolId];
+  if (envKey && process.env[envKey]) {
+    return process.env[envKey] || null;
+  }
+
+  return null;
+}
+
+/**
  * Check if a provider has an API key configured (either user or env)
  */
 export async function isProviderConfigured(
