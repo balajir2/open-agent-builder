@@ -75,6 +75,34 @@ export async function getLLMApiKey(
 
 /**
  * Get the API key for a specific tool (e.g., 'firecrawl', 'serper')
+ * Checks user keys first, then falls back to environment variables
+ */
+export async function getToolApiKey(
+  toolId: string,
+  userId?: string
+): Promise<string | null> {
+  // First, try to get user-specific key if userId is provided
+  if (userId) {
+    try {
+      const client = getConvexClient();
+      const userKey = await client.action(api.userToolKeysActions.getActiveKey, {
+        userId,
+        toolId,
+      });
+
+      if (userKey?.apiKey) {
+        return userKey.apiKey;
+      }
+    } catch (error) {
+      console.error(`Failed to get user key for tool ${toolId}:`, error);
+      // Continue to environment variable fallback
+    }
+  }
+
+  // Fall back to environment variables
+  const envKeyMap: Record<string, string> = {
+    'firecrawl': 'FIRECRAWL_API_KEY',
+    'serper': 'SERPER_API_KEY',
     'serper-search': 'SERPER_API_KEY',
     'serpapi': 'SERPAPI_API_KEY',
     'serpapi-search': 'SERPAPI_API_KEY',

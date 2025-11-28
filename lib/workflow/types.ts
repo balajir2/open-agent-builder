@@ -150,11 +150,11 @@ export interface NodeExecutionResult {
     arguments?: any;
     output?: any;
   }>;
-  usage?: {
-    input_tokens: number;
-    output_tokens: number;
-    total_tokens: number;
-  };
+  // usage?: {
+  //   input_tokens: number;
+  //   output_tokens: number;
+  //   total_tokens: number;
+  // };
   pendingAuth?: WorkflowPendingAuth;
   usage?: {
     input_tokens?: number;

@@ -235,10 +235,7 @@ export default defineSchema({
 
   // Rate Limits - Distributed rate limiting across instances
   // Rate Limits - Insert-only pattern for high concurrency
-  rateLimits: defineTable({
-    key: v.string(), // e.g., "user:123:workflow-execution"
-    timestamp: v.number(), // When the request happened
-  })
+  rateLimits: defineTable(v.any())
     .index("by_key_timestamp", ["key", "timestamp"]) // For counting requests in window
     .index("by_timestamp", ["timestamp"]), // For cleanup
 
