@@ -22,6 +22,7 @@ import type * as functions_cache_set from "../functions/cache/set.js";
 import type * as http_uploadFile from "../http/uploadFile.js";
 import type * as http from "../http.js";
 import type * as lib_encryption from "../lib/encryption.js";
+import type * as lib_utils from "../lib/utils.js";
 import type * as mcpServers from "../mcpServers.js";
 import type * as rateLimits_check from "../rateLimits/check.js";
 import type * as templates from "../templates.js";
@@ -62,6 +63,7 @@ declare const fullApi: ApiFromModules<{
   "http/uploadFile": typeof http_uploadFile;
   http: typeof http;
   "lib/encryption": typeof lib_encryption;
+  "lib/utils": typeof lib_utils;
   mcpServers: typeof mcpServers;
   "rateLimits/check": typeof rateLimits_check;
   templates: typeof templates;

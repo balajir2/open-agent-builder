@@ -164,7 +164,7 @@ export const toolRegistry: ToolDefinition[] = [
             {
                 name: "waitForSelector",
                 label: "Wait for Selector",
-                type: "text",
+                type: "string",
                 required: false,
                 placeholder: "e.g., .content, #main",
                 description: "CSS selector to wait for before scraping"
@@ -172,7 +172,7 @@ export const toolRegistry: ToolDefinition[] = [
             {
                 name: "executeScript",
                 label: "Execute JavaScript",
-                type: "text",
+                type: "string",
                 required: false,
                 placeholder: "e.g., window.scrollTo(0, document.body.scrollHeight)",
                 description: "JavaScript to execute on the page"

@@ -10,19 +10,19 @@ import { extractTrueVariableNames } from '@/lib/workflow/deep-variable-extractor
  */
 export async function GET(
   request: Request,
-  { params }: { params: { workflowId: string } }
+  { params }: any
 ) {
-  const { workflowId } = params;
-  
+  const { workflowId } = await params;
+
   try {
     // Initialize Convex client
     const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
-    
+
     // Get workflow
     let workflow;
     try {
       // Try to fetch by Convex ID first
-      workflow = await convex.query(api.workflows.getWorkflow, { id: workflowId });
+      workflow = await convex.query(api.workflows.getWorkflow, { id: workflowId as any });
     } catch (e) {
       // If that fails, try by custom ID
       workflow = await convex.query(api.workflows.getWorkflowByCustomId, { customId: workflowId });
@@ -37,15 +37,15 @@ export async function GET(
 
     // Extract true variable names from the workflow definition
     const trueVariables = extractTrueVariableNames(workflow);
-    
+
     // Map to a format expected by the UI Builder
-    const inputVariables = trueVariables.length > 0 ? 
+    const inputVariables = trueVariables.length > 0 ?
       trueVariables.map(name => ({
         name,
         type: 'string',
         description: 'True workflow variable'
       })) : [];
-    
+
     // Prepare metadata response
     const metadata = {
       id: workflow._id,

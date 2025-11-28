@@ -1,3 +1,3 @@
-export default function HeroFlame() {
-  return null;
+export default function HeroFlame({ className }: { className?: string }) {
+  return <div className={className} />;
 }

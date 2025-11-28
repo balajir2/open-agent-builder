@@ -14,62 +14,67 @@ export async function GET(request: Request) {
     const sortBy = searchParams.get("sortBy") || "updatedAt";
     const order = searchParams.get("order") || "desc";
     const limit = parseInt(searchParams.get("limit") || "50", 10);
-    
+
     // Fetch all workflows first (we'll filter them in-memory)
     const workflows = await convex.query(api.workflows.list);
-    
+
     if (!workflows || !Array.isArray(workflows)) {
       return NextResponse.json({ workflows: [] });
     }
-    
+
     // Apply filters
     let filteredWorkflows = [...workflows];
-    
+
     // Filter by query text
     if (query) {
       const lowerQuery = query.toLowerCase();
-      filteredWorkflows = filteredWorkflows.filter(workflow => 
+      filteredWorkflows = filteredWorkflows.filter(workflow =>
         workflow.name?.toLowerCase().includes(lowerQuery) ||
         workflow.description?.toLowerCase().includes(lowerQuery)
       );
     }
-    
+
     // Filter by tags
     if (tags.length > 0) {
       filteredWorkflows = filteredWorkflows.filter(workflow => {
         if (!workflow.tags || !Array.isArray(workflow.tags)) return false;
-        return tags.some(tag => workflow.tags.includes(tag));
+        return tags.some(tag => (workflow.tags as string[]).includes(tag));
       });
     }
-    
+
     // Sort workflows
     filteredWorkflows.sort((a, b) => {
-      let aValue, bValue;
-      
-      switch(sortBy) {
+      let aValue: any, bValue: any;
+
+      switch (sortBy) {
         case "name":
           aValue = a.name || "";
           bValue = b.name || "";
-          return order === "asc" 
-            ? aValue.localeCompare(bValue) 
+          return order === "asc"
+            ? aValue.localeCompare(bValue)
             : bValue.localeCompare(aValue);
-          
+
         case "createdAt":
           aValue = a._creationTime || 0;
           bValue = b._creationTime || 0;
-          return order === "asc" ? aValue - bValue : bValue - aValue;
-          
+          return order === "asc" ? (aValue as number) - (bValue as number) : (bValue as number) - (aValue as number);
+
         case "updatedAt":
         default:
           aValue = a.updatedAt || a._creationTime || 0;
           bValue = b.updatedAt || b._creationTime || 0;
-          return order === "asc" ? aValue - bValue : bValue - aValue;
+
+          // Handle string dates if necessary
+          if (typeof aValue === 'string') aValue = new Date(aValue).getTime();
+          if (typeof bValue === 'string') bValue = new Date(bValue).getTime();
+
+          return order === "asc" ? (aValue as number) - (bValue as number) : (bValue as number) - (aValue as number);
       }
     });
-    
+
     // Limit results
     filteredWorkflows = filteredWorkflows.slice(0, limit);
-    
+
     // Get all unique tags from workflows (for filters)
     const allTags = new Set<string>();
     workflows.forEach(workflow => {
@@ -77,7 +82,7 @@ export async function GET(request: Request) {
         workflow.tags.forEach(tag => allTags.add(tag));
       }
     });
-    
+
     return NextResponse.json({
       workflows: filteredWorkflows,
       total: filteredWorkflows.length,

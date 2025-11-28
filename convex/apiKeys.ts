@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
-import { hashString } from "./lib/encryption";
+import { hashString } from "./lib/utils";
 
 /**
  * API Key Management for Secure Workflow API Access
@@ -75,6 +75,43 @@ export const verifyAndUpdateApiKey = internalMutation({
     const apiKey = await ctx.db
       .query("apiKeys")
       .withIndex("by_key", (q) => q.eq("key", args.keyHash))
+      .first();
+
+    if (!apiKey) {
+      return { valid: false, error: "Invalid API key" };
+    }
+
+    if (apiKey.revokedAt) {
+      return { valid: false, error: "API key revoked" };
+    }
+
+    if (apiKey.expiresAt && new Date(apiKey.expiresAt) < new Date()) {
+      return { valid: false, error: "API key expired" };
+    }
+
+    // Update usage stats
+    await ctx.db.patch(apiKey._id, {
+      lastUsedAt: new Date().toISOString(),
+      usageCount: apiKey.usageCount + 1,
+    });
+
+    return {
+      valid: true,
+      userId: apiKey.userId,
+    };
+  },
+});
+
+// Verify API key (public mutation called from server-side API routes)
+export const verify = mutation({
+  args: { key: v.string() },
+  handler: async (ctx, { key }) => {
+    // Hash the provided key to match stored hash
+    const keyHash = await hashString(key);
+
+    const apiKey = await ctx.db
+      .query("apiKeys")
+      .withIndex("by_key", (q) => q.eq("key", keyHash))
       .first();
 
     if (!apiKey) {

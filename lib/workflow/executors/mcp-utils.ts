@@ -112,13 +112,25 @@ export async function executeMcpTool(
     args: any,
     apiKeys: { firecrawl?: string } = {}
 ): Promise<any> {
+    // Fix: Firecrawl search tool often gets hallucinated 'sources' parameter which causes validation error
+    if (toolName.includes('firecrawl_search') && args && typeof args === 'object' && args.sources) {
+        console.log(`[MCP] Removing invalid 'sources' parameter from ${toolName}`);
+        const { sources, ...rest } = args;
+        args = rest;
+    }
+
     // Replace URL placeholders
     const resolvedMcpUrl = mcpServer.url && mcpServer.url.includes('{FIRECRAWL_API_KEY}')
         ? mcpServer.url.replace('{FIRECRAWL_API_KEY}', encodeURIComponent(apiKeys.firecrawl || ''))
         : (mcpServer.url || '');
 
     // Support both authToken and accessToken for backward compatibility
-    const authToken = mcpServer.authToken || mcpServer.accessToken;
+    let authToken = mcpServer.authToken || mcpServer.accessToken;
+
+    // Auto-inject Firecrawl API key if missing and server is Firecrawl
+    if (!authToken && (mcpServer.name?.toLowerCase().includes('firecrawl') || mcpServer.url?.includes('firecrawl'))) {
+        authToken = apiKeys.firecrawl;
+    }
 
     const mcpResponse = await fetch(resolvedMcpUrl, {
         method: 'POST',

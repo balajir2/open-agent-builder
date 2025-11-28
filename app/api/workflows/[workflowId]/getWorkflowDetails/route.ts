@@ -1,15 +1,13 @@
-// app/api/workflows/[workflowId]/getWorkflowDetails/route.ts
 import { NextResponse } from "next/server";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 
-interface RouteContext {
-  params: { workflowId: string };
-}
-
-export async function GET(req: Request, context: RouteContext) {
+export async function GET(
+  req: Request,
+  { params }: any
+) {
   try {
-    const { workflowId } = await context.params;
+    const { workflowId } = await params;
 
     if (!workflowId) {
       return NextResponse.json({ error: "Missing workflowId" }, { status: 400 });

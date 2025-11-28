@@ -9,14 +9,14 @@ import { extractTrueVariableNames } from '../../../../../lib/workflow/deep-varia
 
 export async function GET(
   request: Request,
-  { params }: { params: { workflowId: string } }
+  { params }: any
 ) {
-  const { workflowId } = params;
-  
+  const { workflowId } = await params;
+
   try {
     // Initialize Convex client
     const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
-    
+
     // Get workflow
     let workflow;
     try {
@@ -38,15 +38,15 @@ export async function GET(
     const standardVariables = extractWorkflowVariables(workflow);
     const internalVars = extractVariableNames(workflow);
     const templateVars = findVariablesInTemplates(workflow);
-    
+
     // Use the deep variable extractor for most aggressive variable detection
     const trueVariables = extractTrueVariableNames(workflow);
-    
+
     console.log('Deep extraction - TRUE VARIABLES:', trueVariables);
     console.log('Variables from standard extraction:', standardVariables.map(v => v.name));
     console.log('Variables from internal extractor:', internalVars);
     console.log('Variables from templates:', templateVars);
-    
+
     // Format all variables
     let allVariables: Array<{
       name: string;
@@ -58,7 +58,7 @@ export async function GET(
       internal?: boolean;
       trueVariable?: boolean;
     }> = [];
-    
+
     // Highest priority: If we found true variables from deep extraction, use those first
     if (trueVariables && trueVariables.length > 0) {
       // Convert true variables to the expected format with special flags
@@ -70,15 +70,15 @@ export async function GET(
         trueVariable: true, // Special flag to indicate this is a true workflow variable
         description: 'This is a true variable used directly in the workflow code'
       }));
-      
+
       // Start with the true variables (highest priority)
       allVariables = [...trueVarObjects];
-      
+
       console.log('Using TRUE VARIABLES as primary source:', trueVarObjects.map(v => v.name));
     } else {
       // If no true variables found, fall back to other extraction methods
       console.log('No true variables found, using fallback extraction methods');
-      
+
       // Convert other internal variables to the expected format
       const internalVariables = [...internalVars, ...templateVars].map(name => ({
         name,
@@ -86,15 +86,15 @@ export async function GET(
         type: 'string',
         internal: true // Mark these as internal variables
       }));
-      
+
       // Add these internal variables first
       const existingNames = new Set(standardVariables.map(v => v.name));
       const newVars = internalVariables.filter(v => !existingNames.has(v.name));
-      
+
       // Combine variables, putting internal ones first for priority
       allVariables = [...newVars, ...standardVariables];
     }
-    
+
     return NextResponse.json(allVariables);
   } catch (error) {
     console.error('Error fetching workflow variables:', error);
@@ -111,15 +111,15 @@ export async function GET(
  * rather than just edge connections
  */
 function extractWorkflowVariables(workflow: any) {
-  const result: Array<{ 
-    name: string, 
-    label?: string, 
-    type?: string, 
+  const result: Array<{
+    name: string,
+    label?: string,
+    type?: string,
     default?: any,
     description?: string,
     required?: boolean
   }> = [];
-  
+
   // Directly check for standard workflow variable definitions
   if (workflow.variables && Array.isArray(workflow.variables)) {
     workflow.variables.forEach((v: any) => {
@@ -134,17 +134,17 @@ function extractWorkflowVariables(workflow: any) {
     });
     return result;
   }
-  
+
   // Check nodes for input definitions
   if (workflow.nodes && Array.isArray(workflow.nodes)) {
     // Find the start node
-    const startNode = workflow.nodes.find((n: any) => 
-      n.type === 'start' || 
-      n.id === 'start' || 
+    const startNode = workflow.nodes.find((n: any) =>
+      n.type === 'start' ||
+      n.id === 'start' ||
       n.name === 'start' ||
       n.nodeType === 'start'
     );
-    
+
     if (startNode) {
       // Check for output definitions (often represent workflow inputs)
       if (startNode.outputs) {
@@ -172,7 +172,7 @@ function extractWorkflowVariables(workflow: any) {
           });
         }
       }
-      
+
       // Check data.inputs
       if (startNode.data && startNode.data.inputs) {
         if (Array.isArray(startNode.data.inputs)) {
@@ -189,14 +189,14 @@ function extractWorkflowVariables(workflow: any) {
         }
       }
     }
-    
+
     // Check for agent nodes with parameters
-    const agentNodes = workflow.nodes.filter((n: any) => 
-      n.type === 'agent' || 
+    const agentNodes = workflow.nodes.filter((n: any) =>
+      n.type === 'agent' ||
       n.nodeType === 'agent' ||
       (n.data && n.data.type === 'agent')
     );
-    
+
     for (const agentNode of agentNodes) {
       if (agentNode.data && agentNode.data.parameters && Array.isArray(agentNode.data.parameters)) {
         agentNode.data.parameters.forEach((param: any) => {
@@ -214,7 +214,7 @@ function extractWorkflowVariables(workflow: any) {
       }
     }
   }
-  
+
   // If no variables found yet, try to extract input data from the top level
   if (result.length === 0 && workflow.inputs) {
     if (Array.isArray(workflow.inputs)) {
@@ -241,6 +241,6 @@ function extractWorkflowVariables(workflow: any) {
       });
     }
   }
-  
+
   return result;
 }

@@ -1,3 +1,3 @@
-export default function AsciiExplosion() {
-  return null;
+export default function AsciiExplosion({ className }: { className?: string }) {
+  return <div className={className} />;
 }

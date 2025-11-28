@@ -41,7 +41,7 @@ export const checkRateLimit = mutation({
         )
         .first();
 
-      const resetAt = oldestRequest ? oldestRequest.timestamp + windowMs : now + windowMs;
+      const resetAt = oldestRequest ? (oldestRequest.timestamp ?? now) + windowMs : now + windowMs;
 
       return {
         allowed: false,
@@ -110,3 +110,5 @@ export const cleanupExpiredRecords = mutation({
     return { deletedCount, hasMore: expiredRecords.length === 1000 };
   },
 });
+
+
