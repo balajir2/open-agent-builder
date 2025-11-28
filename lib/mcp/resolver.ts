@@ -45,7 +45,7 @@ export async function resolveMCPServers(serverIds: string[]): Promise<any[]> {
     });
 
     // Transform to the format expected by executors
-    return servers.filter(Boolean).map(server => ({
+    return servers.filter((s): s is NonNullable<typeof s> => !!s).map(server => ({
       name: server.name,
       url: server.url,
       description: server.description,

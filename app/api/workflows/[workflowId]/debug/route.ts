@@ -8,7 +8,7 @@ import { api } from '@/convex/_generated/api';
  */
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ workflowId: string }> }
+  { params }: any
 ) {
   const { workflowId } = await params;
 
@@ -20,7 +20,7 @@ export async function GET(
     let workflow;
     try {
       // Try to fetch by Convex ID first
-      workflow = await convex.query(api.workflows.getWorkflow, { id: workflowId });
+      workflow = await convex.query(api.workflows.getWorkflow, { id: workflowId as any });
     } catch (e) {
       // If that fails, try by custom ID
       workflow = await convex.query(api.workflows.getWorkflowByCustomId, { customId: workflowId });

@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ workflowId: string }> }
+  { params }: any
 ) {
   // Validate API key
   const authResult = await validateApiKey(request);
@@ -138,7 +138,7 @@ export async function POST(
         const nodeResults: Record<string, any> = {};
 
         // Get API keys - check user keys first, then fall back to environment
-        const { getLLMApiKey, getToolApiKey } = await import('@/lib/api/llm-keys');
+        const { getLLMApiKey, getToolApiKey } = await import('@/lib/api/llm-keys') as any;
         const userId = authResult.userId;
 
         const apiKeys = {

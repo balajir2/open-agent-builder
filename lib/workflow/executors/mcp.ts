@@ -131,7 +131,7 @@ export async function executeMCPNode(
 
   // MCP executor always runs on server side in LangGraph context
   // No client-side detection needed
-  
+
   const nodeName = data.nodeName?.toLowerCase() || '';
   const nodeData = data as any;
   const lastOutput = state.variables?.lastOutput;
@@ -163,17 +163,19 @@ export async function executeMCPNode(
       // Server-side Firecrawl execution - use Firecrawl SDK directly
       console.log('🖥️ MCP executor running Firecrawl on server side');
 
-      const apiKeys = getServerAPIKeys();
-      if (!apiKeys.firecrawl) {
-        throw new Error('FIRECRAWL_API_KEY not configured. Add it to your .env.local file:\nFIRECRAWL_API_KEY=your_key_here');
+      const serverApiKeys = getServerAPIKeys();
+      const firecrawlKey = apiKey || serverApiKeys.firecrawl;
+
+      if (!firecrawlKey) {
+        throw new Error('FIRECRAWL_API_KEY not configured. Add it to your .env.local file or configure it in Settings.');
       }
 
-      const firecrawl = new FirecrawlApp({ apiKey: apiKeys.firecrawl });
-      
+      const firecrawl = new FirecrawlApp({ apiKey: firecrawlKey });
+
       // Get the action and parameters from the node data
       const nodeData = data as any;
       const action = nodeData.mcpAction || 'scrape';
-      
+
       // Get URL from input or previous step
       const getUrl = () => {
         const explicitUrl = nodeData.scrapeUrl || nodeData.mapUrl || nodeData.crawlUrl;
@@ -183,7 +185,7 @@ export async function executeMCPNode(
             return substituted;
           }
         }
-        
+
         const lastOutput = state.variables?.lastOutput;
         if (typeof lastOutput === 'string' && lastOutput.startsWith('http')) {
           return lastOutput;
@@ -205,7 +207,7 @@ export async function executeMCPNode(
             return substituted;
           }
         }
-        
+
         const lastOutput = state.variables?.lastOutput;
         if (typeof lastOutput === 'string' && !lastOutput.startsWith('http')) {
           return lastOutput;
@@ -217,7 +219,7 @@ export async function executeMCPNode(
       };
 
       let result: any;
-      
+
       try {
         switch (action) {
           case 'scrape':
@@ -225,38 +227,38 @@ export async function executeMCPNode(
               formats: nodeData.useJsonMode ? ['json'] : ['markdown', 'html'],
             });
             break;
-            
+
           case 'search':
             result = await firecrawl.search(getSearchQuery(), {
               limit: nodeData.searchLimit || 5,
             });
             break;
-            
+
           case 'map':
             result = await firecrawl.map(getUrl());
             break;
-            
+
           case 'crawl':
             result = await firecrawl.crawl(getUrl(), {
               limit: nodeData.crawlLimit || 10,
             });
             break;
-            
+
           default:
             throw new Error(`Unknown Firecrawl action: ${action}`);
         }
-        
+
         console.log('✅ MCP Firecrawl server-side execution completed successfully');
-        
+
         // Extract specific field based on configuration
         let outputData = result;
         if (nodeData.outputField && nodeData.outputField !== 'full') {
           outputData = extractField(result, nodeData.outputField, nodeData.customOutputPath);
         }
-        
+
         // Update state
         state.variables.lastOutput = outputData;
-        
+
         return {
           results: [{
             server: 'Firecrawl',
@@ -273,7 +275,7 @@ export async function executeMCPNode(
             output: result,
           }],
         };
-        
+
       } catch (error) {
         console.error('❌ MCP Firecrawl server-side execution failed:', error);
         throw new Error(`Firecrawl ${action} failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -303,7 +305,7 @@ export async function executeMCPNode(
 
   return {
     results,
-    mcpServers: mcpServers.map(s => s.name),
+    mcpServers: mcpServers.map((s: any) => s.name),
   };
 }
 

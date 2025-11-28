@@ -7,7 +7,7 @@ import {
   ConnectorToRight,
 } from "@/components/shared/layout/curvy-rect";
 import HeaderGithubClient from "@/components/shared/header/Github/GithubClient";
-import { NAV_ITEMS } from "@/components/shared/header/Nav/Nav";
+import { NAV_ITEMS } from "@/components/layout/header/Nav/Nav";
 
 import HeaderDropdownMobileItem from "./Item/Item";
 import Link from "next/link";

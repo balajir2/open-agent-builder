@@ -158,66 +158,64 @@ export default function VariableReferencePicker({ nodes, currentNodeId, onSelect
                 <h4 className="text-label-small text-accent-black">Available Variables</h4>
               </div>
 
-            <div className="max-h-320 overflow-y-auto">
-              {variables.map((group, groupIndex) => (
-                <div key={groupIndex}>
-                  <div className="px-12 py-8 bg-background-base">
-                    <p className="text-body-small text-black-alpha-48 font-medium">
-                      {group.category}
-                    </p>
-                  </div>
+              <div className="max-h-320 overflow-y-auto">
+                {variables.map((group, groupIndex) => (
+                  <div key={groupIndex}>
+                    <div className="px-12 py-8 bg-background-base">
+                      <p className="text-body-small text-black-alpha-48 font-medium">
+                        {group.category}
+                      </p>
+                    </div>
 
-                  {group.items.map((item: any, itemIndex) => (
-                    <button
-                      key={itemIndex}
-                      onClick={() => {
-                        onSelect(item.path);
-                        setIsOpen(false);
-                      }}
-                      className={`w-full px-12 py-10 text-left hover:bg-heat-4 transition-colors border-b border-border-faint last:border-0 ${
-                        item.isField ? 'pl-24 bg-background-base' : ''
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-8">
-                        <div className="flex-1 min-w-0">
-                          {item.isNested && (
-                            <span className="text-body-small text-heat-100 mr-6">↳↳</span>
-                          )}
-                          {item.isField && !item.isNested && (
-                            <span className="text-body-small text-heat-100 mr-6">↳</span>
-                          )}
-                          <p className={`text-body-small font-medium break-all ${
-                            item.isField || item.isInputVariable || item.isNested ? 'text-heat-100' : 'text-accent-black'
-                          }`}>
-                            {item.name}
-                          </p>
-                          <p className="text-body-small text-black-alpha-48 mt-2 font-mono text-[10px]">
-                            {`{{${item.path}}}`}
-                          </p>
-                          {item.description && (
-                            <p className="text-body-small text-black-alpha-48 mt-4 truncate">
-                              {item.description}
+                    {group.items.map((item: any, itemIndex: number) => (
+                      <button
+                        key={itemIndex}
+                        onClick={() => {
+                          onSelect(item.path);
+                          setIsOpen(false);
+                        }}
+                        className={`w-full px-12 py-10 text-left hover:bg-heat-4 transition-colors border-b border-border-faint last:border-0 ${item.isField ? 'pl-24 bg-background-base' : ''
+                          }`}
+                      >
+                        <div className="flex items-start justify-between gap-8">
+                          <div className="flex-1 min-w-0">
+                            {item.isNested && (
+                              <span className="text-body-small text-heat-100 mr-6">↳↳</span>
+                            )}
+                            {item.isField && !item.isNested && (
+                              <span className="text-body-small text-heat-100 mr-6">↳</span>
+                            )}
+                            <p className={`text-body-small font-medium break-all ${item.isField || item.isInputVariable || item.isNested ? 'text-heat-100' : 'text-accent-black'
+                              }`}>
+                              {item.name}
                             </p>
-                          )}
+                            <p className="text-body-small text-black-alpha-48 mt-2 font-mono text-[10px]">
+                              {`{{${item.path}}}`}
+                            </p>
+                            {item.description && (
+                              <p className="text-body-small text-black-alpha-48 mt-4 truncate">
+                                {item.description}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-4 items-end">
+                            {item.propertyType && (
+                              <span className="px-6 py-2 bg-black-alpha-4 text-black-alpha-64 rounded-4 text-[10px] font-medium flex-shrink-0">
+                                {item.propertyType}
+                              </span>
+                            )}
+                            {(item.nodeType || item.type) && (
+                              <span className="px-6 py-2 bg-heat-4 text-heat-100 rounded-4 text-body-small font-medium flex-shrink-0">
+                                {item.nodeType || item.type}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex flex-col gap-4 items-end">
-                          {item.propertyType && (
-                            <span className="px-6 py-2 bg-black-alpha-4 text-black-alpha-64 rounded-4 text-[10px] font-medium flex-shrink-0">
-                              {item.propertyType}
-                            </span>
-                          )}
-                          {(item.nodeType || item.type) && (
-                            <span className="px-6 py-2 bg-heat-4 text-heat-100 rounded-4 text-body-small font-medium flex-shrink-0">
-                              {item.nodeType || item.type}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </div>
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
 
               <div className="p-12 bg-background-base border-t border-border-faint">
                 <p className="text-body-small text-black-alpha-48">

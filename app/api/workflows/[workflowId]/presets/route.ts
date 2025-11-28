@@ -8,10 +8,10 @@ import { NextResponse } from "next/server";
 // GET - retrieve presets for a workflow
 export async function GET(
   request: Request,
-  { params }: { params: { workflowId: string } }
+  { params }: any
 ) {
   try {
-    const { workflowId } = params;
+    const { workflowId } = await params;
     if (!workflowId) {
       return NextResponse.json({ error: "Missing workflowId" }, { status: 400 });
     }
@@ -41,10 +41,10 @@ export async function GET(
 // POST - save a new preset
 export async function POST(
   request: Request,
-  { params }: { params: { workflowId: string } }
+  { params }: any
 ) {
   try {
-    const { workflowId } = params;
+    const { workflowId } = await params;
     if (!workflowId) {
       return NextResponse.json({ error: "Missing workflowId" }, { status: 400 });
     }
@@ -55,7 +55,7 @@ export async function POST(
     } catch (e) {
       return NextResponse.json({ error: "Invalid JSON in request body" }, { status: 400 });
     }
-    
+
     const { presetName, inputValues } = body;
 
     if (!presetName || !inputValues) {
@@ -84,10 +84,10 @@ export async function POST(
 // DELETE - remove a preset
 export async function DELETE(
   request: Request,
-  { params }: { params: { workflowId: string } }
+  { params }: any
 ) {
   try {
-    const { workflowId } = params;
+    const { workflowId } = await params;
     if (!workflowId) {
       return NextResponse.json({ error: "Missing workflowId" }, { status: 400 });
     }

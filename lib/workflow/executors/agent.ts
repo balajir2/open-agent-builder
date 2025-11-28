@@ -231,7 +231,9 @@ export async function executeAgentNode(
         let useManualToolCalling = false;
         let anthropicError: any = null;
 
-        const manualMcpTools = flattenedMcpTools.filter((t: any) => t.name.includes('firecrawl'));
+        const manualMcpTools = flattenedMcpTools.filter((t: any) =>
+          t.name.includes('firecrawl') || t.serverName?.toLowerCase().includes('firecrawl')
+        );
 
         const finalTools = [
           ...standardTools.map(t => {
@@ -320,12 +322,48 @@ export async function executeAgentNode(
 
                   // Sanitize input for Firecrawl search
                   let sanitizedInput = tu.input;
-                  if (tu.name.includes('firecrawl_search') && sanitizedInput && typeof sanitizedInput === 'object') {
-                    // Map 'url' to 'query' if query is missing (LLM often confuses these)
-                    const inputObj = sanitizedInput as any;
-                    if (!inputObj.query && inputObj.url) {
-                      console.log('[Agent] Mapping url to query for firecrawl_search');
-                      inputObj.query = inputObj.url;
+                  if (tu.name.includes('firecrawl_search')) {
+                    console.log(`[Agent] Raw input for ${tu.name}:`, JSON.stringify(tu.input, null, 2));
+
+                    if (!sanitizedInput) {
+                      console.log('[Agent] Input is null/undefined, defaulting to empty object');
+                      sanitizedInput = {};
+                    }
+
+                    if (typeof sanitizedInput === 'string') {
+                      // If input is just a string, treat it as the query
+                      console.log('[Agent] Converting string input to query object for firecrawl_search');
+                      sanitizedInput = { query: sanitizedInput };
+                    } else if (typeof sanitizedInput === 'object') {
+                      // Map common aliases to 'query'
+                      const inputObj = { ...sanitizedInput } as any; // Clone to avoid mutating original if needed
+
+                      if (!inputObj.query) {
+                        const mappedQuery = inputObj.url || inputObj.input || inputObj.topic || inputObj.q || inputObj.search_query || inputObj.search || inputObj.text || inputObj.content;
+
+                        if (mappedQuery) {
+                          console.log('[Agent] Mapping alias to query for firecrawl_search:', mappedQuery);
+                          inputObj.query = mappedQuery;
+                        } else {
+                          // Fallback: find the first string property
+                          const firstStringKey = Object.keys(inputObj).find(k => typeof inputObj[k] === 'string');
+                          if (firstStringKey) {
+                            console.log(`[Agent] Fallback: using property '${firstStringKey}' as query`);
+                            inputObj.query = inputObj[firstStringKey];
+                          } else {
+                            // Last resort: stringify the whole object (safely)
+                            console.log('[Agent] Last resort: stringifying input object as query');
+                            inputObj.query = JSON.stringify(tu.input || {});
+                          }
+                        }
+                      }
+                      sanitizedInput = inputObj;
+
+                      // Remove 'sources' if present (LLM hallucination that causes validation errors)
+                      if (sanitizedInput.sources) {
+                        console.log('[Agent] Removing invalid "sources" parameter from firecrawl_search');
+                        delete sanitizedInput.sources;
+                      }
                     }
                   }
 

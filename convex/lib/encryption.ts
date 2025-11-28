@@ -153,13 +153,7 @@ export function generateSecureToken(length: number = 32): string {
   return crypto.randomBytes(length).toString('base64url').slice(0, length);
 }
 
-/**
- * Hash a string using SHA-256 (for API key hashing)
- * Note: For passwords, use bcrypt or argon2 instead
- */
-export function hashString(input: string): string {
-  return crypto.createHash('sha256').update(input).digest('hex');
-}
+
 
 /**
  * Constant-time string comparison to prevent timing attacks

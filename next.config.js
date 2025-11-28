@@ -1,5 +1,4 @@
 /** @type {import('next').NextConfig} */
-// Force rebuild 9
 const nextConfig = {
   images: {
     remotePatterns: [

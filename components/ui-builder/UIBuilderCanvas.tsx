@@ -16,7 +16,7 @@ try {
   toast = (args: { title: string; description?: string; variant?: string }) => {
     console.log(`Toast: ${args.title} - ${args.description || ''}`);
     if (args.variant === "destructive" && typeof window !== "undefined") {
-      try { alert(`${args.title}\n${args.description || ''}`); } catch {}
+      try { alert(`${args.title}\n${args.description || ''}`); } catch { }
     }
   };
 }
@@ -51,149 +51,176 @@ export default function UIBuilderCanvas() {
   const router = useRouter();
   const [showNameModal, setShowNameModal] = useState(false);
   const [workflowName, setWorkflowName] = useState("");
+  const [showVariablePanel, setShowVariablePanel] = useState(false);
+  const [showInstructionsPanel, setShowInstructionsPanel] = useState(false);
+  const [customVariables, setCustomVariables] = useState<any[]>([]);
+  const [instructions, setInstructions] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const buttonRef = React.useRef<HTMLButtonElement>(null);
 
-
-useEffect(() => {
-  if (!selectedWorkflowId) return;
-
-  let isMounted = true;
-
-  const sanitizeValue = (value: any): any => {
-    if (value == null) return "";
-    if (["string", "number", "boolean"].includes(typeof value)) return value;
-
-    if (typeof value === "object") {
-      // Prevent React elements from crashing render
-      if (value._owner || value._store || value.type || value.props) return "[ReactElement]";
-      if (Array.isArray(value)) return value.map(sanitizeValue);
-      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, sanitizeValue(v)]));
-    }
-
-    return String(value);
+  const addCustomVariable = () => {
+    setCustomVariables([...customVariables, { name: "", type: "string", description: "", defaultValue: "", required: false }]);
   };
 
-const fetchWorkflowDetails = async () => {
-  try {
-    const res = await fetch(`/api/workflows/${selectedWorkflowId}`);
-    if (!res.ok)
-      throw new Error(`Failed to fetch workflow details (${res.status})`);
+  const updateCustomVariable = (index: number, updates: any) => {
+    const newVars = [...customVariables];
+    newVars[index] = { ...newVars[index], ...updates };
+    setCustomVariables(newVars);
+  };
 
-    const workflowData = await res.json();
-    console.log("Fetched workflow details:", workflowData);
+  const removeCustomVariable = (index: number) => {
+    setCustomVariables(customVariables.filter((_, i) => i !== index));
+  };
 
-    const nodes = workflowData?.workflow?.nodes || workflowData?.nodes || [];
-    if (!isMounted || !nodes?.length) {
-      console.warn("⚠️ No nodes found in workflow data:", workflowData);
-      return;
-    }
+  const addInstructions = () => {
+    // Placeholder
+  };
 
-    // 🧩 Backend node type → UI component type mapping
-    const typeMap: Record<string, string> = {
-      start: "input",
-      agent: "textarea",
-      input: "input",
-      text: "text",
-      button: "button",
-      decision: "textarea",
-      process: "textarea",
-      task: "textarea",
-      transform:"textarea",
-      note:"textarea",
-      end: "button",
+  const handleOpen = () => setIsOpen(true);
 
-    };
 
-const nodeComponents = nodes.map((node: any, index: number) => {
-  const backendType =
-    node.data?.nodeType?.toLowerCase?.() || node.type?.toLowerCase?.() || "textarea";
 
-  const mappedType = typeMap[backendType] || "textarea";
-  const safeData = node.data ? JSON.parse(JSON.stringify(node.data)) : {};
-      // 🧠 Build props dynamically based on node type
-      const baseProps = {
-        nodeId: node.id,
-        label: sanitizeValue(
-          safeData.nodeName ||
-            safeData.label ||
-            node.name ||
-            backendType.charAt(0).toUpperCase() + backendType.slice(1)
-        ),
-        title: sanitizeValue(safeData.nodeName || safeData.title || "Untitled Node"),
-        content: sanitizeValue(safeData.description || ""),
-        placeholder: sanitizeValue(safeData.placeholder || ""),
-        variant: "primary",
-        _inputName: sanitizeValue(
-          safeData.inputVariables?.[0]?.name || safeData._inputName || undefined
-        ),
-        trueVariable: sanitizeValue(safeData.trueVariable || false),
-      };
+  useEffect(() => {
+    if (!selectedWorkflowId) return;
 
-      let textValue = "";
-      let instructionsValue = "";
+    let isMounted = true;
 
-      // 🧩 Customize behavior per node type
-      if (backendType === "agent") {
-        textValue = sanitizeValue(
-          safeData.instructions || safeData.text || "Write agent instructions..."
-        );
-        instructionsValue = textValue;
-      } else if (backendType === "input" || backendType === "start") {
-        textValue = sanitizeValue(
-          safeData.text || safeData.placeholder || "Enter input"
-        );
-      } else if (backendType === "end" || backendType === "button") {
-        textValue = sanitizeValue(safeData.text || "End");
-      } else {
-        textValue = sanitizeValue(safeData.text || node.name || "");
+    const sanitizeValue = (value: any): any => {
+      if (value == null) return "";
+      if (["string", "number", "boolean"].includes(typeof value)) return value;
+
+      if (typeof value === "object") {
+        // Prevent React elements from crashing render
+        if (value._owner || value._store || value.type || value.props) return "[ReactElement]";
+        if (Array.isArray(value)) return value.map(sanitizeValue);
+        return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, sanitizeValue(v)]));
       }
 
-      return {
-        id: node.id || `node-${index}`,
-        type: mappedType,
-        props: {
-          ...baseProps,
-          // text: textValue,
-          label: sanitizeValue(
-        safeData.nodeName ||
-          safeData.label ||
-          node.name ||
-          backendType.charAt(0).toUpperCase() + backendType.slice(1)
-      ),
-            text: sanitizeValue(safeData.instructions || safeData.text || ""),
-      title: sanitizeValue(safeData.nodeName || safeData.title || "Untitled Node"),
-      content: sanitizeValue(safeData.description || ""),
-      placeholder: sanitizeValue(safeData.placeholder || ""),
-      variant: "primary",
-      _inputName: sanitizeValue(
-        safeData.inputVariables?.[0]?.name || safeData._inputName || undefined
-      ),
-      trueVariable: sanitizeValue(safeData.trueVariable || false),
-          // value: textValue,
-          // instructions: instructionsValue,
-               inputVariables: safeData.inputVariables || [],
-      instructions: sanitizeValue(safeData.instructions || ""),
-      value: sanitizeValue(safeData.text || safeData.instructions || ""),
-        },
-        position:
-          node.position || { x: 100 + index * 150, y: 100 + index * 60 },
-      };
-    });
+      return String(value);
+    };
 
-    setComponents(nodeComponents);
-  } catch (err) {
-    console.error("Error fetching workflow details:", err);
-  }
-};
+    const fetchWorkflowDetails = async () => {
+      try {
+        const res = await fetch(`/api/workflows/${selectedWorkflowId}`);
+        if (!res.ok)
+          throw new Error(`Failed to fetch workflow details (${res.status})`);
+
+        const workflowData = await res.json();
+        console.log("Fetched workflow details:", workflowData);
+
+        const nodes = workflowData?.workflow?.nodes || workflowData?.nodes || [];
+        if (!isMounted || !nodes?.length) {
+          console.warn("⚠️ No nodes found in workflow data:", workflowData);
+          return;
+        }
+
+        // 🧩 Backend node type → UI component type mapping
+        const typeMap: Record<string, string> = {
+          start: "input",
+          agent: "textarea",
+          input: "input",
+          text: "text",
+          button: "button",
+          decision: "textarea",
+          process: "textarea",
+          task: "textarea",
+          transform: "textarea",
+          note: "textarea",
+          end: "button",
+
+        };
+
+        const nodeComponents = nodes.map((node: any, index: number) => {
+          const backendType =
+            node.data?.nodeType?.toLowerCase?.() || node.type?.toLowerCase?.() || "textarea";
+
+          const mappedType = typeMap[backendType] || "textarea";
+          const safeData = node.data ? JSON.parse(JSON.stringify(node.data)) : {};
+          // 🧠 Build props dynamically based on node type
+          const baseProps = {
+            nodeId: node.id,
+            label: sanitizeValue(
+              safeData.nodeName ||
+              safeData.label ||
+              node.name ||
+              backendType.charAt(0).toUpperCase() + backendType.slice(1)
+            ),
+            title: sanitizeValue(safeData.nodeName || safeData.title || "Untitled Node"),
+            content: sanitizeValue(safeData.description || ""),
+            placeholder: sanitizeValue(safeData.placeholder || ""),
+            variant: "primary",
+            _inputName: sanitizeValue(
+              safeData.inputVariables?.[0]?.name || safeData._inputName || undefined
+            ),
+            trueVariable: sanitizeValue(safeData.trueVariable || false),
+          };
+
+          let textValue = "";
+          let instructionsValue = "";
+
+          // 🧩 Customize behavior per node type
+          if (backendType === "agent") {
+            textValue = sanitizeValue(
+              safeData.instructions || safeData.text || "Write agent instructions..."
+            );
+            instructionsValue = textValue;
+          } else if (backendType === "input" || backendType === "start") {
+            textValue = sanitizeValue(
+              safeData.text || safeData.placeholder || "Enter input"
+            );
+          } else if (backendType === "end" || backendType === "button") {
+            textValue = sanitizeValue(safeData.text || "End");
+          } else {
+            textValue = sanitizeValue(safeData.text || node.name || "");
+          }
+
+          return {
+            id: node.id || `node-${index}`,
+            type: mappedType,
+            props: {
+              ...baseProps,
+              // text: textValue,
+              label: sanitizeValue(
+                safeData.nodeName ||
+                safeData.label ||
+                node.name ||
+                backendType.charAt(0).toUpperCase() + backendType.slice(1)
+              ),
+              text: sanitizeValue(safeData.instructions || safeData.text || ""),
+              title: sanitizeValue(safeData.nodeName || safeData.title || "Untitled Node"),
+              content: sanitizeValue(safeData.description || ""),
+              placeholder: sanitizeValue(safeData.placeholder || ""),
+              variant: "primary",
+              _inputName: sanitizeValue(
+                safeData.inputVariables?.[0]?.name || safeData._inputName || undefined
+              ),
+              trueVariable: sanitizeValue(safeData.trueVariable || false),
+              // value: textValue,
+              // instructions: instructionsValue,
+              inputVariables: safeData.inputVariables || [],
+              instructions: sanitizeValue(safeData.instructions || ""),
+              value: sanitizeValue(safeData.text || safeData.instructions || ""),
+            },
+            position:
+              node.position || { x: 100 + index * 150, y: 100 + index * 60 },
+          };
+        });
+
+        setComponents(nodeComponents);
+      } catch (err) {
+        console.error("Error fetching workflow details:", err);
+      }
+    };
 
 
-  // 🚀 Small delay to avoid clash with savedConfig loader
-  const delay = setTimeout(fetchWorkflowDetails, 600);
+    // 🚀 Small delay to avoid clash with savedConfig loader
+    const delay = setTimeout(fetchWorkflowDetails, 600);
 
-  return () => {
-    isMounted = false;
-    clearTimeout(delay);
-  };
-}, [selectedWorkflowId]);
+    return () => {
+      isMounted = false;
+      clearTimeout(delay);
+    };
+  }, [selectedWorkflowId]);
 
 
 
@@ -206,46 +233,19 @@ const nodeComponents = nodes.map((node: any, index: number) => {
   const [activeComponentId, setActiveComponentId] = useState<string | null>(null);
   const [showVariableEditor, setShowVariableEditor] = useState(false);
   // const { workflow, convexId, saveWorkflow, saveWorkflowImmediate } = useWorkflow(selectedWorkflowId || undefined);
-  const buttonRef = React.useRef<HTMLButtonElement>(null);
-  const [isOpen, setIsOpen] = useState(false);
   const [buttonPosition, setButtonPosition] = useState({ top: 0, right: 0 });
-  const [instructions, setInstructions] = useState("");
   const [showIntro, setShowIntro] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [showVariablePanel, setShowVariablePanel] = useState(false);
-  const [showInstructionsPanel, setShowInstructionsPanel] = useState(false);
 
-// 🧠 Derived list of all available input variables
-const derivedInputVariables = useMemo(() => {
-  return components
-    .filter(c => c.type === "input")
-    .map(c => ({
-      name: c.props._inputName || c.props.label || "unnamed_input",
-      type: "string",
-    }));
-}, [components]);
-
-
-  const handleOpen = () => {
-    if (buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
-      setButtonPosition({
-        top: rect.bottom + 8,
-        right: window.innerWidth - rect.right,
-      });
-    }
-    setIsOpen(!isOpen);
-  };
-
-  const onSelect = item => {
+  const onSelect = (item: any) => {
     setInstructions(prev => prev + ` {{input.${item.name}}} `);
   }
 
   // Convex mutations and queries
   const saveConfig = useMutation(api.uiBuilderConfigurations.saveConfig);
   const savedConfig = useQuery(
-    api.uiBuilderConfigurations.getConfigForWorkflow, 
+    api.uiBuilderConfigurations.getConfigForWorkflow,
     selectedWorkflowId ? { workflowId: selectedWorkflowId } : "skip"
   );
 
@@ -321,7 +321,7 @@ const derivedInputVariables = useMemo(() => {
     setActiveId(null);
   };
 
-    const getDefaultPropsForType = (type: string): Record<string, any> => {
+  const getDefaultPropsForType = (type: string): Record<string, any> => {
     switch (type) {
       case "button":
         return { label: "Execute Workflow", variant: "primary", buttonType: "workflow" };
@@ -357,66 +357,6 @@ const derivedInputVariables = useMemo(() => {
         return {};
     }
   };
-  const [customVariables, setCustomVariables] = useState<
-  { name: string; type: string; required: boolean; defaultValue?: string; description?: string }[]
->([]);
-  const addCustomVariable = () => {
-  const newVar = {
-    name: `input${customVariables.length + 1}`,
-    type: "string",
-    required: false,
-    defaultValue: "",
-    description: "",
-  };
-  console.log("Custom Variables = ",customVariables);
-  setCustomVariables([...customVariables, newVar]);
-
-  // instantly add as input component on canvas
-  ensureInputComponentsForWorkflow([...customVariables, newVar]);
-};
-
-const addInstructions = () => {
-  const newVar = {
-    name: `instructions`,
-    type: "textarea",
-    required: false,
-    default: instructions,
-    description: "",
-  };
-
-  // instantly add as input component on canvas
-  ensureInputComponentsForWorkflow([...customVariables, newVar]);
-}
-
-const updateCustomVariable = (index: number, updates: Partial<typeof customVariables[0]>) => {
-  setCustomVariables(customVariables.map((v, i) => (i === index ? { ...v, ...updates } : v)));
-  ensureInputComponentsForWorkflow(customVariables.map((v, i) => (i === index ? { ...v, ...updates } : v)));
-  // Reflect updates on existing components
-  const variable = { ...customVariables[index], ...updates };
-  setComponents((prev) =>
-    prev.map((c) =>
-      c.props?._inputName === variable.name
-        ? {
-            ...c,
-            props: {
-              ...c.props,
-              label: variable.name,
-              placeholder: variable.defaultValue ?? "",
-              required: variable.required,
-            },
-          }
-        : c
-    )
-  );
-};
-
-const removeCustomVariable = (index: number) => {
-  const removed = customVariables[index];
-  setCustomVariables(customVariables.filter((_, i) => i !== index));
-  // Remove linked component
-  setComponents((prev) => prev.filter((c) => c.props?._inputName !== removed.name));
-  ensureInputComponentsForWorkflow(customVariables.filter((_, i) => i !== index));
-};
 
   const handleComponentUpdate = (id: string, props: Record<string, any>) => {
     setComponents((prev) =>
@@ -434,7 +374,7 @@ const removeCustomVariable = (index: number) => {
     setComponents((prev) => prev.filter((comp) => comp.id !== id));
   };
 
-    // Collect input values from UI components whenever components change
+  // Collect input values from UI components whenever components change
   useEffect(() => {
     const inputs: Record<string, any> = {};
     components.forEach((comp) => {
@@ -445,7 +385,7 @@ const removeCustomVariable = (index: number) => {
     });
   }, [components]);
 
-        // Reset UI configuration to defaults based on workflow inputs
+  // Reset UI configuration to defaults based on workflow inputs
   const handleResetConfiguration = async () => {
     if (!selectedWorkflowId) {
       toast({
@@ -472,11 +412,11 @@ const removeCustomVariable = (index: number) => {
       const res = await fetch(url);
       if (res.ok) {
         const variables = await res.json();
-        
+
         if (variables && variables.length > 0) {
           // Prioritize true variables
           const trueVars = variables.filter((v: any) => v.trueVariable === true);
-          
+
           if (trueVars.length > 0) {
             console.log("Resetting with TRUE workflow variables:", trueVars);
             await ensureInputComponentsForWorkflow(trueVars);
@@ -504,7 +444,7 @@ const removeCustomVariable = (index: number) => {
     }
   };
 
-  
+
   // Save current configuration to Convex
   const handleSaveConfiguration = async () => {
     if (!selectedWorkflowId) {
@@ -523,7 +463,7 @@ const removeCustomVariable = (index: number) => {
       Object.entries(workflowInputBindings).forEach(([key, value]) => {
         bindingsMap.set(key, value);
       });
-      
+
       await saveConfig({
         workflowId: selectedWorkflowId,
         components: components,
@@ -603,54 +543,51 @@ const removeCustomVariable = (index: number) => {
     setWorkflowResponses([]);
     setShowIntro(false);
 
-        try {
+    try {
       // Build payload based on workflow-declared inputs and component bindings
       const inputs: Record<string, any> = {};
-      
+
       // Include the raw components in debug
       console.debug("Components at execution time:", components);
       console.debug("Workflow input bindings:", workflowInputBindings);
       console.debug("Workflow inputs:", workflowInputs);
-      
-      if (workflowInputs && workflowInputs.length > 0) {
-        // First pass: handle workflow-declared inputs
-        for (const wi of workflowInputs) {
-          const boundId = workflowInputBindings[wi.name];
-          const boundComp = components.find((c) => c.id === boundId);
-          
-          if (boundComp) {
-            // Get the correct input name for the workflow with updated priorities
-            // Priority: 1) True variable (if flagged), 2) _originalName, 3) _inputName, 4) name from workflowInputs
-            const inputName = wi.trueVariable ? wi.name : 
-                             (boundComp.props._originalName || boundComp.props._inputName || wi.name); 
-            inputs[inputName] = boundComp.props.value ?? boundComp.props.placeholder ?? wi.default ?? "";
-            console.debug(`Setting workflow input '${inputName}' to:`, inputs[inputName]);
-            
-            // Also include it with the cleaned name if it differs (for compatibility)
-            if (inputName !== wi.name && !inputs[wi.name]) {
-              inputs[wi.name] = inputs[inputName];
-              console.debug(`Also setting cleaned name '${wi.name}' to same value`);
-            }
-            
-            // If we have a very complex original name, also include a simplified version
-            if (boundComp.props._originalName && boundComp.props._originalName !== inputName) {
-              // Try to extract a clean part from the original name
-              const simplifiedName = boundComp.props._originalName
-                .split(/\-|\_\_/)
-                .find(part => !part.includes('node') && !part.includes('edge') && !part.includes('xy'));
-              
-              if (simplifiedName && !inputs[simplifiedName]) {
-                inputs[simplifiedName] = inputs[inputName];
-                console.debug(`Also including simplified name '${simplifiedName}' from complex original`);
-              }
-            }
-          } else {
-            // Fall back to default declared by workflow with exact name
-            inputs[wi.name] = wi.default ?? "";
-            console.debug(`Using default for workflow input '${wi.name}':`, inputs[wi.name]);
+      // Process each workflow input
+      workflowInputs.forEach(wi => {
+        // Find component bound to this input
+        const componentId = workflowInputBindings[wi.name];
+        const boundComp = components.find(c => c.id === componentId);
+
+        if (boundComp) {
+          // Use the value from the bound component
+          const inputName = boundComp.props._originalName || boundComp.props._inputName || wi.name;
+          inputs[inputName] = boundComp.props.value ?? boundComp.props.placeholder ?? wi.default ?? "";
+          console.debug(`Setting workflow input '${inputName}' to:`, inputs[inputName]);
+
+          // Also include it with the cleaned name if it differs (for compatibility)
+          if (inputName !== wi.name && !inputs[wi.name]) {
+            inputs[wi.name] = inputs[inputName];
+            console.debug(`Also setting cleaned name '${wi.name}' to same value`);
           }
+
+          // If we have a very complex original name, also include a simplified version
+          if (boundComp.props._originalName && boundComp.props._originalName !== inputName) {
+            // Try to extract a clean part from the original name
+            const simplifiedName = boundComp.props._originalName
+              .split(/\-|\_\_/)
+              .find((part: string) => !part.includes('node') && !part.includes('edge') && !part.includes('xy'));
+
+            if (simplifiedName && !inputs[simplifiedName]) {
+              inputs[simplifiedName] = inputs[inputName];
+              console.debug(`Also including simplified name '${simplifiedName}' from complex original`);
+            }
+          }
+        } else {
+          // Fall back to default declared by workflow with exact name
+          inputs[wi.name] = wi.default ?? "";
+          console.debug(`Using default for workflow input '${wi.name}':`, inputs[wi.name]);
         }
-      }
+      });
+
 
       // Second pass: include all input/textarea components (for maximum compatibility)
       components.forEach((comp) => {
@@ -660,7 +597,7 @@ const removeCustomVariable = (index: number) => {
           if (inputName && inputs[inputName] !== undefined) {
             return; // Already included this input
           }
-          
+
           // Try different naming strategies for maximum compatibility
           const possibleNames = [
             // Original name from the backend
@@ -674,10 +611,10 @@ const removeCustomVariable = (index: number) => {
             // Last resort: use the component ID
             comp.id
           ];
-          
+
           // Use the first valid name
           const key = possibleNames.find(name => name && name.length > 0) || comp.id;
-          
+
           // Add this input if we don't already have it
           if (inputs[key] === undefined) {
             inputs[key] = comp.props.value || comp.props.placeholder || "";
@@ -685,7 +622,7 @@ const removeCustomVariable = (index: number) => {
           }
         }
       });
-      
+
       console.debug("Final workflow inputs:", inputs);
 
       // Call the streaming API
@@ -741,7 +678,7 @@ const removeCustomVariable = (index: number) => {
           timestamp: new Date().toISOString(),
         },
       ]);
-        } finally {
+    } finally {
       setIsExecuting(false);
       // Only reset activeComponentId if it's not the global button
       if (activeComponentId !== "global-workflow-button") {
@@ -750,122 +687,122 @@ const removeCustomVariable = (index: number) => {
     }
   };
 
-// Inside your component:
-const saveWorkflow = useMutation(api.workflows.saveWorkflow);
+  // Inside your component:
+  const saveWorkflow = useMutation(api.workflows.saveWorkflow);
 
   // Ensure canvas has input components for all workflow inputs and create bindings
   const handleSaveWorkflow = async (userWorkflowName: string) => {
-  if (!selectedWorkflowId) {
-    alert("Please select or create a workflow first!");
-    return;
-  }
+    if (!selectedWorkflowId) {
+      alert("Please select or create a workflow first!");
+      return;
+    }
 
-  try {
-    // 1️ Fetch original Firecrawl workflow
-    const res = await fetch(`/api/workflows/${selectedWorkflowId}`);
-    if (!res.ok) throw new Error(`Failed to fetch workflow details (${res.status})`);
+    try {
+      // 1️ Fetch original Firecrawl workflow
+      const res = await fetch(`/api/workflows/${selectedWorkflowId}`);
+      if (!res.ok) throw new Error(`Failed to fetch workflow details (${res.status})`);
 
-    const originalWorkflow = await res.json();
-    const originalNodes = originalWorkflow?.workflow?.nodes || originalWorkflow?.nodes || [];
-    const originalEdges = originalWorkflow?.workflow?.edges || originalWorkflow?.edges || [];
+      const originalWorkflow = await res.json();
+      const originalNodes = originalWorkflow?.workflow?.nodes || originalWorkflow?.nodes || [];
+      const originalEdges = originalWorkflow?.workflow?.edges || originalWorkflow?.edges || [];
 
-    //  Prepare updates from UI builder
-    const updates = Object.fromEntries(
-      components.map((comp) => [
-        comp.id,
-        {
-          newText:
-            comp.props.value?.trim() ||
-            comp.props.text?.trim() ||
-            comp.props.instructions?.trim() ||
-            "",
-          newLabel: comp.props.label,
-          newTitle: comp.props.title,
-          newNodeType: comp.props.nodeType || comp.type,
-          newInputs: comp.props.inputVariables || [],
-        },
-      ])
-    );
+      //  Prepare updates from UI builder
+      const updates = Object.fromEntries(
+        components.map((comp) => [
+          comp.id,
+          {
+            newText:
+              comp.props.value?.trim() ||
+              comp.props.text?.trim() ||
+              comp.props.instructions?.trim() ||
+              "",
+            newLabel: comp.props.label,
+            newTitle: comp.props.title,
+            newNodeType: comp.props.nodeType || comp.type,
+            newInputs: comp.props.inputVariables || [],
+          },
+        ])
+      );
 
-    // Merge into Firecrawl-style nodes
-    const mergedNodes = originalNodes.map((oldNode) => {
-      const update = updates[oldNode.id];
-      if (!update) return oldNode;
+      // Merge into Firecrawl-style nodes
+      const mergedNodes = originalNodes.map((oldNode: any) => {
+        const update = updates[oldNode.id];
+        if (!update) return oldNode;
 
-      const mergedData = { ...oldNode.data };
+        const mergedData = { ...oldNode.data };
 
-      //  Update instructions & text if edited in UI
-      if (update.newText && update.newText !== mergedData.instructions) {
-        mergedData.instructions = update.newText;
-        mergedData.text = update.newText;
-      }
+        //  Update instructions & text if edited in UI
+        if (update.newText && update.newText !== mergedData.instructions) {
+          mergedData.instructions = update.newText;
+          mergedData.text = update.newText;
+        }
 
-      //Update labels and titles
-      if (update.newLabel) mergedData.label = update.newLabel;
-      if (update.newTitle) mergedData.title = update.newTitle;
+        //Update labels and titles
+        if (update.newLabel) mergedData.label = update.newLabel;
+        if (update.newTitle) mergedData.title = update.newTitle;
 
-      // Merge input variables (for Start/Input nodes)
-      if (
-        ["start", "input"].includes(
-          (mergedData.nodeType || oldNode.type || "").toLowerCase()
-        )
-      ) {
-        mergedData.inputVariables = Array.isArray(update.newInputs)
-          ? update.newInputs
-          : mergedData.inputVariables || [];
-      }
+        // Merge input variables (for Start/Input nodes)
+        if (
+          ["start", "input"].includes(
+            (mergedData.nodeType || oldNode.type || "").toLowerCase()
+          )
+        ) {
+          mergedData.inputVariables = Array.isArray(update.newInputs)
+            ? update.newInputs
+            : mergedData.inputVariables || [];
+        }
 
-      mergedData.nodeType = mergedData.nodeType || oldNode.type;
+        mergedData.nodeType = mergedData.nodeType || oldNode.type;
 
-      return {
-        ...oldNode,
-        data: mergedData,
-        type: mergedData.nodeType,
+        return {
+          ...oldNode,
+          data: mergedData,
+          type: mergedData.nodeType,
+        };
+      });
+
+      //  Derive requiredInputs from Start/Input node
+      const startNode = mergedNodes.find((n: any) =>
+        ["start", "input"].includes((n.data?.nodeType || "").toLowerCase())
+      );
+
+      const requiredInputs = startNode?.data?.inputVariables?.map((v: any) => ({
+        name: v.name,
+        description: v.description || "Enter value",
+        type: v.type || "string",
+        required: !!v.required,
+        defaultValue: v.defaultValue || "",
+      })) || [];
+
+      //  Build final workflow payload
+      const payload = {
+        customId: `workflow_${Date.now()}`,
+        name: `Copy of ${originalWorkflow?.workflow?.name || originalWorkflow?.name || "Workflow"}_${Date.now()}_${userWorkflowName}`,
+        description: "Saved workflow from UI Builder Canvas",
+        nodes: mergedNodes,
+        edges: originalEdges,
+        category: "Custom",
+        tags: [],
+        version: "1.0.0",
+        // requiredInputs,
       };
-    });
 
-    //  Derive requiredInputs from Start/Input node
-    const startNode = mergedNodes.find((n) =>
-      ["start", "input"].includes((n.data?.nodeType || "").toLowerCase())
-    );
+      console.log("🧩 Final workflow JSON before saving:", payload);
 
-    const requiredInputs = startNode?.data?.inputVariables?.map((v: any) => ({
-      name: v.name,
-      description: v.description || "Enter value",
-      type: v.type || "string",
-      required: !!v.required,
-      defaultValue: v.defaultValue || "",
-    })) || [];
+      // Save to backend
+      await saveWorkflow(payload);
+      alert("✅ Workflow saved successfully!");
 
-    //  Build final workflow payload
-    const payload = {
-      customId: `workflow_${Date.now()}`,
-      name: `Copy of ${originalWorkflow?.workflow?.name || originalWorkflow?.name || "Workflow"}_${Date.now()}_${userWorkflowName}`,
-      description: "Saved workflow from UI Builder Canvas",
-      nodes: mergedNodes,
-      edges: originalEdges,
-      category: "Custom",
-      tags: [],
-      version: "1.0.0",
-      // requiredInputs,
-    };
+      // Optional: open in new tab for verification
+      // const url = `${window.location.origin}/api/workflows/${payload.customId}/getWorkflowDetails`;
+      const url = `${window.location.origin}/workflow-runner?workflowid=${payload.customId}`;
 
-    console.log("🧩 Final workflow JSON before saving:", payload);
-
-    // Save to backend
-    await saveWorkflow(payload);
-    alert("✅ Workflow saved successfully!");
-
-    // Optional: open in new tab for verification
-    // const url = `${window.location.origin}/api/workflows/${payload.customId}/getWorkflowDetails`;
-    const url = `${window.location.origin}/workflow-runner?workflowid=${payload.customId}`;
-    
-    window.open(url, "_blank");
-  } catch (err) {
-    console.error("❌ Error saving workflow:", err);
-    alert("Failed to save workflow.");
-  }
-};
+      window.open(url, "_blank");
+    } catch (err) {
+      console.error("❌ Error saving workflow:", err);
+      alert("Failed to save workflow.");
+    }
+  };
 
 
   const ensureInputComponentsForWorkflow = async (
@@ -873,25 +810,25 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
   ) => {
     // Log what variables we've detected
     console.log("Working with workflow input variables:", inputs);
-    
+
     // Prioritize internal variables from template analysis
-    console.log("inputs = ",inputs);
+    console.log("inputs = ", inputs);
     const internalInputs = inputs.filter(input => input.internal === true);
-    
+
     // If we have internal variables, use only those as they are the true workflow variables
     const workingSet = internalInputs.length > 0 ? internalInputs : inputs;
-    console.log(internalInputs.length > 0 ? 
-      "Using internal workflow variables:" : 
-      "No internal variables found, using all detected variables:", 
+    console.log(internalInputs.length > 0 ?
+      "Using internal workflow variables:" :
+      "No internal variables found, using all detected variables:",
       workingSet);
-    
+
     // Filter out system variables or edge IDs
     const cleanedInputs = workingSet.filter(input => {
       const name = input.name;
       // Exclude items that look like edge IDs
       if (
-        name.startsWith('xy-') || 
-        name.includes('node_') || 
+        name.startsWith('xy-') ||
+        name.includes('node_') ||
         name.includes('-input') ||
         name.includes('-output') ||
         name.includes('__')
@@ -914,7 +851,7 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
     //   cleanedInputs.push(...inputs.map(input => {
     //     // Try to extract a better name from the variable
     //     let cleanName = input.name;
-        
+
     //     // Remove common prefixes and suffixes
     //     cleanName = cleanName
     //       .replace(/^xy\-edge__/, "")
@@ -923,7 +860,7 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
     //       .replace(/^output\-/, "")
     //       .replace(/\-input$/, "")
     //       .replace(/^input\-/, "");
-          
+
     //     // If it still looks messy, use the label if available
     //     if (
     //       (cleanName.includes('node_') || cleanName.includes('__')) && 
@@ -932,7 +869,7 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
     //     ) {
     //       cleanName = input.label;
     //     }
-        
+
     //     return {
     //       ...input,
     //       name: cleanName,
@@ -946,9 +883,9 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
 
     // Clear existing components if loading new workflow inputs
     // (only if there are no saved configurations being loaded)
-   if (!isLoading && !savedConfig && components.length === 0) {
-  setComponents([]);
-}
+    if (!isLoading && !savedConfig && components.length === 0) {
+      setComponents([]);
+    }
 
     // Use current components snapshot and return a deterministic update
     const prevComponents = components;
@@ -957,37 +894,37 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
 
     // Create input components with proper spacing
     let yOffset = 40;
-    
+
     cleanedInputs.forEach((input, index) => {
       // Keep the original input name exactly as it comes from the backend
       const inputName = input.name;
       const desiredLabel = input.label || input.name;
-      const description = input.description || ""; 
-      
+      const description = input.description || "";
+
       // Check if we already have a component for this input
       const found = updated.find(
         (c) =>
           (c.type === "input" || c.type === "textarea") &&
           (c.props?._inputName === inputName || // Match by our special tracking property
-           c.id.includes(`input-${inputName}-`)) // Or by ID pattern
+            c.id.includes(`input-${inputName}-`)) // Or by ID pattern
       );
 
       if (found) {
         // Update the binding but keep the existing component
         newBindings[inputName] = found.id;
-        
+
         // Optionally update the component with any new metadata
         if (!found.props._inputName) {
           found.props._inputName = inputName;
         }
-        
+
         return;
       }
 
       // Determine if this should be a textarea based on the input type or expected length
-      const useTextarea = 
-        input.type === "textarea" || 
-        input.type === "text" || 
+      const useTextarea =
+        input.type === "textarea" ||
+        input.type === "text" ||
         (typeof input.default === "string" && input.default.length > 100);
 
       // Create new component with exact input name matching backend
@@ -1008,7 +945,7 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
       if (input.required) {
         newComp.props.required = true;
       }
-      
+
       if (input._originalName) {
         newComp.props._originalName = input._originalName;
       }
@@ -1027,18 +964,18 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
       const newComponents = updated.filter(c => !existingIds.has(c.id));
       setComponents([...prevComponents, ...newComponents]);
     }
-    
+
     // Update bindings
     setWorkflowInputBindings((prev) => ({ ...prev, ...newBindings }));
 
-    console.debug("ensureInputComponentsForWorkflow:", { 
-      inputs: cleanedInputs, 
-      addedBindings: newBindings, 
-      componentsAfter: updated 
+    console.debug("ensureInputComponentsForWorkflow:", {
+      inputs: cleanedInputs,
+      addedBindings: newBindings,
+      componentsAfter: updated
     });
   };
 
-  
+
   return (
     <div className="flex h-[calc(100vh-160px)] bg-gray-50">
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -1072,7 +1009,7 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
         {/* Main Canvas Area */}
         <div className="flex-1 flex flex-col min-w-0 bg-white px-8 sm:px-12 lg:px-20">
           {/* Top Bar - Workflow Selector */}
-                              <div className="border-b-2 border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 p-4 flex-shrink-0">
+          <div className="border-b-2 border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 p-4 flex-shrink-0">
             <div className="flex flex-col space-y-4">
               {isLoading ? (
                 <div className="flex items-center justify-center p-3">
@@ -1085,8 +1022,8 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
                   onSelectWorkflow={setSelectedWorkflowId}
                 />
               )}
-              
-                            {/* Save UI Configuration Section - Full Width & Prominent */}
+
+              {/* Save UI Configuration Section - Full Width & Prominent */}
               <div className="">
                 <div className="flex flex-col space-y-3">
                   {/* <div className="flex justify-between items-start">
@@ -1095,9 +1032,9 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
                       <p className="text-sm text-emerald-700 mt-1">Save the current UI layout and component bindings to Convex. Your saved configuration will be loaded automatically when you select this workflow again.</p>
                     </div>
                   </div> */}
-                  
+
                   <div className="flex gap-3 justify-end">
-                    
+
                     {/* <button
                       onClick={handleResetConfiguration}
                       disabled={isLoading || !selectedWorkflowId}
@@ -1111,8 +1048,8 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
                       </svg>
                       Reset UI
                     </button> */}
-                    
-                    
+
+
                     {/* <button
                       onClick={handleSaveConfiguration}
                       disabled={isSaving || !selectedWorkflowId || components.length === 0}
@@ -1152,8 +1089,8 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
                       <Plus className="w-14 h-14" />
                       Variables
                     </button> */}
-                    
-                      {/* <button
+
+                    {/* <button
                         onClick={() => setShowInstructionsPanel(true)}
                         disabled={!selectedWorkflowId || components.length === 0}
                         className={`px-10 py-6 rounded-8 font-medium transition-all active:scale-[0.98] flex items-center gap-2
@@ -1163,19 +1100,19 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
                         Instructions
                       </button> */}
 
-                      {/* <button
+                    {/* <button
                           onClick={()=>handleSaveWorkflow()}
                           className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-md"
                         >
                           💾 Save Workflow
                       </button> */}
 
-                      <button
+                    <button
                       // onClick={() => selectedWorkflowId && handleExecuteWorkflow("global-workflow-button", selectedWorkflowId)}
                       // onClick={()=>handleSaveWorkflow()}
                       onClick={() => {
                         if (!selectedWorkflowId) return;
-                        setWorkflowName(""); 
+                        setWorkflowName("");
                         setShowNameModal(true);   // <-- open modal
                       }}
                       disabled={isExecuting || !selectedWorkflowId}
@@ -1204,15 +1141,15 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
                   <div className="flex items-start">
                     {/* <FileQuestion className="h-20 w-20 text-indigo-500 mt-1 mr-3 flex-shrink-0" /> */}
                     {/* <div className="flex-1"> */}
-                      {/* <h3 className="text-sm font-semibold text-indigo-800">Workflow Input Variables</h3> */}
-                      {/* <p className="text-xs text-indigo-700 mt-1 mb-2">
+                    {/* <h3 className="text-sm font-semibold text-indigo-800">Workflow Input Variables</h3> */}
+                    {/* <p className="text-xs text-indigo-700 mt-1 mb-2">
                         Found {workflowInputs.length} input variables for this workflow. 
                         {components.length === 0 ? " Input components will be automatically created for you." : " Input components are mapped to these variables."}
                         {workflowInputs.some(input => input.trueVariable) && 
                          " Using TRUE variables directly extracted from workflow code."}
                       </p> */}
-                      
-                      {/* <div className="mt-3 overflow-x-auto">
+
+                    {/* <div className="mt-3 overflow-x-auto">
                         <table className="min-w-full border border-indigo-200 text-xs">
                           <thead className="bg-indigo-100">
                             <tr>
@@ -1250,9 +1187,9 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
                           </tbody>
                         </table>
                       </div> */}
-                      
-                      {/* Variable explanation */}
-                      {/* <div className="mt-3 text-xs text-indigo-700">
+
+                    {/* Variable explanation */}
+                    {/* <div className="mt-3 text-xs text-indigo-700">
                         <p className="font-semibold">Variable Source Types:</p>
                         <ul className="list-disc pl-4 mt-1">
                           <li><span className="bg-green-100 text-green-800 py-0 px-1 rounded text-xs font-bold inline-block w-10 text-center">TRUE</span> - Extracted directly from workflow code (highest accuracy)</li>
@@ -1266,50 +1203,50 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
               )}
             </div>
             {showNameModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-[99999]">
-          <div className="bg-white p-6 rounded-xl shadow-xl w-[380px]">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800">
-              Enter Workflow Name
-            </h2>
+              <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-[99999]">
+                <div className="bg-white p-6 rounded-xl shadow-xl w-[380px]">
+                  <h2 className="text-lg font-semibold mb-4 text-gray-800">
+                    Enter Workflow Name
+                  </h2>
 
-            <input
-              type="text"
-              className="w-full border rounded-md p-2 text-sm"
-              placeholder="My Custom Workflow"
-              value={workflowName}
-              onChange={(e) => setWorkflowName(e.target.value)}
-            />
+                  <input
+                    type="text"
+                    className="w-full border rounded-md p-2 text-sm"
+                    placeholder="My Custom Workflow"
+                    value={workflowName}
+                    onChange={(e) => setWorkflowName(e.target.value)}
+                  />
 
-            <div className="flex justify-end mt-5 gap-3">
-              <button
-                onClick={() => setShowNameModal(false)}
-                className="px-4 py-2 text-sm bg-gray-200 rounded-md"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (!workflowName.trim()) {
-                    alert("Please enter a workflow name.");
-                    return;
-                  }
-                  setShowNameModal(false);
-                  handleSaveWorkflow(workflowName);  // <-- pass user name
-                }}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md"
-              >
-                Save
-              </button>
-      </div>
-    </div>
-  </div>
-)}
+                  <div className="flex justify-end mt-5 gap-3">
+                    <button
+                      onClick={() => setShowNameModal(false)}
+                      className="px-4 py-2 text-sm bg-gray-200 rounded-md"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!workflowName.trim()) {
+                          alert("Please enter a workflow name.");
+                          return;
+                        }
+                        setShowNameModal(false);
+                        handleSaveWorkflow(workflowName);  // <-- pass user name
+                      }}
+                      className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
           </div>
 
           {/* Canvas */}
-            <div className="flex-1 overflow-auto p-6 min-h-0 bg-gray-50">
-           
+          <div className="flex-1 overflow-auto p-6 min-h-0 bg-gray-50">
+
             {/* {showIntro && components.length > 0 && (
               // <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4 shadow-sm">
               //   <div className="flex items-start">
@@ -1334,7 +1271,7 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
             )} */}
             <DropZone
               components={components}
-              onComponentUpdate={handleComponentUpdate}              
+              onComponentUpdate={handleComponentUpdate}
               onComponentMove={handleComponentMove}
               onComponentDelete={handleComponentDelete}
               onExecuteWorkflow={handleExecuteWorkflow}
@@ -1349,7 +1286,7 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
         </div>
 
         {/* Right Sidebar - Response Display (Resizable) */}
-                {/* <ResizableRightPane
+        {/* <ResizableRightPane
           defaultWidth={384}
           minWidth={300}
           maxWidth={600}
@@ -1377,7 +1314,7 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
           ) : null}
         </DragOverlay>
       </DndContext>
-              {/* 🆕 Custom Variable Editor Panel */}
+      {/* 🆕 Custom Variable Editor Panel */}
       <AnimatePresence>
         {showVariablePanel && (
           <motion.div
@@ -1386,7 +1323,7 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
             exit={{ x: 400, opacity: 0 }}
             transition={{ duration: 0.3 }}
             className="fixed right-10 top-20 h-[calc(100vh-120px)] w-[420px] bg-white border border-gray-200 rounded-lg shadow-lg overflow-y-auto z-[9999] p-6"
->
+          >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-800">Custom Variables</h2>
               <button onClick={() => setShowVariablePanel(false)} className="text-gray-600 hover:text-gray-900">
@@ -1396,7 +1333,7 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
 
             <div className="flex justify-end mb-4">
               <button
-                onClick={()=>addCustomVariable()}
+                onClick={() => addCustomVariable()}
                 className="px-3 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center gap-1"
               >
                 <Plus className="w-4 h-4" /> Add Variable
@@ -1481,20 +1418,20 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
             exit={{ x: 400, opacity: 0 }}
             transition={{ duration: 0.3 }}
             className="fixed right-10 top-20 h-[calc(100vh-120px)] w-[420px] bg-white border border-gray-200 rounded-lg shadow-lg overflow-y-auto z-[9999] p-6"
->
+          >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-800">Custom Variables</h2>
-              <button onClick={() => {addInstructions(); setShowInstructionsPanel(false)}} className="text-gray-600 hover:text-gray-900">
+              <button onClick={() => { addInstructions(); setShowInstructionsPanel(false) }} className="text-gray-600 hover:text-gray-900">
                 ✕
               </button>
             </div>
             <textarea
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value)}
-                placeholder="Enter agent instructions..."
-                rows={8}
-                className="w-full px-14 py-10 bg-background-base border border-border-faint rounded-10 text-sm text-accent-black placeholder-black-alpha-32 focus:outline-none focus:border-heat-100 transition-colors resize-y"
-              />
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              placeholder="Enter agent instructions..."
+              rows={8}
+              className="w-full px-14 py-10 bg-background-base border border-border-faint rounded-10 text-sm text-accent-black placeholder-black-alpha-32 focus:outline-none focus:border-heat-100 transition-colors resize-y"
+            />
             <div className="absolute right-8 top-1/2 -translate-y-1/2">
               <button
                 ref={buttonRef}
@@ -1506,73 +1443,71 @@ const saveWorkflow = useMutation(api.workflows.saveWorkflow);
                 </svg>
                 Insert Variable
               </button>
-             
+
             </div>
           </motion.div>
         )}
       </AnimatePresence>
       <AnimatePresence>
-              {isOpen && (
-                <>
-                  {/* Backdrop to close on click outside */}
-                  <div
-                    className="fixed inset-0 z-[9998]"
-                    onClick={() => setIsOpen(false)}
-                  />
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="fixed w-400 max-w-[calc(100vw-40px)] bg-accent-white border border-border-faint rounded-12 shadow-2xl z-[9999] overflow-hidden"
-                    style={{
-                      top: `${buttonPosition.top}px`,
-                      right: `${buttonPosition.right}px`,
+        {isOpen && (
+          <>
+            {/* Backdrop to close on click outside */}
+            <div
+              className="fixed inset-0 z-[9998]"
+              onClick={() => setIsOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="fixed w-400 max-w-[calc(100vw-40px)] bg-accent-white border border-border-faint rounded-12 shadow-2xl z-[9999] overflow-hidden"
+              style={{
+                top: `${buttonPosition.top}px`,
+                right: `${buttonPosition.right}px`,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-12 border-b border-border-faint">
+                <h4 className="text-label-small text-accent-black">Available Variables</h4>
+              </div>
+
+              <div className="max-h-320 overflow-y-auto">
+                {customVariables.map((item: any, itemIndex) => (
+                  <button
+                    key={itemIndex}
+                    onClick={() => {
+                      onSelect(item);
+                      setIsOpen(false);
                     }}
-                    onClick={(e) => e.stopPropagation()}
+                    className={`w-full px-12 py-10 text-left hover:bg-heat-4 transition-colors border-b border-border-faint last:border-0 ${item.isField ? 'pl-24 bg-background-base' : ''
+                      }`}
                   >
-                    <div className="p-12 border-b border-border-faint">
-                      <h4 className="text-label-small text-accent-black">Available Variables</h4>
+                    <div className="flex items-start justify-between gap-8">
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-body-small font-medium break-all ${item.isField || item.isInputVariable || item.isNested ? 'text-heat-100' : 'text-accent-black'
+                          }`}>
+                          {item.name}
+                        </p>
+                        {item.description && (
+                          <p className="text-body-small text-black-alpha-48 mt-4 truncate">
+                            {item.description}
+                          </p>
+                        )}
+                      </div>
                     </div>
-      
-                  <div className="max-h-320 overflow-y-auto">
-                    {customVariables.map((item: any, itemIndex) => (
-                        <button
-                          key={itemIndex}
-                          onClick={() => {
-                            onSelect(item);
-                            setIsOpen(false);
-                          }}
-                          className={`w-full px-12 py-10 text-left hover:bg-heat-4 transition-colors border-b border-border-faint last:border-0 ${
-                            item.isField ? 'pl-24 bg-background-base' : ''
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-8">
-                            <div className="flex-1 min-w-0">
-                              <p className={`text-body-small font-medium break-all ${
-                                item.isField || item.isInputVariable || item.isNested ? 'text-heat-100' : 'text-accent-black'
-                              }`}>
-                                {item.name}
-                              </p>
-                              {item.description && (
-                                <p className="text-body-small text-black-alpha-48 mt-4 truncate">
-                                  {item.description}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                  </div>
-      
-                    <div className="p-12 bg-background-base border-t border-border-faint">
-                      <p className="text-body-small text-black-alpha-48">
-                        Click a variable to insert its reference
-                      </p>
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
+                  </button>
+                ))}
+              </div>
+
+              <div className="p-12 bg-background-base border-t border-border-faint">
+                <p className="text-body-small text-black-alpha-48">
+                  Click a variable to insert its reference
+                </p>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
