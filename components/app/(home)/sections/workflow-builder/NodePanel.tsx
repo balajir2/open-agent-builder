@@ -83,6 +83,7 @@ export default function NodePanel({
   const [model, setModel] = useState("anthropic/claude-3-5-sonnet-20241022");
   const [outputFormat, setOutputFormat] = useState("Text");
   const [customModel, setCustomModel] = useState("");
+  const [tokenLimit, setTokenLimit] = useState<number | undefined>(undefined);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showSearchSources, setShowSearchSources] = useState(false);
   const [jsonOutputSchema, setJsonOutputSchema] = useState(`{
@@ -193,6 +194,7 @@ export default function NodePanel({
       setInstructions(incomingInstructions);
       setIncludeChatHistory(data.includeChatHistory ?? true);
       setModel(data.model || "anthropic/claude-3-5-sonnet-20241022");
+      setTokenLimit(data.tokenLimit);
       setOutputFormat(data.outputFormat || "Text");
       setShowSearchSources(data.showSearchSources ?? false);
       setSelectedTools(data.selectedTools || []);
@@ -323,6 +325,7 @@ export default function NodePanel({
           mcpTools: mcpTools.length > 0 ? mcpTools : undefined,
           mcpServerIds: currentMCPServerIds.length > 0 ? currentMCPServerIds : undefined,
           selectedTools: selectedTools.length > 0 ? selectedTools : undefined,
+          tokenLimit: tokenLimit,
         });
       } catch (error) {
         console.error("Error updating node:", error);
@@ -341,6 +344,7 @@ export default function NodePanel({
     currentMCPServerIds,
     mcpServers,
     selectedTools,
+    tokenLimit,
   ]);
 
   return (
@@ -521,6 +525,19 @@ export default function NodePanel({
                           key={modelOption.id}
                           onClick={() => {
                             setModel(modelOption.id);
+
+                            // Set default token limit based on model
+                            const modelId = modelOption.id;
+                            let limit = 4096; // Default fallback
+
+                            if (modelId.includes('gpt-4o-mini')) limit = 16384;
+                            else if (modelId.includes('gpt-4o')) limit = 4096;
+                            else if (modelId.includes('claude-3-5-sonnet')) limit = 8192;
+                            else if (modelId.includes('claude-3-opus')) limit = 4096;
+                            else if (modelId.includes('gemini')) limit = 8192;
+                            else if (modelId.includes('gpt-oss-120b')) limit = 32768;
+
+                            setTokenLimit(limit);
                             setShowModelsDropdown(false);
                           }}
                           className={`w-full text-left px-8 py-6 rounded-6 text-sm transition-colors ${model === modelOption.id
@@ -1279,6 +1296,24 @@ export default function NodePanel({
               {showAdvanced && (
                 <div className="space-y-16 pt-16 border-t border-border-faint">
                   {/* Advanced settings section - reserved for future options */}
+                  <div>
+                    <label className="block text-sm font-medium text-black-alpha-48 mb-8">
+                      Token Limit
+                    </label>
+                    <input
+                      type="number"
+                      value={tokenLimit || ""}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        setTokenLimit(isNaN(val) ? undefined : val);
+                      }}
+                      placeholder="e.g. 4096 (Leave empty for default)"
+                      className="w-full px-14 py-10 bg-background-base border border-border-faint rounded-10 text-sm text-accent-black placeholder-black-alpha-32 focus:outline-none focus:border-heat-100 transition-colors"
+                    />
+                    <p className="text-xs text-black-alpha-48 mt-4">
+                      Maximum number of tokens to generate. Leave empty to use the model's default.
+                    </p>
+                  </div>
                 </div>
               )}
             </details>

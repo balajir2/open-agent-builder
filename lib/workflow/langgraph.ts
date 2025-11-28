@@ -54,8 +54,8 @@ export const WorkflowStateAnnotation = Annotation.Root({
   }),
 
   // Chat history for conversational workflows
-  chatHistory: Annotation<Array<{ role: string; content: string }>>({
-    reducer: (left, right) => [...left, ...right],
+  chatHistory: Annotation<any>({
+    reducer: (left, right) => [...(left || []), ...(right || [])],
     default: () => [],
   }),
 
@@ -66,7 +66,7 @@ export const WorkflowStateAnnotation = Annotation.Root({
   }),
 
   // Node results for tracking
-  nodeResults: Annotation<Record<string, NodeExecutionResult>>({
+  nodeResults: Annotation<any>({
     reducer: (left, right) => ({ ...left, ...right }),
     default: () => ({}),
   }),
@@ -78,8 +78,8 @@ export const WorkflowStateAnnotation = Annotation.Root({
   }),
 
   // Loop results accumulator (array that accumulates across iterations)
-  loopResults: Annotation<Array<any>>({
-    reducer: (left, right) => [...left, ...right],
+  loopResults: Annotation<any>({
+    reducer: (left, right) => [...(left || []), ...(right || [])],
     default: () => [],
   }),
 });
@@ -104,12 +104,14 @@ export class LangGraphExecutor {
   constructor(
     workflow: Workflow,
     onNodeUpdate?: (nodeId: string, result: NodeExecutionResult) => void,
-    apiKeys?: { [key: string]: string | undefined }
+    apiKeys?: { anthropic?: string; groq?: string; openai?: string; firecrawl?: string; arcade?: string }
   ) {
     this.workflow = workflow;
     this.onNodeUpdate = onNodeUpdate;
     this.apiKeys = apiKeys;
 
+    // Initialize checkpointer for state persistence
+    // - Required for human-in-the-loop (interrupts)
     // - Time-travel debugging
     // Note: MemorySaver is lightweight and doesn't impact performance
     this.checkpointer = new MemorySaver();
@@ -390,13 +392,14 @@ export class LangGraphExecutor {
         let toolCalls: any = undefined;
         let chatHistoryUpdates: any[] = [];
         let variableUpdates: Record<string, any> = {};
+        let usage: any = undefined;
 
         if (output && typeof output === 'object' && output !== null && '__agentValue' in output) {
           actualOutput = output.__agentValue;
           toolCalls = (output as any).__agentToolCalls;
           chatHistoryUpdates = (output as any).__chatHistoryUpdates || [];
           variableUpdates = (output as any).__variableUpdates || {};
-          const usage = (output as any).__agentUsage;
+          usage = (output as any).__usage;
 
           console.log(`Extracted from agent output:`, {
             actualOutput: typeof actualOutput === 'string' ? actualOutput.substring(0, 100) : actualOutput,
@@ -407,14 +410,12 @@ export class LangGraphExecutor {
             usage: usage
           });
 
-          if (usage) {
-            result.usage = usage;
-          }
         }
 
         // Update result
         result.output = actualOutput;
         result.toolCalls = toolCalls;
+        result.usage = usage;
         result.status = 'completed';
         result.completedAt = new Date().toISOString();
         this.onNodeUpdate?.(node.id, result);
@@ -744,7 +745,7 @@ export class LangGraphExecutor {
       return Boolean(
         expr.evaluate({
           input: state.variables.input,
-          state: state as any,
+          state: state,
           lastOutput: state.variables.lastOutput,
           iteration: currentIteration
         })
@@ -770,7 +771,6 @@ export class LangGraphExecutor {
       console.warn(`While loop max iterations ${parsed} exceeds limit, capping at ${ABSOLUTE_MAX}`);
       return ABSOLUTE_MAX;
     }
-
     return parsed;
   }
 
@@ -785,7 +785,6 @@ export class LangGraphExecutor {
     const maxIterations = Math.min(this.parseMaxIterations(data.maxIterations), ABSOLUTE_MAX);
     const iterationKey = `${node.id}__iterationCount`;
     const previousIteration = Number(langGraphState.variables?.[iterationKey] || 0);
-
     // Add absolute safety check
     if (previousIteration > ABSOLUTE_MAX) {
       console.error(`While loop ${node.id} exceeded absolute limit of ${ABSOLUTE_MAX}`);
