@@ -112,11 +112,41 @@ export async function executeMcpTool(
     args: any,
     apiKeys: { firecrawl?: string } = {}
 ): Promise<any> {
-    // Fix: Firecrawl search tool often gets hallucinated 'sources' parameter which causes validation error
-    if (toolName.includes('firecrawl_search') && args && typeof args === 'object' && args.sources) {
-        console.log(`[MCP] Removing invalid 'sources' parameter from ${toolName}`);
-        const { sources, ...rest } = args;
-        args = rest;
+    // Fix: Firecrawl search tool robust input sanitization
+    if (toolName.includes('firecrawl_search')) {
+        if (!args) {
+            console.log('[MCP] Input is null/undefined for firecrawl_search, defaulting to empty object');
+            args = {};
+        }
+
+        if (typeof args === 'string') {
+            console.log('[MCP] Converting string input to query object for firecrawl_search');
+            args = { query: args };
+        } else if (typeof args === 'object') {
+            // Map aliases and fallback
+            if (!args.query) {
+                const mappedQuery = args.url || args.input || args.topic || args.q || args.search_query || args.search || args.text || args.content;
+                if (mappedQuery) {
+                    console.log('[MCP] Mapping alias to query for firecrawl_search:', mappedQuery);
+                    args.query = mappedQuery;
+                } else {
+                    const firstStringKey = Object.keys(args).find(k => typeof args[k] === 'string');
+                    if (firstStringKey) {
+                        console.log(`[MCP] Fallback: using property '${firstStringKey}' as query`);
+                        args.query = args[firstStringKey];
+                    } else {
+                        console.log('[MCP] Last resort: stringifying input object as query');
+                        args.query = JSON.stringify(args);
+                    }
+                }
+            }
+
+            // Remove sources if present
+            if (args.sources) {
+                console.log(`[MCP] Removing invalid 'sources' parameter from ${toolName}`);
+                delete args.sources;
+            }
+        }
     }
 
     // Replace URL placeholders
