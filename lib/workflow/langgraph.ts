@@ -396,12 +396,14 @@ export class LangGraphExecutor {
         let toolCalls: any = undefined;
         let chatHistoryUpdates: any[] = [];
         let variableUpdates: Record<string, any> = {};
+        let usage: any = undefined;
 
         if (output && typeof output === 'object' && output !== null && '__agentValue' in output) {
           actualOutput = output.__agentValue;
           toolCalls = (output as any).__agentToolCalls;
           chatHistoryUpdates = (output as any).__chatHistoryUpdates || [];
           variableUpdates = (output as any).__variableUpdates || {};
+          usage = (output as any).__usage;
 
           console.log(`Extracted from agent output:`, {
             actualOutput: typeof actualOutput === 'string' ? actualOutput.substring(0, 100) : actualOutput,
@@ -409,12 +411,14 @@ export class LangGraphExecutor {
             toolCalls: toolCalls,
             chatHistoryUpdates: chatHistoryUpdates.length,
             variableUpdates: Object.keys(variableUpdates),
+            usage: usage,
           });
         }
 
         // Update result
         result.output = actualOutput;
         result.toolCalls = toolCalls;
+        result.usage = usage;
         result.status = 'completed';
         result.completedAt = new Date().toISOString();
         this.onNodeUpdate?.(node.id, result);
