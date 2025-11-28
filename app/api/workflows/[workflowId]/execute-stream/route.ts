@@ -18,12 +18,13 @@ export async function POST(
 ) {
   // Validate API key
   const authResult = await validateApiKey(request);
+
   if (!authResult.authenticated) {
     return createUnauthorizedResponse(authResult.error || 'Authentication required');
   }
 
   // Rate limiting - Using distributed Convex-based rate limiting
-  const rateLimitKey = getRateLimitKey(authResult.userId, 'workflow-execution');
+  const rateLimitKey = getRateLimitKey(authResult.userId || 'anonymous', 'workflow-execution');
   const rateLimitResponse = await checkRateLimit(rateLimitKey, RATE_LIMITS.WORKFLOW_EXECUTION);
 
   if (rateLimitResponse) {
@@ -34,13 +35,32 @@ export async function POST(
 
   // Create SSE stream
   const encoder = new TextEncoder();
+  let isStreamClosed = false;
+
   const stream = new ReadableStream({
     async start(controller) {
+      const closeStream = () => {
+        if (!isStreamClosed) {
+          isStreamClosed = true;
+          try {
+            controller.close();
+          } catch (e) {
+            // Ignore if already closed
+          }
+        }
+      };
+
       const sendEvent = (event: string, data: any) => {
+        if (isStreamClosed) return;
         try {
           const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
           controller.enqueue(encoder.encode(message));
         } catch (error) {
+          // If enqueue fails, it might be because the stream is closed/errored
+          if (error instanceof TypeError && (error.message.includes('closed') || error.message.includes('errored'))) {
+            isStreamClosed = true;
+            return; // Don't log expected closure errors
+          }
           console.error('Failed to send SSE event:', error);
         }
       };
@@ -56,7 +76,7 @@ export async function POST(
             error: 'Convex not configured',
             workflowId,
           });
-          controller.close();
+          closeStream();
           return;
         }
 
@@ -83,7 +103,7 @@ export async function POST(
             error: `Workflow ${workflowId} not found`,
             workflowId,
           });
-          controller.close();
+          closeStream();
           return;
         }
 
@@ -98,12 +118,13 @@ export async function POST(
             error: `Workflow ${workflowId} not found`,
             workflowId,
           });
-          controller.close();
+          closeStream();
           return;
         }
 
         const workflow = workflowData as any;
 
+        const startTime = Date.now();
         // Send start event
         sendEvent('workflow_started', {
           workflowId,
@@ -117,7 +138,7 @@ export async function POST(
         const nodeResults: Record<string, any> = {};
 
         // Get API keys - check user keys first, then fall back to environment
-        const { getLLMApiKey } = await import('@/lib/api/llm-keys');
+        const { getLLMApiKey, getToolApiKey } = await import('@/lib/api/llm-keys');
         const userId = authResult.userId;
 
         const apiKeys = {
@@ -125,15 +146,22 @@ export async function POST(
           groq: (userId ? await getLLMApiKey('groq', userId) : undefined) ?? process.env.GROQ_API_KEY,
           openai: (userId ? await getLLMApiKey('openai', userId) : undefined) ?? process.env.OPENAI_API_KEY,
           google: (userId ? await getLLMApiKey('google', userId) : undefined) ?? process.env.GOOGLE_API_KEY,
-          firecrawl: process.env.FIRECRAWL_API_KEY, // Firecrawl keys are still environment-only for now
-          arcade: process.env.ARCADE_API_KEY,
-          e2b: process.env.E2B_API_KEY,
-          tavily: process.env.TAVILY_API_KEY,
-          serper: process.env.SERPER_API_KEY,
-          serpapi: process.env.SERPAPI_API_KEY,
-          scraperapi: process.env.SCRAPERAPI_API_KEY,
-          browserless: process.env.BROWSERLESS_API_KEY,
+          firecrawl: (userId ? await getToolApiKey('firecrawl', userId) : undefined) ?? process.env.FIRECRAWL_API_KEY,
+          arcade: (userId ? await getToolApiKey('arcade', userId) : undefined) ?? process.env.ARCADE_API_KEY,
+          e2b: (userId ? await getToolApiKey('e2b', userId) : undefined) ?? process.env.E2B_API_KEY,
+          tavily: (userId ? await getToolApiKey('tavily-search', userId) : undefined) ?? process.env.TAVILY_API_KEY,
+          serper: (userId ? await getToolApiKey('serper-search', userId) : undefined) ?? process.env.SERPER_API_KEY,
+          serpapi: (userId ? await getToolApiKey('serpapi-search', userId) : undefined) ?? process.env.SERPAPI_API_KEY,
+          scraperapi: (userId ? await getToolApiKey('scraperapi', userId) : undefined) ?? process.env.SCRAPERAPI_API_KEY,
+          browserless: (userId ? await getToolApiKey('browserless', userId) : undefined) ?? process.env.BROWSERLESS_API_KEY,
         };
+
+        console.error('[Route] Debug API Keys:', {
+          userId,
+          hasSerperKey: !!apiKeys.serper,
+          serperKeySource: apiKeys.serper ? (apiKeys.serper === process.env.SERPER_API_KEY ? 'env' : 'db') : 'none',
+          serperKeyLength: apiKeys.serper?.length
+        });
 
         // Prepare initial input - pass as object if it's an object, otherwise as string
         let initialInput: any = '';
@@ -154,43 +182,43 @@ export async function POST(
           executor = new LangGraphExecutor(
             workflow,
             (nodeId, result) => {
-            nodeResults[nodeId] = result;
+              nodeResults[nodeId] = result;
 
-            if (result.status === 'running') {
-              const node = workflow.nodes.find((n: any) => n.id === nodeId);
-              sendEvent('node_started', {
-                nodeId,
-                nodeName: node?.data?.nodeName || node?.data?.label || nodeId,
-                nodeType: node?.type || 'unknown',
-                timestamp: new Date().toISOString(),
-              });
-            } else if (result.status === 'completed') {
-              const node = workflow.nodes.find((n: any) => n.id === nodeId);
-              sendEvent('node_completed', {
-                nodeId,
-                nodeName: node?.data?.nodeName || node?.data?.label || nodeId,
-                result,
-                timestamp: new Date().toISOString(),
-              });
-            } else if (result.status === 'failed') {
-              const node = workflow.nodes.find((n: any) => n.id === nodeId);
-              sendEvent('node_failed', {
-                nodeId,
-                nodeName: node?.data?.nodeName || node?.data?.label || nodeId,
-                error: result.error,
-                timestamp: new Date().toISOString(),
-              });
-            } else if (result.status === 'pending-authorization' || result.status === 'pending-approval') {
-              const node = workflow.nodes.find((n: any) => n.id === nodeId);
-              sendEvent('node_paused', {
-                nodeId,
-                nodeName: node?.data?.nodeName || node?.data?.label || nodeId,
-                status: result.status,
-                timestamp: new Date().toISOString(),
-              });
-            }
-          },
-          apiKeys
+              if (result.status === 'running') {
+                const node = workflow.nodes.find((n: any) => n.id === nodeId);
+                sendEvent('node_started', {
+                  nodeId,
+                  nodeName: node?.data?.nodeName || node?.data?.label || nodeId,
+                  nodeType: node?.type || 'unknown',
+                  timestamp: new Date().toISOString(),
+                });
+              } else if (result.status === 'completed') {
+                const node = workflow.nodes.find((n: any) => n.id === nodeId);
+                sendEvent('node_completed', {
+                  nodeId,
+                  nodeName: node?.data?.nodeName || node?.data?.label || nodeId,
+                  result,
+                  timestamp: new Date().toISOString(),
+                });
+              } else if (result.status === 'failed') {
+                const node = workflow.nodes.find((n: any) => n.id === nodeId);
+                sendEvent('node_failed', {
+                  nodeId,
+                  nodeName: node?.data?.nodeName || node?.data?.label || nodeId,
+                  error: result.error,
+                  timestamp: new Date().toISOString(),
+                });
+              } else if (result.status === 'pending-authorization' || result.status === 'pending-approval') {
+                const node = workflow.nodes.find((n: any) => n.id === nodeId);
+                sendEvent('node_paused', {
+                  nodeId,
+                  nodeName: node?.data?.nodeName || node?.data?.label || nodeId,
+                  status: result.status,
+                  timestamp: new Date().toISOString(),
+                });
+              }
+            },
+            apiKeys
           );
         } catch (graphBuildError) {
           console.error('❌ Failed to build LangGraph:', graphBuildError);
@@ -198,7 +226,7 @@ export async function POST(
             error: graphBuildError instanceof Error ? graphBuildError.message : 'Graph compilation failed',
             timestamp: new Date().toISOString(),
           });
-          controller.close();
+          closeStream();
           return;
         }
 
@@ -210,7 +238,7 @@ export async function POST(
 
         let finalState: any = null;
 
-        // CRITICAL FIX: Proper async iteration with error handling
+        // Proper async iteration with error handling
         try {
           for await (const stateUpdate of executionStream) {
             const mergedState = {
@@ -243,7 +271,7 @@ export async function POST(
               // TODO: Save execution state to Convex for resume capability
               // await convex.mutation(api.executions.createExecution, {...})
 
-              controller.close();
+              closeStream();
               return;
             }
           }
@@ -253,12 +281,25 @@ export async function POST(
             error: streamError instanceof Error ? streamError.message : 'Stream error',
             timestamp: new Date().toISOString(),
           });
-          controller.close();
+          closeStream();
           return;
         }
 
         // Send completion event
         const status = finalState?.pendingAuth ? 'waiting-auth' : 'completed';
+
+        // Calculate metrics
+        const endTime = Date.now();
+        const totalTime = endTime - startTime;
+
+        let totalTokens = 0;
+        if (finalState?.nodeResults) {
+          Object.values(finalState.nodeResults).forEach((result: any) => {
+            if (result.usage?.total_tokens) {
+              totalTokens += result.usage.total_tokens;
+            }
+          });
+        }
 
         sendEvent('workflow_completed', {
           workflowId,
@@ -266,20 +307,27 @@ export async function POST(
           results: finalState?.nodeResults || {},
           status,
           timestamp: new Date().toISOString(),
+          metrics: {
+            totalTime,
+            totalTokens
+          }
         });
 
         // TODO: Save execution results to Convex
         // await convex.mutation(api.executions.completeExecution, {...})
 
-        controller.close();
+        closeStream();
       } catch (error) {
         sendEvent('error', {
           error: error instanceof Error ? error.message : 'Unknown error',
           timestamp: new Date().toISOString(),
         });
-        controller.close();
+        closeStream();
       }
     },
+    cancel() {
+      isStreamClosed = true;
+    }
   });
 
   return new Response(stream, {

@@ -4,9 +4,10 @@ import { resolveMCPServers, migrateMCPData } from '@/lib/mcp/resolver';
 import { ToolFactory } from './tool-factory';
 import { APIKeys } from '@/lib/api/config';
 import { convertToOpenAITool } from '@langchain/core/utils/function_calling';
-import { parseToolCallResult } from './tool-utils';
+import { parseToolCallResult, truncateContent } from './tool-utils';
 import { prefetchFileContents } from '../file-utils';
 import { unwrapMCPResponse, convertMcpToOpenAiTool, executeMcpTool, fetchMcpTools } from './mcp-utils';
+
 
 export async function executeAgentNode(
   node: WorkflowNode,
@@ -14,6 +15,10 @@ export async function executeAgentNode(
   apiKeys?: { anthropic?: string; groq?: string; openai?: string; firecrawl?: string; arcade?: string; google?: string }
 ): Promise<any> {
   const { data } = node;
+
+  // Log available keys (security: only log names)
+  console.log('[Agent] Available API Keys:', Object.keys(apiKeys || {}).filter(k => !!(apiKeys as any)[k]));
+  console.log('[Agent] Selected Tools Config:', JSON.stringify(data.selectedTools || [], null, 2));
 
   try {
     // 1. Migrate data if using old format
@@ -44,24 +49,36 @@ export async function executeAgentNode(
         ? server.url.replace('{FIRECRAWL_API_KEY}', encodeURIComponent(apiKeys?.firecrawl || ''))
         : (server.url || '');
 
+      if (server.name.toLowerCase().includes('firecrawl') && !apiKeys?.firecrawl) {
+        console.warn(`[Tools] ⚠️ Firecrawl tool detected but no API key provided in apiKeys.firecrawl`);
+      }
+
       let tools = server.availableTools || [];
 
       // Check if tools are just strings (names) or missing, and fetch if needed
       if (tools.length === 0 || (tools.length > 0 && typeof tools[0] === 'string')) {
         console.log(`[Tools] Fetching full tool definitions for ${server.name}...`);
         const fetchedTools = await fetchMcpTools(server, apiKeys);
+        console.log(`[Tools] Fetched ${fetchedTools.length} tools from ${server.name}`);
         if (fetchedTools.length > 0) {
           tools = fetchedTools;
+        } else {
+          console.warn(`[Tools] ⚠️ Failed to fetch tools from ${server.name} or no tools available.`);
         }
       }
 
-      return tools.map((tool: any) => ({
-        ...tool,
-        serverName: server.name,
-        serverUrl: url,
-        serverAuthToken: server.accessToken
-      }));
+      return tools.map((tool: any) => {
+        const toolObj = typeof tool === 'string' ? { name: tool } : tool;
+        return {
+          ...toolObj,
+          serverName: server.name,
+          serverUrl: url,
+          serverAuthToken: server.accessToken
+        };
+      });
     }))).flat();
+
+    console.log(`[Tools] Total flattened MCP tools: ${flattenedMcpTools.length}`);
 
     // 3. Prefetch file contents
     await prefetchFileContents(migratedData.instructions || '', state);
@@ -186,7 +203,7 @@ export async function executeAgentNode(
         const realMcpTools = mcpTools.filter((mcp: any) => !mcp.name?.toLowerCase().includes('arcade'));
 
         if (arcadeTools.length > 0) {
-          console.warn('âš ï¸ Arcade tools detected in MCP config - these will be skipped');
+          console.warn('⚠️ Arcade tools detected in MCP config - these will be skipped');
         }
 
         const mcpServers = realMcpTools
@@ -197,7 +214,7 @@ export async function executeAgentNode(
 
             // Validate that we have required fields
             if (!url || !mcp.name) {
-              console.warn(`âš ï¸ Skipping invalid MCP server: ${mcp.name || 'unnamed'} - missing URL or name`);
+              console.warn(`⚠️ Skipping invalid MCP server: ${mcp.name || 'unnamed'} - missing URL or name`);
               return null;
             }
 
@@ -214,29 +231,43 @@ export async function executeAgentNode(
 
             return server;
           })
-          .filter(Boolean); // Remove null entries from invalid servers
+          .filter(Boolean)
+          .filter((s: any) => !s.name.toLowerCase().includes('firecrawl'));
 
         let useManualToolCalling = false;
         let anthropicError: any = null;
 
-        // Log MCP servers for debugging
-        console.log('ðŸ“¡ Sending request to Anthropic with MCP servers:', mcpServers.map((s: any) => ({ name: s.name, url: s.url })));
+        const manualMcpTools = flattenedMcpTools.filter((t: any) => t.name.includes('firecrawl'));
+
+        const finalTools = [
+          ...standardTools.map(t => {
+            const openAITool = convertToOpenAITool(t);
+            return {
+              name: openAITool.function.name,
+              description: openAITool.function.description,
+              input_schema: openAITool.function.parameters,
+            };
+          }),
+          ...manualMcpTools.map((t: any) => {
+            const openAITool = convertMcpToOpenAiTool(t);
+            return {
+              name: openAITool.function.name,
+              description: openAITool.function.description,
+              input_schema: openAITool.function.parameters,
+            };
+          })
+        ];
+
+        console.log('[Agent] Final Tools passed to LLM:', JSON.stringify(finalTools.map(t => ({ name: t.name, description: t.description })), null, 2));
 
         try {
           const response = await client.beta.messages.create({
             model: modelName,
             max_tokens: maxTokens,
             messages: messages as any,
-            mcp_servers: mcpServers.length > 0 ? mcpServers as any : undefined, // Don't send empty array
-            tools: standardTools.map(t => {
-              const openAITool = convertToOpenAITool(t);
-              return {
-                name: openAITool.function.name,
-                description: openAITool.function.description,
-                input_schema: openAITool.function.parameters,
-              };
-            }),
-            betas: mcpServers.length > 0 ? ['mcp-client-2025-04-04'] : undefined, // Only include beta if using MCP
+            mcp_servers: mcpServers.length > 0 ? mcpServers as any : undefined,
+            tools: finalTools,
+            betas: mcpServers.length > 0 ? ['mcp-client-2025-04-04'] : undefined,
           } as any);
 
           const toolUses = response.content.filter((item: any) =>
@@ -250,20 +281,66 @@ export async function executeAgentNode(
           responseText = textBlocks.map((item: any) => item.text).join('\n');
           usage = (response.usage as any) || {};
 
-          // Handle standard tools manually if Anthropic didn't execute them (mixed mode)
-          const standardToolUses = toolUses.filter((tu: any) => standardTools.some(st => st.name === tu.name));
+          const manualToolUses = toolUses.filter((tu: any) =>
+            standardTools.some(st => st.name === tu.name) ||
+            manualMcpTools.some((mt: any) => (mt.name || mt.toolName) === tu.name)
+          );
+
           let extraToolResults: any[] = [];
 
-          if (standardToolUses.length > 0) {
-            extraToolResults = await Promise.all(standardToolUses.map(async (tu: any) => {
+          if (manualToolUses.length > 0) {
+            extraToolResults = await Promise.all(manualToolUses.map(async (tu: any) => {
               const tool = standardTools.find(t => t.name === tu.name);
               if (tool) {
                 try {
                   const result = await tool.invoke(tu.input);
+                  const stringResult = typeof result === 'string' ? result : JSON.stringify(result);
                   return {
                     type: 'tool_result',
                     tool_use_id: tu.id,
-                    content: typeof result === 'string' ? result : JSON.stringify(result)
+                    content: truncateContent(stringResult)
+                  };
+                } catch (e) {
+                  return {
+                    type: 'tool_result',
+                    tool_use_id: tu.id,
+                    content: JSON.stringify({ error: e instanceof Error ? e.message : 'Unknown error' }),
+                    is_error: true
+                  };
+                }
+              }
+
+              const mcpTool = manualMcpTools.find((t: any) => (t.name || t.toolName) === tu.name);
+              if (mcpTool) {
+                try {
+                  const mcpServer = {
+                    name: mcpTool.serverName,
+                    url: mcpTool.serverUrl,
+                    authToken: mcpTool.serverAuthToken
+                  };
+                  console.log(`🔧 Manual MCP tool call: ${tu.name}`, {
+                    input: tu.input,
+                    inputType: typeof tu.input,
+                    schema: mcpTool.inputSchema
+                  });
+
+                  // Sanitize input for Firecrawl search
+                  let sanitizedInput = tu.input;
+                  if (tu.name.includes('firecrawl_search') && sanitizedInput && typeof sanitizedInput === 'object') {
+                    // Map 'url' to 'query' if query is missing (LLM often confuses these)
+                    const inputObj = sanitizedInput as any;
+                    if (!inputObj.query && inputObj.url) {
+                      console.log('[Agent] Mapping url to query for firecrawl_search');
+                      inputObj.query = inputObj.url;
+                    }
+                  }
+
+                  const result = await executeMcpTool(mcpServer, tu.name, sanitizedInput, apiKeys);
+                  const stringResult = JSON.stringify(result.result || result);
+                  return {
+                    type: 'tool_result',
+                    tool_use_id: tu.id,
+                    content: truncateContent(stringResult)
                   };
                 } catch (e) {
                   return {
@@ -289,14 +366,7 @@ export async function executeAgentNode(
                   { role: 'user', content: extraToolResults }
                 ],
                 mcp_servers: mcpServers as any,
-                tools: standardTools.map(t => {
-                  const openAITool = convertToOpenAITool(t);
-                  return {
-                    name: openAITool.function.name,
-                    description: openAITool.function.description,
-                    input_schema: openAITool.function.parameters,
-                  };
-                }),
+                tools: finalTools,
                 betas: ['mcp-client-2025-04-04'],
               } as any);
 
@@ -320,15 +390,8 @@ export async function executeAgentNode(
             const result = existingResult || extraResult;
 
             if (result) {
-              if (result.is_error) {
-                toolCall.output = { error: result.content };
-              } else if (Array.isArray(result.content)) {
-                toolCall.output = result.content[0]?.text || result.content;
-              } else {
-                toolCall.output = result.content;
-              }
+              toolCall.output = result.is_error ? { error: result.content } : (Array.isArray(result.content) ? result.content[0]?.text || result.content : result.content);
             }
-
             return toolCall;
           });
         } catch (err: any) {
@@ -340,8 +403,7 @@ export async function executeAgentNode(
             errorMsg.includes('Internal server error') ||
             err.status === 500;
 
-          // Log detailed error information for debugging
-          console.error('âŒ Anthropic API error:', {
+          console.error('❌ Anthropic API error:', {
             status: err.status,
             message: errorMsg,
             mcpServers: mcpServers.map((s: any) => ({ name: s.name, url: s.url, hasAuth: !!s.authorization_token })),
@@ -351,11 +413,10 @@ export async function executeAgentNode(
           if (!isMCPError) {
             throw err;
           }
-          console.warn('âš ï¸ Anthropic MCP failed, falling back to manual tool execution. Error:', errorMsg.substring(0, 200));
+          console.warn('⚠️ Anthropic MCP failed, falling back to manual tool execution. Error:', errorMsg.substring(0, 200));
         }
 
         if (useManualToolCalling) {
-          // Provide more helpful error message
           const errorDetails = anthropicError?.message || JSON.stringify(anthropicError);
           throw new Error(`Anthropic MCP execution failed. Please check:\n1. MCP server URL is correct and accessible\n2. MCP server is running\n3. Authentication token is valid (if required)\n\nError: ${errorDetails.substring(0, 300)}`);
         }
@@ -404,19 +465,18 @@ export async function executeAgentNode(
 
                 if (mcpTool) {
                   const args = JSON.parse(call.function.arguments);
-                  // Construct a server object for executeMcpTool
                   const mcpServer = {
                     name: mcpTool.serverName,
                     url: mcpTool.serverUrl,
                     authToken: mcpTool.serverAuthToken
                   };
-                  console.log(`ðŸ”§ Calling MCP tool: ${call.function.name} with args:`, JSON.stringify(args, null, 2));
+                  console.log(`🔧 Calling MCP tool: ${call.function.name} with args: `, JSON.stringify(args, null, 2));
                   const result = await executeMcpTool(mcpServer, call.function.name, args, apiKeys);
-                  console.log(`âœ… MCP tool ${call.function.name} returned:`, JSON.stringify(result, null, 2).substring(0, 500));
+                  console.log(`✅ MCP tool ${call.function.name} returned: `, JSON.stringify(result, null, 2).substring(0, 500));
                   return {
                     tool_call_id: call.id,
                     role: "tool" as const,
-                    content: JSON.stringify(result.result || result)
+                    content: truncateContent(JSON.stringify(result.result || result))
                   };
                 }
 
@@ -424,15 +484,17 @@ export async function executeAgentNode(
                 if (standardTool) {
                   const args = JSON.parse(call.function.arguments);
                   const result = await standardTool.invoke(args);
+                  const stringResult = typeof result === 'string' ? result : JSON.stringify(result);
                   return {
                     tool_call_id: call.id,
                     role: "tool" as const,
-                    content: typeof result === 'string' ? result : JSON.stringify(result)
+                    content: truncateContent(stringResult)
                   };
                 }
 
-                throw new Error(`Tool not found: ${call.function.name}`);
+                throw new Error(`Tool not found: ${call.function.name} `);
               } catch (error) {
+                console.error(`❌ Tool execution failed for ${call.function.name}:`, error);
                 return {
                   tool_call_id: call.id,
                   role: "tool" as const,
@@ -516,23 +578,24 @@ export async function executeAgentNode(
                     url: mcpTool.serverUrl,
                     authToken: mcpTool.serverAuthToken
                   };
-                  console.log(`ðŸ”§ Calling MCP tool: ${call.name} with args:`, JSON.stringify(call.args, null, 2));
+                  console.log(`🔧 Calling MCP tool: ${call.name} with args: `, JSON.stringify(call.args, null, 2));
                   const result = await executeMcpTool(mcpServer, call.name, call.args, apiKeys);
-                  console.log(`âœ… MCP tool ${call.name} returned:`, JSON.stringify(result, null, 2).substring(0, 500));
+                  console.log(`✅ MCP tool ${call.name} returned: `, JSON.stringify(result, null, 2).substring(0, 500));
                   return {
                     tool_call_id: call.id,
                     role: "tool" as const,
-                    content: JSON.stringify(result.result || result)
+                    content: truncateContent(JSON.stringify(result.result || result))
                   };
                 }
 
                 const standardTool = standardTools.find(t => t.name === call.name);
                 if (standardTool) {
                   const result = await standardTool.invoke(call.args);
+                  const stringResult = typeof result === 'string' ? result : JSON.stringify(result);
                   return {
                     tool_call_id: call.id,
                     role: "tool" as const,
-                    content: typeof result === 'string' ? result : JSON.stringify(result)
+                    content: truncateContent(stringResult)
                   };
                 }
 
@@ -586,7 +649,7 @@ export async function executeAgentNode(
       }
 
     } else {
-      throw new Error(`No API key available for provider: ${provider}`);
+      throw new Error(`No API key available for provider: ${provider} `);
     }
 
     // 10. Return Result
@@ -602,26 +665,26 @@ export async function executeAgentNode(
       try {
         output = JSON.parse(responseText);
       } catch (e) {
-    console.warn('Could not parse JSON output, using raw text');
-  }
-}
+        console.warn('Could not parse JSON output, using raw text');
+      }
+    }
 
-return {
-  __agentValue: output,
-  __agentToolCalls: toolCalls,
-  __chatHistoryUpdates: serverChatUpdates,
-  __variableUpdates: { lastOutput: output },
-  __usage: {
-    input_tokens: usage.input_tokens || usage.prompt_tokens || 0,
-    output_tokens: usage.output_tokens || usage.completion_tokens || 0,
-    total_tokens: usage.total_tokens || ((usage.input_tokens || usage.prompt_tokens || 0) + (usage.output_tokens || usage.completion_tokens || 0)),
-  },
-};
+    return {
+      __agentValue: output,
+      __agentToolCalls: toolCalls,
+      __chatHistoryUpdates: serverChatUpdates,
+      __variableUpdates: { lastOutput: output },
+      __usage: {
+        input_tokens: usage.input_tokens || usage.prompt_tokens || 0,
+        output_tokens: usage.output_tokens || usage.completion_tokens || 0,
+        total_tokens: usage.total_tokens || ((usage.input_tokens || usage.prompt_tokens || 0) + (usage.output_tokens || usage.completion_tokens || 0)),
+      },
+    };
 
   } catch (error) {
-  console.error('Agent execution error:', error);
+    console.error('Agent execution error:', error);
 
-  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-  throw new Error(`Agent execution failed: ${errorMessage}`);
-}
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`Agent execution failed: ${errorMessage} `);
+  }
 }

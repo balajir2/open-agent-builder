@@ -58,10 +58,41 @@ export function convertMcpToOpenAiTool(mcp: any) {
         return cleaned;
     };
 
+    const toolName = mcp.name || mcp.toolName || (mcp.function && mcp.function.name) || 'unknown_tool';
+
+    if (toolName === 'unknown_tool') {
+        console.warn('MCP tool has no name:', JSON.stringify(mcp));
+    }
+
+    // Force safe schema for Firecrawl tools to prevent validation errors
+    if (toolName.includes('firecrawl')) {
+        if (toolName.includes('scrape')) {
+            schema.properties = {
+                url: { type: 'string', description: 'The URL to scrape (e.g. https://example.com)' },
+                formats: { type: 'array', items: { type: 'string' }, description: 'Formats to return (markdown, html, etc.)' }
+            };
+            schema.required = ['url'];
+        } else if (toolName.includes('crawl')) {
+            schema.properties = {
+                url: { type: 'string', description: 'The URL to start crawling from' },
+                limit: { type: 'number', description: 'Maximum number of pages to crawl' },
+                scrapeOptions: { type: 'object', properties: { formats: { type: 'array', items: { type: 'string' } } } }
+            };
+            schema.required = ['url'];
+        } else if (toolName.includes('search')) {
+            schema.properties = {
+                query: { type: 'string', description: 'The search query (e.g. "Diageo competitors"). Do NOT pass a URL here.' }
+            };
+            schema.required = ['query'];
+        }
+    } else if (Object.keys(schema).length === 0) {
+        // ... existing fallback for other tools ...
+    }
+
     return {
         type: "function" as const,
         function: {
-            name: mcp.name || mcp.toolName || 'unknown_tool',
+            name: toolName,
             description: mcp.description || 'No description',
             parameters: {
                 type: "object",
@@ -93,6 +124,7 @@ export async function executeMcpTool(
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'Accept': 'application/json, text/event-stream',
             ...(authToken && { 'Authorization': `Bearer ${authToken}` })
         },
         body: JSON.stringify({
@@ -106,11 +138,41 @@ export async function executeMcpTool(
         })
     });
 
-    if (!mcpResponse.ok) {
-        throw new Error(`MCP server returned ${mcpResponse.status}: ${mcpResponse.statusText}`);
+    const contentType = mcpResponse.headers.get('content-type');
+    let result;
+
+    if (contentType && contentType.includes('text/event-stream')) {
+        const text = await mcpResponse.text();
+        // Parse SSE events
+        const lines = text.split('\n');
+        for (const line of lines) {
+            if (line.startsWith('data: ')) {
+                try {
+                    const data = JSON.parse(line.slice(6));
+                    if (data.result || data.error) {
+                        result = data;
+                        break;
+                    }
+                } catch (e) {
+                    // Ignore parse errors for intermediate lines
+                }
+            }
+        }
+        if (!result) {
+            // Fallback: try to parse the whole text if it's not standard SSE but just JSON with wrong header
+            try {
+                result = JSON.parse(text);
+            } catch (e) {
+                throw new Error(`Failed to parse SSE response from ${mcpServer.name}. Raw text: ${text.substring(0, 500)}`);
+            }
+        }
+    } else {
+        result = await mcpResponse.json();
     }
 
-    let result = await mcpResponse.json();
+    if (result && result.error) {
+        throw new Error(`MCP error ${result.error.code}: ${result.error.message}`);
+    }
 
     // Unwrap the response
     return unwrapMCPResponse(result, mcpServer.name);
@@ -137,6 +199,7 @@ export async function fetchMcpTools(
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json, text/event-stream',
                 ...(authToken && { 'Authorization': `Bearer ${authToken}` })
             },
             body: JSON.stringify({
@@ -148,8 +211,28 @@ export async function fetchMcpTools(
         });
 
         if (rpcResponse.ok) {
-            const data = await rpcResponse.json();
-            if (data.result && data.result.tools) {
+            const contentType = rpcResponse.headers.get('content-type');
+            let data;
+
+            if (contentType && contentType.includes('text/event-stream')) {
+                const text = await rpcResponse.text();
+                const lines = text.split('\n');
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const parsed = JSON.parse(line.slice(6));
+                            if (parsed.result) {
+                                data = parsed;
+                                break;
+                            }
+                        } catch (e) { }
+                    }
+                }
+            } else {
+                data = await rpcResponse.json();
+            }
+
+            if (data && data.result && data.result.tools) {
                 return data.result.tools;
             }
         }
@@ -158,14 +241,37 @@ export async function fetchMcpTools(
         const getUrl = resolvedMcpUrl.endsWith('/') ? `${resolvedMcpUrl}tools/list` : `${resolvedMcpUrl}/tools/list`;
         const getResponse = await fetch(getUrl, {
             headers: {
+                'Accept': 'application/json, text/event-stream',
                 ...(authToken && { 'Authorization': `Bearer ${authToken}` })
             }
         });
 
         if (getResponse.ok) {
-            const data = await getResponse.json();
-            if (data.tools) return data.tools;
-            if (data.result && data.result.tools) return data.result.tools;
+            const contentType = getResponse.headers.get('content-type');
+            let data;
+
+            if (contentType && contentType.includes('text/event-stream')) {
+                const text = await getResponse.text();
+                const lines = text.split('\n');
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const parsed = JSON.parse(line.slice(6));
+                            if (parsed.tools || (parsed.result && parsed.result.tools)) {
+                                data = parsed;
+                                break;
+                            }
+                        } catch (e) { }
+                    }
+                }
+            } else {
+                data = await getResponse.json();
+            }
+
+            if (data) {
+                if (data.tools) return data.tools;
+                if (data.result && data.result.tools) return data.result.tools;
+            }
         }
 
         console.warn(`Failed to fetch tools from ${mcpServer.name}`);

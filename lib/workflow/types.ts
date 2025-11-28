@@ -156,6 +156,11 @@ export interface NodeExecutionResult {
     total_tokens: number;
   };
   pendingAuth?: WorkflowPendingAuth;
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+  };
 }
 
 export interface WorkflowState {
