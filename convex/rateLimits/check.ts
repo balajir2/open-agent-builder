@@ -1,3 +1,4 @@
+
 import { mutation } from "../_generated/server";
 import { v } from "convex/values";
 
@@ -108,5 +109,23 @@ export const cleanupExpiredRecords = mutation({
     }
 
     return { deletedCount, hasMore: expiredRecords.length === 1000 };
+  },
+});
+
+/**
+ * Migration: Fix schema validation errors by deleting invalid records.
+ * Deletes all records in rateLimits table to ensure schema compliance
+ */
+export const fixRateLimitSchema = mutation({
+  handler: async (ctx) => {
+    const records = await ctx.db.query("rateLimits").collect();
+    let deletedCount = 0;
+
+    for (const record of records) {
+      await ctx.db.delete(record._id);
+      deletedCount++;
+    }
+
+    return { success: true, deletedCount };
   },
 });
