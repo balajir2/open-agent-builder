@@ -234,15 +234,13 @@ export default defineSchema({
     .index("by_execution", ["executionId"]),
 
   // Rate Limits - Distributed rate limiting across instances
+  // Rate Limits - Insert-only pattern for high concurrency
   rateLimits: defineTable({
     key: v.string(), // e.g., "user:123:workflow-execution"
-    requests: v.array(v.number()), // Array of request timestamps
-    resetAt: v.number(), // When the window resets
-    createdAt: v.number(),
-    updatedAt: v.number(),
+    timestamp: v.number(), // When the request happened
   })
-    .index("by_key", ["key"])
-    .index("by_resetAt", ["resetAt"]), // For cleanup of old records
+    .index("by_key_timestamp", ["key", "timestamp"]) // For counting requests in window
+    .index("by_timestamp", ["timestamp"]), // For cleanup
 
   // Cache - Distributed caching across instances
   cache: defineTable({
