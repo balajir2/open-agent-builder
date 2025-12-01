@@ -250,7 +250,7 @@ export async function executeAgentNode(
               input_schema: openAITool.function.parameters,
             };
           }),
-          ...manualMcpTools.map((t: any) => {
+          ...flattenedMcpTools.map((t: any) => {
             const openAITool = convertMcpToOpenAiTool(t);
             return {
               name: openAITool.function.name,
@@ -258,7 +258,9 @@ export async function executeAgentNode(
               input_schema: openAITool.function.parameters,
             };
           })
-        ];
+        ].filter((tool, index, self) =>
+            index === self.findIndex((t) => t.name === tool.name)
+        );
 
         console.log('[Agent] Final Tools passed to LLM:', JSON.stringify(finalTools.map(t => ({ name: t.name, description: t.description })), null, 2));
 
@@ -408,8 +410,126 @@ export async function executeAgentNode(
         }
 
         if (useManualToolCalling) {
-          const errorDetails = anthropicError?.message || JSON.stringify(anthropicError);
-          throw new Error(`Anthropic MCP execution failed. Please check:\n1. MCP server URL is correct and accessible\n2. MCP server is running\n3. Authentication token is valid (if required)\n\nError: ${errorDetails.substring(0, 300)}`);
+          console.log('⚠️ Anthropic MCP failed, attempting manual tool calling for all tools...');
+
+          const allManualMcpTools = flattenedMcpTools;
+          const allFinalTools = [
+            ...standardTools.map(t => {
+              const openAITool = convertToOpenAITool(t);
+              return {
+                name: openAITool.function.name,
+                description: openAITool.function.description,
+                input_schema: openAITool.function.parameters,
+              };
+            }),
+            ...allManualMcpTools.map((t: any) => {
+              const openAITool = convertMcpToOpenAiTool(t);
+              return {
+                name: openAITool.function.name,
+                description: openAITool.function.description,
+                input_schema: openAITool.function.parameters,
+              };
+            })
+          ];
+
+          const initialResponse = await client.messages.create({
+            model: modelName,
+            max_tokens: maxTokens,
+            messages: messages as any,
+            tools: allFinalTools,
+          });
+
+          const toolUses = initialResponse.content.filter((item: any) => item.type === 'tool_use');
+          const textBlocks = initialResponse.content.filter((item: any) => item.type === 'text');
+          responseText = textBlocks.map((item: any) => item.text).join('\n');
+          usage = (initialResponse.usage as any) || {};
+
+          if (toolUses.length > 0) {
+            const toolResults = await Promise.all(toolUses.map(async (tu: any) => {
+              const tool = standardTools.find(t => t.name === tu.name);
+              if (tool) {
+                try {
+                  const result = await tool.invoke(tu.input);
+                  const stringResult = typeof result === 'string' ? result : JSON.stringify(result);
+                  return {
+                    type: 'tool_result',
+                    tool_use_id: tu.id,
+                    content: truncateContent(stringResult)
+                  };
+                } catch (e) {
+                  return {
+                    type: 'tool_result',
+                    tool_use_id: tu.id,
+                    content: JSON.stringify({ error: e instanceof Error ? e.message : 'Unknown error' }),
+                    is_error: true
+                  };
+                }
+              }
+
+              const mcpTool = allManualMcpTools.find((t: any) => (t.name || t.toolName) === tu.name);
+              if (mcpTool) {
+                try {
+                  const mcpServer = {
+                    name: mcpTool.serverName,
+                    url: mcpTool.serverUrl,
+                    authToken: mcpTool.serverAuthToken
+                  };
+                  const result = await executeMcpTool(mcpServer, tu.name, tu.input, apiKeys);
+                  const stringResult = JSON.stringify(result.result || result);
+                  return {
+                    type: 'tool_result',
+                    tool_use_id: tu.id,
+                    content: truncateContent(stringResult)
+                  };
+                } catch (e) {
+                  return {
+                    type: 'tool_result',
+                    tool_use_id: tu.id,
+                    content: JSON.stringify({ error: e instanceof Error ? e.message : 'Unknown error' }),
+                    is_error: true
+                  };
+                }
+              }
+              return {
+                type: 'tool_result',
+                tool_use_id: tu.id,
+                content: JSON.stringify({ error: `Tool not found: ${tu.name}` }),
+                is_error: true
+              };
+            }));
+
+            const finalResponse = await client.messages.create({
+              model: modelName,
+              max_tokens: maxTokens,
+              messages: [
+                ...messages as any,
+                { role: 'assistant', content: initialResponse.content },
+                { role: 'user', content: toolResults }
+              ],
+              tools: allFinalTools,
+            });
+
+            const finalTextBlocks = finalResponse.content.filter((item: any) => item.type === 'text');
+            responseText = finalTextBlocks.map((item: any) => item.text).join('\n');
+            const finalUsage = (finalResponse.usage as any) || {};
+            usage = {
+              input_tokens: (usage.input_tokens || 0) + (finalUsage.input_tokens || 0),
+              output_tokens: (usage.output_tokens || 0) + (finalUsage.output_tokens || 0),
+              total_tokens: (usage.total_tokens || 0) + (finalUsage.total_tokens || 0),
+            };
+
+            toolCalls = toolUses.map((item: any, idx: number) => {
+                const mcpTool = allManualMcpTools.find((t: any) => (t.name || t.toolName) === item.name);
+                return {
+                    type: item.type,
+                    name: item.name,
+                    server_name: mcpTool ? mcpTool.serverName : undefined,
+                    arguments: item.input,
+                    tool_use_id: item.id,
+                    output: toolResults[idx] ? parseToolCallResult(toolResults[idx].content) : null,
+                };
+            });
+          }
         }
       } else {
         const response = await client.messages.create({

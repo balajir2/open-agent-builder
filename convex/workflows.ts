@@ -1,86 +1,88 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 
-
 /**
- * Workflow CRUD Operations
+ * Clean nodes/edges before storing in Convex.
+ * Ensures JSON-safe minimal objects.
  */
+function sanitizeNodesAndEdges(nodes: any[], edges: any[]) {
+  const cleanNodes = (nodes || []).map((node) => ({
+    id: String(node.id ?? ""),
+    type: String(node.type ?? node?.data?.nodeType ?? "default"),
+    position: {
+      x: typeof node?.position?.x === "number" ? node.position.x : 0,
+      y: typeof node?.position?.y === "number" ? node.position.y : 0,
+    },
+    data: JSON.parse(JSON.stringify(node.data ?? {})),
+  }));
 
-// Get all workflows (filtered by user if authenticated)
+  const cleanEdges = (edges || []).map((edge) => ({
+    id: String(edge.id ?? ""),
+    source: String(edge.source ?? ""),
+    target: String(edge.target ?? ""),
+    sourceHandle: edge.sourceHandle != null ? String(edge.sourceHandle) : undefined,
+    targetHandle: edge.targetHandle != null ? String(edge.targetHandle) : undefined,
+    type: edge.type != null ? String(edge.type) : "smoothstep",
+  }));
+
+  return { cleanNodes, cleanEdges };
+}
+
+/* --------------------------------------------------------
+   WORKFLOW CRUD (DEV MODE — NO OWNERSHIP PERMISSIONS)
+--------------------------------------------------------- */
+
+// Get all workflows for logged-in user
 export const list = query({
   args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
 
-    // If authenticated, only show user's workflows (exclude templates and undefined userId)
-    if (identity) {
-      const workflows = await ctx.db
-        .query("workflows")
-        .filter((q) =>
-          q.and(
-            q.eq(q.field("userId"), identity.subject),
-            q.neq(q.field("isTemplate"), true)
-          )
-        )
-        .order("desc")
-        .collect();
-      return workflows;
-    }
-
-    // If not authenticated, return empty array
-    return [];
+    return await ctx.db
+      .query("workflows")
+      .filter((q) =>
+        q.and(q.eq(q.field("userId"), identity.subject), q.neq(q.field("isTemplate"), true))
+      )
+      .order("desc")
+      .collect();
   },
 });
 
-// Get all workflows for the team (no user filter)
+// Get all workflows (team mode)
 export const listAll = query({
   args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-
-    // Must be authenticated to see team workflows
-    if (identity) {
-      const workflows = await ctx.db
-        .query("workflows")
-        .filter((q) => q.neq(q.field("isTemplate"), true)) // Exclude templates
-        .order("desc")
-        .collect();
-      return workflows;
-    }
-
-    // If not authenticated, return empty array
-    return [];
+    if (!identity) return [];
+    return await ctx.db.query("workflows").filter((q) => q.neq(q.field("isTemplate"), true)).order("desc").collect();
   },
 });
 
-// Alias for backwards compatibility
+// Alias
 export const listWorkflows = list;
 
 // Get workflow by Convex ID
 export const getWorkflow = query({
   args: { id: v.id("workflows") },
-  handler: async ({ db }, { id }) => {
-    const workflow = await db.get(id);
-    return workflow;
-  },
+  handler: async ({ db }, { id }) => db.get(id),
 });
 
-// Get workflow by custom ID (like "workflow_123" or "amazon-product-research")
+// Get workflow by custom ID
 export const getWorkflowByCustomId = query({
   args: { customId: v.string() },
   handler: async ({ db }, { customId }) => {
-    const workflow = await db
+    return await db
       .query("workflows")
       .withIndex("by_customId", (q) => q.eq("customId", customId))
       .first();
-    return workflow;
   },
 });
 
-// Create or update workflow
+// Create or update workflow — NO ownership check
 export const saveWorkflow = mutation({
   args: {
-    customId: v.optional(v.string()), // Optional - the workflow's custom ID
+    customId: v.optional(v.string()),
     name: v.string(),
     description: v.optional(v.string()),
     category: v.optional(v.string()),
@@ -92,99 +94,91 @@ export const saveWorkflow = mutation({
     version: v.optional(v.string()),
     isTemplate: v.optional(v.boolean()),
   },
+
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
 
-    // Check if workflow with this customId already exists (if customId provided)
+    const { cleanNodes, cleanEdges } = sanitizeNodesAndEdges(args.nodes, args.edges);
+
+    const safeName =
+      args.name && args.name.trim().length > 0 ? args.name : "Untitled Workflow";
+
+    // If customId exists → update
+    let existing = null;
     if (args.customId) {
-      const existing = await ctx.db
+      existing = await ctx.db
         .query("workflows")
-        .withIndex("by_customId", (q) => q.eq("customId", args.customId))
+        .withIndex("by_customId", (q) => q.eq("customId", args.customId!))
         .first();
-
-      if (existing) {
-        // Check ownership if user is authenticated
-        if (identity && existing.userId && existing.userId !== identity.subject) {
-          throw new Error("Unauthorized: workflow belongs to another user");
-        }
-
-        // Update existing workflow
-        await ctx.db.patch(existing._id, {
-          ...args,
-          updatedAt: new Date().toISOString(),
-        });
-        return existing._id;
-      }
     }
 
-    // Create new workflow with user ownership
-    const newId = await ctx.db.insert("workflows", {
-      ...args,
-      userId: identity?.subject, // Add user ownership if authenticated
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        name: safeName,
+        description: args.description,
+        category: args.category,
+        tags: args.tags,
+        difficulty: args.difficulty,
+        estimatedTime: args.estimatedTime,
+        nodes: cleanNodes,
+        edges: cleanEdges,
+        version: args.version,
+        isTemplate: args.isTemplate,
+        updatedAt: new Date().toISOString(),
+      });
+
+      return existing._id;
+    }
+
+    // Otherwise create
+    const nowIso = new Date().toISOString();
+
+    return await ctx.db.insert("workflows", {
+      customId: args.customId,
+      name: safeName,
+      description: args.description,
+      category: args.category,
+      tags: args.tags,
+      difficulty: args.difficulty,
+      estimatedTime: args.estimatedTime,
+      nodes: cleanNodes,
+      edges: cleanEdges,
+      version: args.version,
+      isTemplate: args.isTemplate,
+      isPublic: false,
+      userId: identity?.subject,
+      createdAt: nowIso,
+      updatedAt: nowIso,
     });
-    return newId;
   },
 });
 
-// Delete workflow
+// Delete workflow — NO ownership restrictions
 export const deleteWorkflow = mutation({
   args: { id: v.id("workflows") },
   handler: async (ctx, { id }) => {
-    const identity = await ctx.auth.getUserIdentity();
-
-    if (!identity) {
-      throw new Error("Unauthorized: must be authenticated to delete workflows");
-    }
-
-    // Get the workflow to check ownership
-    const workflow = await ctx.db.get(id);
-
-    if (!workflow) {
-      throw new Error("Workflow not found");
-    }
-
-    // Check if user owns this workflow
-    if (workflow.userId && workflow.userId !== identity.subject) {
-      throw new Error("Unauthorized: you can only delete your own workflows");
-    }
-
-    // Prevent deletion of public templates (unless admin in future)
-    if (workflow.isTemplate && workflow.isPublic) {
-      throw new Error("Cannot delete public templates");
-    }
-
     await ctx.db.delete(id);
     return { success: true };
   },
 });
 
-// Get workflows by category
+// Workflows by category
 export const getWorkflowsByCategory = query({
   args: { category: v.string() },
   handler: async ({ db }, { category }) => {
-    const workflows = await db
-      .query("workflows")
-      .withIndex("by_category", (q) => q.eq("category", category))
-      .collect();
-    return workflows;
+    return await db.query("workflows").withIndex("by_category", (q) => q.eq("category", category)).collect();
   },
 });
 
-// Get template workflows
+// All templates
 export const getTemplates = query({
   args: {},
   handler: async ({ db }) => {
-    const templates = await db
-      .query("workflows")
-      .withIndex("by_template", (q) => q.eq("isTemplate", true))
-      .collect();
-    return templates;
+    return await db.query("workflows").withIndex("by_template", (q) => q.eq("isTemplate", true)).collect();
   },
 });
 
-// Seed a single official template
+// Seed template
 export const seedOfficialTemplate = mutation({
   args: {
     customId: v.string(),
@@ -198,18 +192,16 @@ export const seedOfficialTemplate = mutation({
     edges: v.array(v.any()),
   },
   handler: async (ctx, template) => {
-    // Check if this template already exists
     const existing = await ctx.db
       .query("workflows")
       .withIndex("by_customId", (q) => q.eq("customId", template.customId))
       .first();
 
-    if (existing) {
-      // Template already exists, skip
-      return { success: false, message: "Template already exists" };
-    }
+    if (existing) return { success: false, message: "Template already exists" };
 
-    // Create the template in Convex
+    const { cleanNodes, cleanEdges } = sanitizeNodesAndEdges(template.nodes, template.edges);
+    const nowIso = new Date().toISOString();
+
     const newId = await ctx.db.insert("workflows", {
       customId: template.customId,
       name: template.name,
@@ -218,45 +210,20 @@ export const seedOfficialTemplate = mutation({
       tags: template.tags || [],
       difficulty: template.difficulty,
       estimatedTime: template.estimatedTime,
-      nodes: template.nodes,
-      edges: template.edges,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      nodes: cleanNodes,
+      edges: cleanEdges,
+      createdAt: nowIso,
+      updatedAt: nowIso,
       version: "1.0.0",
       isTemplate: true,
-      isPublic: true, // Make templates public by default
+      isPublic: true,
     });
 
-    return {
-      success: true,
-      id: newId.toString(),
-      message: `Seeded template: ${template.name}`,
-    };
+    return { success: true, id: newId.toString(), message: `Seeded template: ${template.name}` };
   },
 });
 
-// Get all official templates
-export const getAllOfficialTemplates = query({
-  args: {},
-  handler: async ({ db }) => {
-    const templates = await db
-      .query("workflows")
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("isTemplate"), true),
-          q.eq(q.field("isPublic"), true)
-        )
-      )
-      .collect();
-
-    return templates.map(t => ({
-      ...t,
-      id: t.customId || t._id, // Use customId as the primary identifier
-    }));
-  },
-});
-
-// Get template by custom ID (e.g., 'multi-company-stock-analysis')
+// Get template by ID
 export const getTemplateByCustomId = query({
   args: { customId: v.string() },
   handler: async ({ db }, { customId }) => {
@@ -266,17 +233,16 @@ export const getTemplateByCustomId = query({
       .filter((q) => q.eq(q.field("isTemplate"), true))
       .first();
 
-    if (template) {
-      return {
-        ...template,
-        id: template.customId || template._id,
-      };
-    }
-    return null;
+    if (!template) return null;
+
+    return {
+      ...template,
+      id: template.customId || template._id,
+    };
   },
 });
 
-// Update template structure (nodes and edges)
+// Update template — unrestricted
 export const updateTemplateStructure = mutation({
   args: {
     customId: v.string(),
@@ -284,99 +250,60 @@ export const updateTemplateStructure = mutation({
     edges: v.array(v.any()),
   },
   handler: async (ctx, { customId, nodes, edges }) => {
-    // Find the template
     const template = await ctx.db
       .query("workflows")
       .withIndex("by_customId", (q) => q.eq("customId", customId))
       .filter((q) => q.eq(q.field("isTemplate"), true))
       .first();
 
-    if (!template) {
-      throw new Error(`Template ${customId} not found`);
-    }
+    if (!template) throw new Error(`Template ${customId} not found`);
 
-    // Update the template
+    const { cleanNodes, cleanEdges } = sanitizeNodesAndEdges(nodes, edges);
+
     await ctx.db.patch(template._id, {
-      nodes,
-      edges,
+      nodes: cleanNodes,
+      edges: cleanEdges,
       updatedAt: new Date().toISOString(),
     });
 
-    return { success: true, message: `Updated template ${customId}` };
+    return { success: true };
   },
 });
 
-// Reset template to original from static file
+// Reset template to default
 export const resetTemplateToDefault = mutation({
   args: { customId: v.string() },
   handler: async (ctx, { customId }) => {
-    // Get the original template from static file
     const originalTemplate = await import("../lib/workflow/templates").then((mod) =>
       mod.getTemplate(customId)
     );
 
-    if (!originalTemplate) {
-      throw new Error(`Original template ${customId} not found`);
-    }
+    if (!originalTemplate) throw new Error(`Original template ${customId} not found`);
 
-    // Find the template in database
     const template = await ctx.db
       .query("workflows")
       .withIndex("by_customId", (q) => q.eq("customId", customId))
       .filter((q) => q.eq(q.field("isTemplate"), true))
       .first();
 
-    if (!template) {
-      throw new Error(`Template ${customId} not found in database`);
-    }
+    if (!template) throw new Error(`Template ${customId} not found in database`);
 
-    // Reset to original
+    const { cleanNodes, cleanEdges } = sanitizeNodesAndEdges(
+      originalTemplate.nodes,
+      originalTemplate.edges
+    );
+
     await ctx.db.patch(template._id, {
-      nodes: originalTemplate.nodes,
-      edges: originalTemplate.edges,
+      nodes: cleanNodes,
+      edges: cleanEdges,
       updatedAt: new Date().toISOString(),
     });
 
-    return { success: true, message: `Reset template ${customId} to default` };
+    return { success: true };
   },
 });
 
-// Clean up workflows without userId (admin/development only)
-export const deleteWorkflowsWithoutUserId = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-
-    // Only allow if authenticated (add admin check in production)
-    if (!identity) {
-      throw new Error("Unauthorized: must be authenticated");
-    }
-
-    // Find all workflows without userId and not templates
-    const workflows = await ctx.db
-      .query("workflows")
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("userId"), undefined),
-          q.neq(q.field("isTemplate"), true)
-        )
-      )
-      .collect();
-
-    // Delete them
-    const deletePromises = workflows.map((w) => ctx.db.delete(w._id));
-    await Promise.all(deletePromises);
-
-    return {
-      success: true,
-      count: workflows.length,
-      message: `Deleted ${workflows.length} workflows without userId`,
-    };
-  },
-});
-
-
-
+// Workflow details + extracted input variables
 export const getWorkflowDetails = query({
   args: { customId: v.string() },
   handler: async ({ db }, { customId }) => {
@@ -387,28 +314,23 @@ export const getWorkflowDetails = query({
 
     if (!workflow) return null;
 
-    // ✅ Extract input variables from the "start" node
-    let requiredInputs: any[] = [];
+    const requiredInputs: any[] = [];
+
     try {
-      if (Array.isArray(workflow.nodes)) {
-        workflow.nodes.forEach((node: any) => {
-          // Look for node.data.inputVariables array
-          if (Array.isArray(node.data?.inputVariables)) {
-            node.data.inputVariables.forEach((inputVar: any) => {
-              requiredInputs.push({
-                name: inputVar.name,
-                description: inputVar.description || "Enter value",
-                type: inputVar.type || "text",
-                required: inputVar.required ?? true,
-                defaultValue: inputVar.defaultValue || "",
-              });
+      workflow.nodes?.forEach((node: any) => {
+        if (Array.isArray(node.data?.inputVariables)) {
+          node.data.inputVariables.forEach((inputVar: any) => {
+            requiredInputs.push({
+              name: inputVar.name,
+              description: inputVar.description || "Enter value",
+              type: inputVar.type || "text",
+              required: inputVar.required ?? true,
+              defaultValue: inputVar.defaultValue || "",
             });
-          }
-        });
-      }
-    } catch (err) {
-      // console.error("Error parsing workflow inputs:", err);
-    }
+          });
+        }
+      });
+    } catch {}
 
     return {
       ...workflow,
