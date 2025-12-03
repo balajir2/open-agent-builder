@@ -34,7 +34,11 @@
       "Bash(cmd.exe /c \"taskkill /F /PID 44064\")",
       "Bash(find:*)",
       "Bash(dir /s /b d:GitHubopen-agent-builderconvex_generated 2)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(claude --version:*)",
+      "Bash(claude auth status:*)",
+      "Bash(gh auth:*)",
+      "Bash(gh pr view:*)"
     ],
     "deny": [],
     "ask": []

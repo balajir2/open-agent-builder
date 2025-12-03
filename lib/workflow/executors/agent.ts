@@ -7,6 +7,7 @@ import { convertToOpenAITool } from '@langchain/core/utils/function_calling';
 import { parseToolCallResult, truncateContent } from './tool-utils';
 import { prefetchFileContents } from '../file-utils';
 import { unwrapMCPResponse, convertMcpToOpenAiTool, executeMcpTool, fetchMcpTools } from './mcp-utils';
+import { DEFAULT_MODELS } from '@/lib/api/models';
 
 
 export async function executeAgentNode(
@@ -157,7 +158,8 @@ export async function executeAgentNode(
       : [{ role: 'user' as const, content: contextualPrompt }];
 
     // Parse model string
-    const modelString = data.model || 'anthropic/claude-3-5-sonnet-20241022';
+    let modelString = data.model || `anthropic/${DEFAULT_MODELS.anthropic}`;
+
     let provider: string;
     let modelName: string;
 
