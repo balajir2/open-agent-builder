@@ -266,6 +266,10 @@ export async function executeAgentNode(
         );
 
         console.log('[Agent] Final Tools passed to LLM:', JSON.stringify(finalTools.map(t => ({ name: t.name, description: t.description })), null, 2));
+        console.log('[Agent] MCP Servers configured:', mcpServers.length);
+        console.log('[Agent] Standard Tools count:', standardTools.length);
+        console.log('[Agent] MCP Tools count:', flattenedMcpTools.length);
+        console.log('[Agent] Messages to LLM:', JSON.stringify(messages, null, 2));
 
         try {
           const response = await client.beta.messages.create({
@@ -276,6 +280,14 @@ export async function executeAgentNode(
             tools: finalTools,
             betas: mcpServers.length > 0 ? ['mcp-client-2025-04-04'] : undefined,
           } as any);
+
+          console.log('[Agent] Response from LLM:', {
+            model: response.model,
+            stopReason: response.stop_reason,
+            contentTypes: response.content.map((c: any) => c.type),
+            toolUsesCount: response.content.filter((c: any) => c.type === 'tool_use' || c.type === 'mcp_tool_use').length,
+            textBlocksCount: response.content.filter((c: any) => c.type === 'text').length,
+          });
 
           const toolUses = response.content.filter((item: any) =>
             item.type === 'tool_use' || item.type === 'mcp_tool_use'
@@ -353,43 +365,168 @@ export async function executeAgentNode(
             extraToolResults = extraToolResults.filter(Boolean);
 
             if (extraToolResults.length > 0) {
-              const finalResponse = await client.beta.messages.create({
-                model: modelName,
-                max_tokens: maxTokens,
-                messages: [
-                  ...messages as any,
-                  { role: 'assistant', content: response.content },
-                  { role: 'user', content: extraToolResults }
-                ],
-                mcp_servers: mcpServers as any,
-                tools: finalTools,
-                betas: ['mcp-client-2025-04-04'],
-              } as any);
+              // Implement agentic loop - continue until no more tool calls
+              let currentMessages = [
+                ...messages as any,
+                { role: 'assistant', content: response.content },
+                { role: 'user', content: extraToolResults }
+              ];
+              let currentResponse = response;
+              let iterations = 0;
+              const MAX_ITERATIONS = 10; // Prevent infinite loops
 
-              const finalTextBlocks = finalResponse.content.filter((item: any) => item.type === 'text');
-              responseText = finalTextBlocks.map((item: any) => item.text).join('\n');
-              usage = (finalResponse.usage as any) || {};
+              while (iterations < MAX_ITERATIONS) {
+                const nextResponse = await client.beta.messages.create({
+                  model: modelName,
+                  max_tokens: maxTokens,
+                  messages: currentMessages,
+                  mcp_servers: mcpServers as any,
+                  tools: finalTools,
+                  betas: ['mcp-client-2025-04-04'],
+                } as any);
+
+                console.log(`[Agent] Agentic loop iteration ${iterations + 1}:`, {
+                  stopReason: nextResponse.stop_reason,
+                  contentTypes: nextResponse.content.map((c: any) => c.type),
+                  toolUsesCount: nextResponse.content.filter((c: any) => c.type === 'tool_use' || c.type === 'mcp_tool_use').length,
+                });
+
+                // Accumulate usage
+                usage = {
+                  input_tokens: (usage.input_tokens || 0) + (nextResponse.usage?.input_tokens || 0),
+                  output_tokens: (usage.output_tokens || 0) + (nextResponse.usage?.output_tokens || 0),
+                  total_tokens: (usage.total_tokens || 0) + ((nextResponse.usage?.input_tokens || 0) + (nextResponse.usage?.output_tokens || 0)),
+                };
+
+                const nextToolUses = nextResponse.content.filter((item: any) =>
+                  item.type === 'tool_use' || item.type === 'mcp_tool_use'
+                );
+
+                // If no more tool calls, we're done
+                if (nextToolUses.length === 0) {
+                  const finalTextBlocks = nextResponse.content.filter((item: any) => item.type === 'text');
+                  responseText = finalTextBlocks.map((item: any) => item.text).join('\n');
+                  currentResponse = nextResponse;
+                  break;
+                }
+
+                // Execute the next batch of tool calls
+                const nextManualToolUses = nextToolUses.filter((tu: any) =>
+                  standardTools.some(st => st.name === tu.name) ||
+                  manualMcpTools.some((mt: any) => (mt.name || mt.toolName) === tu.name)
+                );
+
+                const nextToolResults = await Promise.all(nextManualToolUses.map(async (tu: any) => {
+                  const tool = standardTools.find(t => t.name === tu.name);
+                  if (tool) {
+                    try {
+                      const result = await tool.invoke(tu.input);
+                      const stringResult = typeof result === 'string' ? result : JSON.stringify(result);
+                      return {
+                        type: 'tool_result',
+                        tool_use_id: tu.id,
+                        content: truncateContent(stringResult)
+                      };
+                    } catch (e) {
+                      return {
+                        type: 'tool_result',
+                        tool_use_id: tu.id,
+                        content: JSON.stringify({ error: e instanceof Error ? e.message : 'Unknown error' }),
+                        is_error: true
+                      };
+                    }
+                  }
+
+                  const mcpTool = manualMcpTools.find((t: any) => (t.name || t.toolName) === tu.name);
+                  if (mcpTool) {
+                    try {
+                      const mcpServer = {
+                        name: mcpTool.serverName,
+                        url: mcpTool.serverUrl,
+                        authToken: mcpTool.serverAuthToken
+                      };
+                      console.log(`🔧 Agentic loop MCP tool call: ${tu.name}`, {
+                        iteration: iterations + 1,
+                        input: tu.input,
+                      });
+
+                      const result = await executeMcpTool(mcpServer, tu.name, tu.input, apiKeys);
+                      const stringResult = JSON.stringify(result.result || result);
+                      return {
+                        type: 'tool_result',
+                        tool_use_id: tu.id,
+                        content: truncateContent(stringResult)
+                      };
+                    } catch (e) {
+                      return {
+                        type: 'tool_result',
+                        tool_use_id: tu.id,
+                        content: JSON.stringify({ error: e instanceof Error ? e.message : 'Unknown error' }),
+                        is_error: true
+                      };
+                    }
+                  }
+                  return null;
+                }));
+
+                const filteredNextToolResults = nextToolResults.filter(Boolean);
+
+                // Accumulate all tool calls for tracking
+                toolCalls = [
+                  ...toolCalls,
+                  ...nextToolUses.map((item: any) => {
+                    const toolCall: any = {
+                      type: item.type,
+                      name: item.name,
+                      server_name: item.server_name || 'MCP',
+                      arguments: item.input,
+                      tool_use_id: item.id,
+                    };
+
+                    const result = filteredNextToolResults.find((tr: any) => tr.tool_use_id === item.id);
+                    if (result) {
+                      toolCall.output = result.is_error ? { error: result.content } : (Array.isArray(result.content) ? result.content[0]?.text || result.content : result.content);
+                    }
+                    return toolCall;
+                  })
+                ];
+
+                // Update message history for next iteration
+                currentMessages = [
+                  ...currentMessages,
+                  { role: 'assistant', content: nextResponse.content },
+                  { role: 'user', content: filteredNextToolResults }
+                ];
+
+                currentResponse = nextResponse;
+                iterations++;
+              }
+
+              if (iterations >= MAX_ITERATIONS) {
+                console.warn(`⚠️ Agent reached max iterations (${MAX_ITERATIONS}) - stopping agentic loop`);
+              }
+            } else {
+              // No manual tool execution needed - use the original tool results from MCP
+              toolCalls = toolUses.map((item: any, idx: number) => {
+                const toolCall: any = {
+                  type: item.type,
+                  name: item.name,
+                  server_name: item.server_name || 'MCP',
+                  arguments: item.input,
+                  tool_use_id: item.id,
+                };
+
+                const existingResult = toolResults.find((tr: any) => tr.tool_use_id === item.id);
+                if (existingResult) {
+                  toolCall.output = existingResult.is_error ? { error: existingResult.content } : (Array.isArray(existingResult.content) ? existingResult.content[0]?.text || existingResult.content : existingResult.content);
+                }
+                return toolCall;
+              });
             }
+          } else {
+            // No tool uses at all - just text response
+            toolCalls = [];
           }
-
-          toolCalls = toolUses.map((item: any, idx: number) => {
-            const toolCall: any = {
-              type: item.type,
-              name: item.name,
-              server_name: item.server_name || 'MCP',
-              arguments: item.input,
-              tool_use_id: item.id,
-            };
-
-            const existingResult = toolResults.find((tr: any) => tr.tool_use_id === item.id);
-            const extraResult = extraToolResults.find((tr: any) => tr.tool_use_id === item.id);
-            const result = existingResult || extraResult;
-
-            if (result) {
-              toolCall.output = result.is_error ? { error: result.content } : (Array.isArray(result.content) ? result.content[0]?.text || result.content : result.content);
-            }
-            return toolCall;
-          });
         } catch (err: any) {
           anthropicError = err;
           useManualToolCalling = true;
@@ -501,37 +638,143 @@ export async function executeAgentNode(
               };
             }));
 
-            const finalResponse = await client.messages.create({
-              model: modelName,
-              max_tokens: maxTokens,
-              messages: [
-                ...messages as any,
-                { role: 'assistant', content: initialResponse.content },
-                { role: 'user', content: toolResults }
-              ],
-              tools: allFinalTools,
-            });
-
-            const finalTextBlocks = finalResponse.content.filter((item: any) => item.type === 'text');
-            responseText = finalTextBlocks.map((item: any) => item.text).join('\n');
-            const finalUsage = (finalResponse.usage as any) || {};
-            usage = {
-              input_tokens: (usage.input_tokens || 0) + (finalUsage.input_tokens || 0),
-              output_tokens: (usage.output_tokens || 0) + (finalUsage.output_tokens || 0),
-              total_tokens: (usage.total_tokens || 0) + (finalUsage.total_tokens || 0),
-            };
+            // Implement agentic loop for fallback manual tool calling
+            let currentMessages: any[] = [
+              ...messages as any,
+              { role: 'assistant', content: initialResponse.content },
+              { role: 'user', content: toolResults }
+            ];
+            let iterations = 0;
+            const MAX_ITERATIONS = 10;
 
             toolCalls = toolUses.map((item: any, idx: number) => {
-                const mcpTool = allManualMcpTools.find((t: any) => (t.name || t.toolName) === item.name);
+              const mcpTool = allManualMcpTools.find((t: any) => (t.name || t.toolName) === item.name);
+              return {
+                type: item.type,
+                name: item.name,
+                server_name: mcpTool ? mcpTool.serverName : undefined,
+                arguments: item.input,
+                tool_use_id: item.id,
+                output: toolResults[idx] ? parseToolCallResult(toolResults[idx].content) : null,
+              };
+            });
+
+            while (iterations < MAX_ITERATIONS) {
+              const nextResponse = await client.messages.create({
+                model: modelName,
+                max_tokens: maxTokens,
+                messages: currentMessages,
+                tools: allFinalTools,
+              });
+
+              console.log(`[Agent] Anthropic fallback agentic loop iteration ${iterations + 1}:`, {
+                stopReason: nextResponse.stop_reason,
+                contentTypes: nextResponse.content.map((c: any) => c.type),
+                toolUsesCount: nextResponse.content.filter((c: any) => c.type === 'tool_use').length,
+              });
+
+              // Accumulate usage
+              usage = {
+                input_tokens: (usage.input_tokens || 0) + (nextResponse.usage?.input_tokens || 0),
+                output_tokens: (usage.output_tokens || 0) + (nextResponse.usage?.output_tokens || 0),
+                total_tokens: (usage.total_tokens || 0) + ((nextResponse.usage?.input_tokens || 0) + (nextResponse.usage?.output_tokens || 0)),
+              };
+
+              const nextToolUses = nextResponse.content.filter((item: any) => item.type === 'tool_use');
+
+              // If no more tool calls, we're done
+              if (nextToolUses.length === 0) {
+                const finalTextBlocks = nextResponse.content.filter((item: any) => item.type === 'text');
+                responseText = finalTextBlocks.map((item: any) => item.text).join('\n');
+                break;
+              }
+
+              // Execute next batch of tool calls
+              const nextToolResults = await Promise.all(nextToolUses.map(async (tu: any) => {
+                const tool = standardTools.find(t => t.name === tu.name);
+                if (tool) {
+                  try {
+                    const result = await tool.invoke(tu.input);
+                    const stringResult = typeof result === 'string' ? result : JSON.stringify(result);
+                    return {
+                      type: 'tool_result',
+                      tool_use_id: tu.id,
+                      content: truncateContent(stringResult)
+                    };
+                  } catch (e) {
+                    return {
+                      type: 'tool_result',
+                      tool_use_id: tu.id,
+                      content: JSON.stringify({ error: e instanceof Error ? e.message : 'Unknown error' }),
+                      is_error: true
+                    };
+                  }
+                }
+
+                const mcpTool = allManualMcpTools.find((t: any) => (t.name || t.toolName) === tu.name);
+                if (mcpTool) {
+                  try {
+                    const mcpServer = {
+                      name: mcpTool.serverName,
+                      url: mcpTool.serverUrl,
+                      authToken: mcpTool.serverAuthToken
+                    };
+                    console.log(`🔧 Fallback agentic loop MCP tool call: ${tu.name}`, {
+                      iteration: iterations + 1,
+                      input: tu.input,
+                    });
+                    const result = await executeMcpTool(mcpServer, tu.name, tu.input, apiKeys);
+                    const stringResult = JSON.stringify(result.result || result);
+                    return {
+                      type: 'tool_result',
+                      tool_use_id: tu.id,
+                      content: truncateContent(stringResult)
+                    };
+                  } catch (e) {
+                    return {
+                      type: 'tool_result',
+                      tool_use_id: tu.id,
+                      content: JSON.stringify({ error: e instanceof Error ? e.message : 'Unknown error' }),
+                      is_error: true
+                    };
+                  }
+                }
                 return {
+                  type: 'tool_result',
+                  tool_use_id: tu.id,
+                  content: JSON.stringify({ error: `Tool not found: ${tu.name}` }),
+                  is_error: true
+                };
+              }));
+
+              // Accumulate tool calls
+              toolCalls = [
+                ...toolCalls,
+                ...nextToolUses.map((item: any, idx: number) => {
+                  const mcpTool = allManualMcpTools.find((t: any) => (t.name || t.toolName) === item.name);
+                  return {
                     type: item.type,
                     name: item.name,
                     server_name: mcpTool ? mcpTool.serverName : undefined,
                     arguments: item.input,
                     tool_use_id: item.id,
-                    output: toolResults[idx] ? parseToolCallResult(toolResults[idx].content) : null,
-                };
-            });
+                    output: nextToolResults[idx] ? parseToolCallResult(nextToolResults[idx].content) : null,
+                  };
+                })
+              ];
+
+              currentMessages = [
+                ...currentMessages,
+                { role: 'assistant', content: nextResponse.content },
+                { role: 'user', content: nextToolResults }
+              ];
+
+              iterations++;
+            }
+
+            if (iterations >= MAX_ITERATIONS) {
+              console.warn(`⚠️ Anthropic fallback agent reached max iterations (${MAX_ITERATIONS})`);
+            }
           }
         }
       } else {
@@ -645,23 +888,14 @@ export async function executeAgentNode(
             })
           );
 
-          const finalResponse = await client.chat.completions.create({
-            model: modelName,
-            messages: [
-              ...messages as any,
-              message,
-              ...toolResults
-            ],
-            ...(data.tokenLimit ? { max_tokens: maxTokens } : {}),
-          });
-
-          responseText = finalResponse.choices[0].message.content || '';
-          usage = {
-            ...usage,
-            prompt_tokens: (usage.prompt_tokens || 0) + (finalResponse.usage?.prompt_tokens || 0),
-            completion_tokens: (usage.completion_tokens || 0) + (finalResponse.usage?.completion_tokens || 0),
-            total_tokens: (usage.total_tokens || 0) + (finalResponse.usage?.total_tokens || 0),
-          };
+          // Implement agentic loop for OpenAI/Groq
+          let currentMessages: any[] = [
+            ...messages as any,
+            message,
+            ...toolResults
+          ];
+          let iterations = 0;
+          const MAX_ITERATIONS = 10;
 
           toolCalls = message.tool_calls.map((call: any, idx) => ({
             id: call.id,
@@ -669,6 +903,111 @@ export async function executeAgentNode(
             arguments: JSON.parse(call.function.arguments),
             output: toolResults[idx] ? parseToolCallResult(toolResults[idx].content) : null
           }));
+
+          while (iterations < MAX_ITERATIONS) {
+            const nextResponse = await client.chat.completions.create({
+              model: modelName,
+              messages: currentMessages,
+              tools: tools as any,
+              tool_choice: "auto",
+              ...(data.tokenLimit ? { max_tokens: maxTokens } : {}),
+            });
+
+            const nextMessage = nextResponse.choices[0].message;
+
+            console.log(`[Agent] OpenAI/Groq agentic loop iteration ${iterations + 1}:`, {
+              finishReason: nextResponse.choices[0].finish_reason,
+              hasToolCalls: !!nextMessage.tool_calls,
+              toolCallsCount: nextMessage.tool_calls?.length || 0,
+            });
+
+            // Accumulate usage
+            usage = {
+              prompt_tokens: (usage.prompt_tokens || 0) + (nextResponse.usage?.prompt_tokens || 0),
+              completion_tokens: (usage.completion_tokens || 0) + (nextResponse.usage?.completion_tokens || 0),
+              total_tokens: (usage.total_tokens || 0) + (nextResponse.usage?.total_tokens || 0),
+            };
+
+            // If no more tool calls, we're done
+            if (!nextMessage.tool_calls || nextMessage.tool_calls.length === 0) {
+              responseText = nextMessage.content || '';
+              break;
+            }
+
+            // Execute next batch of tool calls
+            const nextToolResults = await Promise.all(
+              nextMessage.tool_calls.map(async (call: any) => {
+                try {
+                  const mcpTool = flattenedMcpTools.find((t: any) =>
+                    (t.name || t.toolName) === call.function.name
+                  );
+
+                  if (mcpTool) {
+                    const args = JSON.parse(call.function.arguments);
+                    const mcpServer = {
+                      name: mcpTool.serverName,
+                      url: mcpTool.serverUrl,
+                      authToken: mcpTool.serverAuthToken
+                    };
+                    console.log(`🔧 Agentic loop MCP tool call: ${call.function.name}`, {
+                      iteration: iterations + 1,
+                      args,
+                    });
+                    const result = await executeMcpTool(mcpServer, call.function.name, args, apiKeys);
+                    return {
+                      tool_call_id: call.id,
+                      role: "tool" as const,
+                      content: truncateContent(JSON.stringify(result.result || result))
+                    };
+                  }
+
+                  const standardTool = standardTools.find(t => t.name === call.function.name);
+                  if (standardTool) {
+                    const args = JSON.parse(call.function.arguments);
+                    const result = await standardTool.invoke(args);
+                    const stringResult = typeof result === 'string' ? result : JSON.stringify(result);
+                    return {
+                      tool_call_id: call.id,
+                      role: "tool" as const,
+                      content: truncateContent(stringResult)
+                    };
+                  }
+
+                  throw new Error(`Tool not found: ${call.function.name}`);
+                } catch (error) {
+                  console.error(`❌ Tool execution failed for ${call.function.name}:`, error);
+                  return {
+                    tool_call_id: call.id,
+                    role: "tool" as const,
+                    content: JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' })
+                  };
+                }
+              })
+            );
+
+            // Accumulate tool calls
+            toolCalls = [
+              ...toolCalls,
+              ...nextMessage.tool_calls.map((call: any, idx) => ({
+                id: call.id,
+                name: call.function.name,
+                arguments: JSON.parse(call.function.arguments),
+                output: nextToolResults[idx] ? parseToolCallResult(nextToolResults[idx].content) : null
+              }))
+            ];
+
+            currentMessages = [
+              ...currentMessages,
+              nextMessage,
+              ...nextToolResults
+            ];
+
+            iterations++;
+          }
+
+          if (iterations >= MAX_ITERATIONS) {
+            console.warn(`⚠️ OpenAI/Groq agent reached max iterations (${MAX_ITERATIONS})`);
+          }
         } else {
           responseText = message.content || '';
         }
@@ -755,19 +1094,14 @@ export async function executeAgentNode(
             })
           );
 
-          const finalResponse = await model.invoke([
+          // Implement agentic loop for Google Gemini
+          let currentMessages: any[] = [
             ...messages as any,
             response,
             ...toolResults
-          ]);
-
-          responseText = finalResponse.content as string;
-          usage = {
-            ...usage,
-            prompt_tokens: (usage.prompt_tokens || 0) + (finalResponse.response_metadata?.usage?.prompt_tokens || 0),
-            completion_tokens: (usage.completion_tokens || 0) + (finalResponse.response_metadata?.usage?.completion_tokens || 0),
-            total_tokens: (usage.total_tokens || 0) + (finalResponse.response_metadata?.usage?.total_tokens || 0),
-          };
+          ];
+          let iterations = 0;
+          const MAX_ITERATIONS = 10;
 
           toolCalls = response.tool_calls.map((call: any, idx) => ({
             id: call.id,
@@ -775,6 +1109,105 @@ export async function executeAgentNode(
             arguments: call.args,
             output: toolResults[idx] ? parseToolCallResult(toolResults[idx].content) : null
           }));
+
+          while (iterations < MAX_ITERATIONS) {
+            const nextResponse = await model.invoke(currentMessages, {
+              tools: tools as any,
+            });
+
+            console.log(`[Agent] Gemini agentic loop iteration ${iterations + 1}:`, {
+              hasToolCalls: !!nextResponse.tool_calls,
+              toolCallsCount: nextResponse.tool_calls?.length || 0,
+            });
+
+            // Accumulate usage
+            usage = {
+              prompt_tokens: (usage.prompt_tokens || 0) + (nextResponse.response_metadata?.usage?.prompt_tokens || 0),
+              completion_tokens: (usage.completion_tokens || 0) + (nextResponse.response_metadata?.usage?.completion_tokens || 0),
+              total_tokens: (usage.total_tokens || 0) + (nextResponse.response_metadata?.usage?.total_tokens || 0),
+            };
+
+            // If no more tool calls, we're done
+            if (!nextResponse.tool_calls || nextResponse.tool_calls.length === 0) {
+              responseText = nextResponse.content as string;
+              break;
+            }
+
+            // Execute next batch of tool calls
+            const nextToolResults = await Promise.all(
+              nextResponse.tool_calls.map(async (call: any) => {
+                try {
+                  const mcpTool = flattenedMcpTools.find((t: any) =>
+                    (t.name || t.toolName) === call.name
+                  );
+
+                  if (mcpTool) {
+                    const mcpServer = {
+                      name: mcpTool.serverName,
+                      url: mcpTool.serverUrl,
+                      authToken: mcpTool.serverAuthToken
+                    };
+                    console.log(`🔧 Agentic loop MCP tool call: ${call.name}`, {
+                      iteration: iterations + 1,
+                      args: call.args,
+                    });
+                    const result = await executeMcpTool(mcpServer, call.name, call.args, apiKeys);
+                    return {
+                      tool_call_id: call.id,
+                      role: "tool" as const,
+                      content: truncateContent(JSON.stringify(result.result || result))
+                    };
+                  }
+
+                  const standardTool = standardTools.find(t => t.name === call.name);
+                  if (standardTool) {
+                    const result = await standardTool.invoke(call.args);
+                    const stringResult = typeof result === 'string' ? result : JSON.stringify(result);
+                    return {
+                      tool_call_id: call.id,
+                      role: "tool" as const,
+                      content: truncateContent(stringResult)
+                    };
+                  }
+
+                  return {
+                    tool_call_id: call.id,
+                    role: "tool" as const,
+                    content: JSON.stringify({ error: 'Tool not found' })
+                  };
+                } catch (error) {
+                  return {
+                    tool_call_id: call.id,
+                    role: "tool" as const,
+                    content: JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' })
+                  };
+                }
+              })
+            );
+
+            // Accumulate tool calls
+            toolCalls = [
+              ...toolCalls,
+              ...nextResponse.tool_calls.map((call: any, idx) => ({
+                id: call.id,
+                name: call.name,
+                arguments: call.args,
+                output: nextToolResults[idx] ? parseToolCallResult(nextToolResults[idx].content) : null
+              }))
+            ];
+
+            currentMessages = [
+              ...currentMessages,
+              nextResponse,
+              ...nextToolResults
+            ];
+
+            iterations++;
+          }
+
+          if (iterations >= MAX_ITERATIONS) {
+            console.warn(`⚠️ Gemini agent reached max iterations (${MAX_ITERATIONS})`);
+          }
         } else {
           responseText = response.content as string;
         }
