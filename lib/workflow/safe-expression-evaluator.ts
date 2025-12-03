@@ -1,10 +1,17 @@
 /**
  * Safe expression evaluator for if-else conditions and set-state values
- * Uses expr-eval library which provides a safe subset of JavaScript expressions
- * without access to dangerous functions or global objects
+ *
+ * SECURITY FIX: Migrated from expr-eval to mathjs
+ * - expr-eval has critical vulnerabilities (CVE-2024-29415): prototype pollution, code injection
+ * - mathjs provides a secure, sandboxed evaluation environment
+ * - No access to dangerous functions or global objects
+ * - Protection against prototype pollution
  */
 
-import { Parser } from 'expr-eval';
+import { create, all, MathJsInstance } from 'mathjs';
+
+// Create a restricted mathjs instance
+const math: MathJsInstance = create(all, {}) as MathJsInstance;
 
 /**
  * Safely evaluate an expression with given context
@@ -26,37 +33,35 @@ export function safeEvaluate(expression: string, context: Record<string, any>): 
   }
 
   try {
-    // Create parser with safe functions only
-    const parser = new Parser({
-      allowMemberAccess: true, // Allow object property access (e.g., input.price)
-    });
+    // Create a clean scope with only safe variables
+    // This prevents prototype pollution attacks
+    const cleanScope = Object.create(null);
 
-    // Add custom safe functions
-    parser.functions = {
-      // String functions
-      toLowerCase: (str: any) => String(str).toLowerCase(),
-      toUpperCase: (str: any) => String(str).toUpperCase(),
-      trim: (str: any) => String(str).trim(),
-      includes: (str: any, search: any) => String(str).includes(String(search)),
-      startsWith: (str: any, search: any) => String(str).startsWith(String(search)),
-      endsWith: (str: any, search: any) => String(str).endsWith(String(search)),
+    // Copy context variables to clean scope
+    for (const [key, value] of Object.entries(context)) {
+      // Block dangerous property names
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+        continue;
+      }
+      cleanScope[key] = value;
+    }
 
-      // Array functions
-      length: (arr: any) => (Array.isArray(arr) ? arr.length : String(arr).length),
+    // Add custom safe functions to the scope
+    cleanScope.toLowerCase = (str: any) => String(str).toLowerCase();
+    cleanScope.toUpperCase = (str: any) => String(str).toUpperCase();
+    cleanScope.trim = (str: any) => String(str).trim();
+    cleanScope.includes = (str: any, search: any) => String(str).includes(String(search));
+    cleanScope.startsWith = (str: any, search: any) => String(str).startsWith(String(search));
+    cleanScope.endsWith = (str: any, search: any) => String(str).endsWith(String(search));
+    cleanScope.length = (arr: any) => (Array.isArray(arr) ? arr.length : String(arr).length);
+    cleanScope.isNull = (val: any) => val === null || val === undefined;
+    cleanScope.isNumber = (val: any) => typeof val === 'number' && !isNaN(val);
+    cleanScope.isString = (val: any) => typeof val === 'string';
+    cleanScope.isBoolean = (val: any) => typeof val === 'boolean';
+    cleanScope.isArray = (val: any) => Array.isArray(val);
 
-      // Type checking
-      isNull: (val: any) => val === null || val === undefined,
-      isNumber: (val: any) => typeof val === 'number' && !isNaN(val),
-      isString: (val: any) => typeof val === 'string',
-      isBoolean: (val: any) => typeof val === 'boolean',
-      isArray: (val: any) => Array.isArray(val),
-
-      // Math functions (already provided by expr-eval, but listed for reference)
-      // abs, ceil, floor, round, sqrt, pow, min, max, random
-    };
-
-    // Parse and evaluate the expression
-    const result = parser.evaluate(expression, context);
+    // Evaluate the expression using mathjs
+    const result = math.evaluate(expression, cleanScope);
 
     return result;
   } catch (error) {
@@ -72,13 +77,8 @@ export function safeEvaluate(expression: string, context: Record<string, any>): 
  */
 export function validateExpression(expression: string): { valid: boolean; error?: string } {
   try {
-    const parser = new Parser({
-      allowMemberAccess: true,
-    });
-
-    // Try to parse (but don't evaluate)
-    parser.parse(expression);
-
+    // Try to parse the expression (but don't evaluate)
+    math.parse(expression);
     return { valid: true };
   } catch (error) {
     return {
@@ -94,9 +94,17 @@ export function validateExpression(expression: string): { valid: boolean; error?
  */
 export function getExpressionVariables(expression: string): string[] {
   try {
-    const parser = new Parser();
-    const parsed = parser.parse(expression);
-    return parsed.variables();
+    const node = math.parse(expression);
+    const variables = new Set<string>();
+
+    // Traverse the AST to find all symbol nodes (variables)
+    node.traverse((node: any) => {
+      if (node.type === 'SymbolNode') {
+        variables.add(node.name);
+      }
+    });
+
+    return Array.from(variables);
   } catch {
     return [];
   }

@@ -85,7 +85,7 @@ export const addMCPServer = mutation({
   },
 });
 
-// Update MCP server
+// Update MCP server — SECURITY FIX: Added ownership check
 export const updateMCPServer = mutation({
   args: {
     id: v.id("mcpServers"),
@@ -102,8 +102,26 @@ export const updateMCPServer = mutation({
     enabled: v.optional(v.boolean()),
     headers: v.optional(v.any()),
   },
-  handler: async ({ db }, { id, ...updates }) => {
-    await db.patch(id, {
+  handler: async (ctx, { id, ...updates }) => {
+    // Get authenticated user
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized: You must be logged in to update MCP servers");
+    }
+
+    // Get the MCP server
+    const server = await ctx.db.get(id);
+    if (!server) {
+      throw new Error("MCP server not found");
+    }
+
+    // Check ownership
+    if (server.userId !== identity.subject) {
+      throw new Error("Unauthorized: You can only update your own MCP servers");
+    }
+
+    // Update the server
+    await ctx.db.patch(id, {
       ...updates,
       updatedAt: new Date().toISOString(),
     });
@@ -111,13 +129,31 @@ export const updateMCPServer = mutation({
   },
 });
 
-// Delete MCP server
+// Delete MCP server — SECURITY FIX: Added ownership check
 export const deleteMCPServer = mutation({
   args: {
     id: v.id("mcpServers"),
   },
-  handler: async ({ db }, { id }) => {
-    await db.delete(id);
+  handler: async (ctx, { id }) => {
+    // Get authenticated user
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized: You must be logged in to delete MCP servers");
+    }
+
+    // Get the MCP server
+    const server = await ctx.db.get(id);
+    if (!server) {
+      throw new Error("MCP server not found");
+    }
+
+    // Check ownership
+    if (server.userId !== identity.subject) {
+      throw new Error("Unauthorized: You can only delete your own MCP servers");
+    }
+
+    // Delete the server
+    await ctx.db.delete(id);
     return { success: true };
   },
 });

@@ -153,10 +153,28 @@ export const saveWorkflow = mutation({
   },
 });
 
-// Delete workflow — NO ownership restrictions
+// Delete workflow — SECURITY FIX: Added ownership check
 export const deleteWorkflow = mutation({
   args: { id: v.id("workflows") },
   handler: async (ctx, { id }) => {
+    // Get authenticated user
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized: You must be logged in to delete workflows");
+    }
+
+    // Get the workflow
+    const workflow = await ctx.db.get(id);
+    if (!workflow) {
+      throw new Error("Workflow not found");
+    }
+
+    // Check ownership
+    if (workflow.userId !== identity.subject) {
+      throw new Error("Unauthorized: You can only delete your own workflows");
+    }
+
+    // Delete the workflow
     await ctx.db.delete(id);
     return { success: true };
   },

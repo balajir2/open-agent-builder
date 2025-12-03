@@ -12,7 +12,7 @@
 
 import 'server-only';
 import { StateGraph, Annotation, START, END, MemorySaver, Command, Send, interrupt, isInterrupted } from "@langchain/langgraph";
-import { Parser } from "expr-eval";
+import { safeEvaluate } from './safe-expression-evaluator';
 import { Workflow, WorkflowState, NodeExecutionResult, WorkflowNode, WorkflowEdge, WorkflowPendingAuth } from './types';
 import { executeAgentNode } from './executors/agent';
 import { executeMCPNode } from './executors/mcp';
@@ -24,6 +24,7 @@ import { executeExtractNode } from './executors/extract';
 import { executeArcadeNode } from './executors/arcade';
 import { createOrUpdateArcadeAuthRecord } from '../arcade/auth-store';
 import { DEFAULT_MODELS } from '@/lib/api/models';
+import { getLangGraphConfig } from '../langsmith/config';
 
 interface ArcadePendingResponse {
   __arcadePendingAuth: true;
@@ -525,11 +526,11 @@ export class LangGraphExecutor {
 
       case 'transform':
       case 'data-transform': {
-        // Support both transformScript (UI) and transformation (templates)
-        const script = data.transformScript || data.transformation || 'return input;';
-        const input = state.variables.lastOutput;
-        const transformFn = new Function('input', 'lastOutput', 'state', script);
-        return transformFn(input, input, state);
+        // SECURITY FIX: Use E2B sandbox instead of Function() constructor
+        // Function() allows arbitrary code execution and bypasses security
+        // Import and use the secure data executor instead
+        const { executeDataTransformNode } = await import('./executors/data');
+        return await executeDataTransformNode(node, state as WorkflowState, this.apiKeys);
       }
 
       case 'http': {
@@ -540,10 +541,20 @@ export class LangGraphExecutor {
       }
 
       case 'if-else': {
+        // SECURITY FIX: Use safe evaluator (mathjs-based) instead of Function() constructor
         const condition = data.condition || 'true';
-        const evalFn = new Function('input', 'state', 'lastOutput', `return ${condition}`);
-        const result = evalFn(state.variables.input, state, state.variables.lastOutput);
-        return { condition: Boolean(result), branch: result ? 'if' : 'else' };
+        try {
+          const result = safeEvaluate(condition, {
+            input: state.variables.input,
+            state: state,
+            lastOutput: state.variables.lastOutput
+          });
+          return { condition: Boolean(result), branch: result ? 'if' : 'else' };
+        } catch (error) {
+          console.error(`If-else condition evaluation error:`, error);
+          // Default to false branch on error
+          return { condition: false, branch: 'else' };
+        }
       }
 
       case 'while': {
@@ -740,11 +751,8 @@ export class LangGraphExecutor {
     const conditionExpr = (node.data as any)?.whileCondition || (node.data as any)?.condition || 'false';
 
     try {
-      const parser = new Parser();
-      const expr = parser.parse(conditionExpr);
-
       return Boolean(
-        expr.evaluate({
+        safeEvaluate(conditionExpr, {
           input: state.variables.input,
           state: state,
           lastOutput: state.variables.lastOutput,
@@ -813,21 +821,14 @@ export class LangGraphExecutor {
 
     try {
       const evaluationIteration = previousIteration + 1;
-      const evalFunction = new Function(
-        'input',
-        'state',
-        'lastOutput',
-        'iteration',
-        `return ${conditionExpr}`
-      );
-
+      // SECURITY FIX: Use safe evaluator (mathjs-based) instead of Function() constructor
       const shouldContinue = Boolean(
-        evalFunction(
-          state.variables.input,
-          langGraphState,
-          state.variables.lastOutput,
-          evaluationIteration
-        )
+        safeEvaluate(conditionExpr, {
+          input: state.variables.input,
+          state: langGraphState,
+          lastOutput: state.variables.lastOutput,
+          iteration: evaluationIteration
+        })
       );
 
       const nextIteration = shouldContinue ? evaluationIteration : previousIteration;
@@ -1062,11 +1063,11 @@ export class LangGraphExecutor {
 
     this.lastStreamState = initialState;
 
-    const rawStream = await this.graph.stream(initialState, {
+    const rawStream = await this.graph.stream(initialState, getLangGraphConfig({
       configurable: { thread_id: threadId },
       streamMode: "values" as const,
       recursionLimit: 100, // Support up to 100 graph steps (default: 25)
-    });
+    }));
 
     return this.wrapStreamWithInterruptHandling(rawStream, initialState);
   }
@@ -1078,11 +1079,11 @@ export class LangGraphExecutor {
     }
 
     const command = new Command({ resume: resumeValue });
-    const rawStream = await this.graph.stream(command, {
+    const rawStream = await this.graph.stream(command, getLangGraphConfig({
       configurable: { thread_id: threadId },
       streamMode: "values" as const,
       recursionLimit: 100, // Support up to 100 graph steps (default: 25)
-    });
+    }));
 
     const fallback = this.lastStreamState ?? {
       variables: {},
@@ -1110,10 +1111,10 @@ export class LangGraphExecutor {
       nodeResults: {},
     };
 
-    const result = await this.graph.invoke(initialState, {
+    const result = await this.graph.invoke(initialState, getLangGraphConfig({
       configurable: { thread_id: threadId },
       recursionLimit: 100, // Support up to 100 graph steps (default: 25)
-    });
+    }));
 
     return {
       id: `exec_${Date.now()}`,
@@ -1232,13 +1233,13 @@ export class LangGraphExecutor {
    * Resume from a specific checkpoint
    */
   async resumeFromCheckpoint(threadId: string, checkpointId: string, input: any) {
-    const config = {
+    const config = getLangGraphConfig({
       configurable: {
         thread_id: threadId,
         checkpoint_id: checkpointId,
       },
       recursionLimit: 100, // Support up to 100 graph steps (default: 25)
-    };
+    });
 
     return await this.graph.invoke(input, config);
   }

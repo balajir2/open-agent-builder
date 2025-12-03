@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { LangGraphExecutor } from '@/lib/workflow/langgraph';
 import { validateApiKey, createUnauthorizedResponse } from '@/lib/api/auth';
 import { checkRateLimit, getRateLimitKey, RATE_LIMITS } from '@/src/lib/api/distributed-rate-limiter';
+import { WorkflowExecutionSchema, WorkflowIdSchema, safeValidate, createValidationErrorResponse } from '@/lib/api/validation-schemas';
+import { getAuthenticatedConvexClient, api } from '@/lib/convex/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,8 +31,28 @@ export async function POST(
 
   try {
     const { workflowId } = await params;
+
+    // SECURITY FIX: Validate workflow ID
+    const idValidation = safeValidate(WorkflowIdSchema, workflowId);
+    if (!idValidation.success) {
+      return NextResponse.json(
+        createValidationErrorResponse(idValidation.error || 'Invalid workflow ID'),
+        { status: 400 }
+      );
+    }
+
     const body = await request.json();
-    const { input, workflow } = body;
+
+    // SECURITY FIX: Validate request body with Zod
+    const validation = safeValidate(WorkflowExecutionSchema, body);
+    if (!validation.success) {
+      return NextResponse.json(
+        createValidationErrorResponse(validation.error || 'Invalid request body'),
+        { status: 400 }
+      );
+    }
+
+    const { input, workflow } = validation.data!;
 
     console.log('API: Executing workflow', workflowId, 'with input:', input);
 
@@ -43,19 +65,27 @@ export async function POST(
 
     console.log('API: Loaded workflow:', workflow.name);
 
+    // Get API keys - check user keys first, then fall back to system keys from Convex
+    const { getLLMApiKey, getToolApiKey } = await import('@/lib/api/llm-keys') as any;
+    const userId = authResult.userId;
+
+    // Get system API keys from Convex environment
+    const convex = await getAuthenticatedConvexClient();
+    const systemKeys = await convex.action(api.systemApiKeys.getAllSystemApiKeys);
+
     const apiKeys = {
-      anthropic: process.env.ANTHROPIC_API_KEY,
-      groq: process.env.GROQ_API_KEY,
-      openai: process.env.OPENAI_API_KEY,
-      google: process.env.GOOGLE_API_KEY,
-      firecrawl: process.env.FIRECRAWL_API_KEY,
-      arcade: process.env.ARCADE_API_KEY,
-      e2b: process.env.E2B_API_KEY,
-      tavily: process.env.TAVILY_API_KEY,
-      serper: process.env.SERPER_API_KEY,
-      serpapi: process.env.SERPAPI_API_KEY,
-      scraperapi: process.env.SCRAPERAPI_API_KEY,
-      browserless: process.env.BROWSERLESS_API_KEY,
+      anthropic: (userId ? await getLLMApiKey('anthropic', userId) : undefined) ?? systemKeys.anthropic,
+      groq: (userId ? await getLLMApiKey('groq', userId) : undefined) ?? systemKeys.groq,
+      openai: (userId ? await getLLMApiKey('openai', userId) : undefined) ?? systemKeys.openai,
+      google: (userId ? await getLLMApiKey('google', userId) : undefined) ?? systemKeys.google,
+      firecrawl: (userId ? await getToolApiKey('firecrawl', userId) : undefined) ?? systemKeys.firecrawl,
+      arcade: (userId ? await getToolApiKey('arcade', userId) : undefined) ?? systemKeys.arcade,
+      e2b: (userId ? await getToolApiKey('e2b', userId) : undefined) ?? systemKeys.e2b,
+      tavily: (userId ? await getToolApiKey('tavily-search', userId) : undefined) ?? systemKeys.tavily,
+      serper: (userId ? await getToolApiKey('serper-search', userId) : undefined) ?? systemKeys.serper,
+      serpapi: (userId ? await getToolApiKey('serpapi-search', userId) : undefined) ?? systemKeys.serpapi,
+      scraperapi: (userId ? await getToolApiKey('scraperapi', userId) : undefined) ?? systemKeys.scraperapi,
+      browserless: (userId ? await getToolApiKey('browserless', userId) : undefined) ?? systemKeys.browserless,
     };
 
     // Execute workflow using LangGraph

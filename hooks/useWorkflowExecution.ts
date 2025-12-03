@@ -292,7 +292,6 @@ export function useWorkflowExecution() {
       return;
     }
 
-    console.log('⏳ Resuming workflow from approval...');
     setIsRunning(true);
 
     try {

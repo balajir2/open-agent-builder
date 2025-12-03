@@ -10,7 +10,32 @@ import { httpAction } from "../_generated/server";
  * Instead we return the filename in the HTTP response for the client to consume.
  */
 
+// SECURITY FIX: CORS configuration (imported from parent)
+const ALLOWED_ORIGINS = [
+  process.env.NEXT_PUBLIC_APP_URL,
+  process.env.NEXT_PUBLIC_CONVEX_URL,
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'https://localhost:3000',
+].filter(Boolean) as string[];
+
+function corsHeaders(origin?: string | null) {
+  const isAllowed = origin && ALLOWED_ORIGINS.some(allowed => {
+    if (allowed === origin) return true;
+    if (allowed && origin.includes('.convex.cloud') || origin.includes('.convex.site')) return true;
+    return false;
+  });
+
+  return {
+    "Access-Control-Allow-Origin": isAllowed ? origin : ALLOWED_ORIGINS[0] || 'http://localhost:3000',
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Accept",
+    "Vary": "Origin",
+  };
+}
+
 export default httpAction(async (ctx, req: any) => {
+  const origin = req.headers?.get?.('origin') ?? null;
   try {
     const headers = (req && req.headers) ?? {};
     const getHeader = (k: string) =>
@@ -28,7 +53,10 @@ export default httpAction(async (ctx, req: any) => {
       const maybeName = form.get("filename") as any | null;
 
       if (!fileField) {
-        return new Response(JSON.stringify({ error: "Missing 'file' field in multipart/form-data" }), { status: 400, headers: { "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ error: "Missing 'file' field in multipart/form-data" }), {
+          status: 400,
+          headers: { ...corsHeaders(origin), "Content-Type": "application/json" }
+        });
       }
 
       blobLike = fileField;
@@ -53,12 +81,18 @@ export default httpAction(async (ctx, req: any) => {
         if ((blobLike as any).size) size = (blobLike as any).size;
         if ((blobLike as any).type) contentTypeOut = (blobLike as any).type;
       } else {
-        return new Response(JSON.stringify({ error: "Unsupported request body type; cannot read file" }), { status: 400, headers: { "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ error: "Unsupported request body type; cannot read file" }), {
+          status: 400,
+          headers: { ...corsHeaders(origin), "Content-Type": "application/json" }
+        });
       }
     }
 
     if (!blobLike) {
-      return new Response(JSON.stringify({ error: "No file provided" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "No file provided" }), {
+        status: 400,
+        headers: { ...corsHeaders(origin), "Content-Type": "application/json" }
+      });
     }
 
     // ---- IMPORTANT: do NOT pass unknown metadata object here (TypeScript error) ----
@@ -71,9 +105,15 @@ export default httpAction(async (ctx, req: any) => {
       originalFilename: filename,
       size,
       contentType: contentTypeOut,
-    }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }), {
+      status: 200,
+      headers: { ...corsHeaders(origin), "Content-Type": "application/json" }
+    });
   } catch (err: any) {
     console.error("uploadFile action error:", err?.stack ?? err);
-    return new Response(JSON.stringify({ error: String(err) || "Upload failed" }), { status: 500, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: String(err) || "Upload failed" }), {
+      status: 500,
+      headers: { ...corsHeaders(origin), "Content-Type": "application/json" }
+    });
   }
 });

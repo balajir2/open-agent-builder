@@ -3,6 +3,7 @@ import { getConvexClient, getAuthenticatedConvexClient, api, isConvexConfigured 
 import { LangGraphExecutor } from '@/lib/workflow/langgraph';
 import { validateApiKey, createUnauthorizedResponse } from '@/lib/api/auth';
 import { checkRateLimit, getRateLimitKey, RATE_LIMITS } from '@/src/lib/api/distributed-rate-limiter';
+import { WorkflowIdSchema, WorkflowInputSchema, safeValidate } from '@/lib/api/validation-schemas';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +33,21 @@ export async function POST(
   }
 
   const { workflowId } = await params;
+
+  // SECURITY FIX: Validate workflow ID
+  const idValidation = safeValidate(WorkflowIdSchema, workflowId);
+  if (!idValidation.success) {
+    return new Response(
+      JSON.stringify({
+        error: 'Validation failed',
+        details: idValidation.error || 'Invalid workflow ID'
+      }),
+      {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+  }
 
   // Create SSE stream
   const encoder = new TextEncoder();
@@ -68,6 +84,18 @@ export async function POST(
       try {
         // Get inputs from request body
         const body = await request.json();
+
+        // SECURITY FIX: Validate inputs
+        const inputValidation = safeValidate(WorkflowInputSchema, body);
+        if (!inputValidation.success) {
+          sendEvent('error', {
+            error: 'Invalid input format',
+            details: inputValidation.error
+          });
+          closeStream();
+          return;
+        }
+
         const inputs = body || {};
 
         // Get workflow from Convex
@@ -137,30 +165,34 @@ export async function POST(
         const executionId = `exec_${Date.now()}`;
         const nodeResults: Record<string, any> = {};
 
-        // Get API keys - check user keys first, then fall back to environment
+        // Get API keys - check user keys first, then fall back to system keys from Convex
         const { getLLMApiKey, getToolApiKey } = await import('@/lib/api/llm-keys') as any;
         const userId = authResult.userId;
 
+        // Get system API keys from Convex environment
+        const systemKeys = await convex.action(api.systemApiKeys.getAllSystemApiKeys);
+
         const apiKeys = {
-          anthropic: (userId ? await getLLMApiKey('anthropic', userId) : undefined) ?? process.env.ANTHROPIC_API_KEY,
-          groq: (userId ? await getLLMApiKey('groq', userId) : undefined) ?? process.env.GROQ_API_KEY,
-          openai: (userId ? await getLLMApiKey('openai', userId) : undefined) ?? process.env.OPENAI_API_KEY,
-          google: (userId ? await getLLMApiKey('google', userId) : undefined) ?? process.env.GOOGLE_API_KEY,
-          firecrawl: (userId ? await getToolApiKey('firecrawl', userId) : undefined) ?? process.env.FIRECRAWL_API_KEY,
-          arcade: (userId ? await getToolApiKey('arcade', userId) : undefined) ?? process.env.ARCADE_API_KEY,
-          e2b: (userId ? await getToolApiKey('e2b', userId) : undefined) ?? process.env.E2B_API_KEY,
-          tavily: (userId ? await getToolApiKey('tavily-search', userId) : undefined) ?? process.env.TAVILY_API_KEY,
-          serper: (userId ? await getToolApiKey('serper-search', userId) : undefined) ?? process.env.SERPER_API_KEY,
-          serpapi: (userId ? await getToolApiKey('serpapi-search', userId) : undefined) ?? process.env.SERPAPI_API_KEY,
-          scraperapi: (userId ? await getToolApiKey('scraperapi', userId) : undefined) ?? process.env.SCRAPERAPI_API_KEY,
-          browserless: (userId ? await getToolApiKey('browserless', userId) : undefined) ?? process.env.BROWSERLESS_API_KEY,
+          anthropic: (userId ? await getLLMApiKey('anthropic', userId) : undefined) ?? systemKeys.anthropic,
+          groq: (userId ? await getLLMApiKey('groq', userId) : undefined) ?? systemKeys.groq,
+          openai: (userId ? await getLLMApiKey('openai', userId) : undefined) ?? systemKeys.openai,
+          google: (userId ? await getLLMApiKey('google', userId) : undefined) ?? systemKeys.google,
+          firecrawl: (userId ? await getToolApiKey('firecrawl', userId) : undefined) ?? systemKeys.firecrawl,
+          arcade: (userId ? await getToolApiKey('arcade', userId) : undefined) ?? systemKeys.arcade,
+          e2b: (userId ? await getToolApiKey('e2b', userId) : undefined) ?? systemKeys.e2b,
+          tavily: (userId ? await getToolApiKey('tavily-search', userId) : undefined) ?? systemKeys.tavily,
+          serper: (userId ? await getToolApiKey('serper-search', userId) : undefined) ?? systemKeys.serper,
+          serpapi: (userId ? await getToolApiKey('serpapi-search', userId) : undefined) ?? systemKeys.serpapi,
+          scraperapi: (userId ? await getToolApiKey('scraperapi', userId) : undefined) ?? systemKeys.scraperapi,
+          browserless: (userId ? await getToolApiKey('browserless', userId) : undefined) ?? systemKeys.browserless,
         };
 
-        console.error('[Route] Debug API Keys:', {
+        console.log('[Route] Debug API Keys:', {
           userId,
+          hasTavilyKey: !!apiKeys.tavily,
           hasSerperKey: !!apiKeys.serper,
-          serperKeySource: apiKeys.serper ? (apiKeys.serper === process.env.SERPER_API_KEY ? 'env' : 'db') : 'none',
-          serperKeyLength: apiKeys.serper?.length
+          hasFirecrawlKey: !!apiKeys.firecrawl,
+          hasAnthropicKey: !!apiKeys.anthropic,
         });
 
         // Prepare initial input - pass as object if it's an object, otherwise as string

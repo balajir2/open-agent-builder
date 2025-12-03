@@ -211,7 +211,6 @@ export function useWorkflow(workflowId?: string) {
           body: JSON.stringify(updated, getCircularReplacer()),
         });
         const data = await response.json();
-        console.log('💾 [AUTO-SAVE] Workflow synced to Convex:', data.success ? '✅ SUCCESS' : '❌ FAILED');
 
         // Store the Convex ID from the response
         if (data.success && data.workflowId) {
@@ -221,7 +220,7 @@ export function useWorkflow(workflowId?: string) {
         // Don't reload workflows on every save - only when explicitly needed
         // This prevents unnecessary re-fetches and duplicate saves
       } catch (error) {
-        console.error('❌ Failed to save workflow to Convex:', error);
+        console.error('Failed to save workflow to Convex:', error);
       }
     }, 1000); // 1000ms debounce to batch rapid saves
   }, [workflow, loadWorkflows]);

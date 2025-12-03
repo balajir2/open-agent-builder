@@ -25,6 +25,7 @@ import type * as lib_encryption from "../lib/encryption.js";
 import type * as lib_utils from "../lib/utils.js";
 import type * as mcpServers from "../mcpServers.js";
 import type * as rateLimits_check from "../rateLimits/check.js";
+import type * as systemApiKeys from "../systemApiKeys.js";
 import type * as templates from "../templates.js";
 import type * as uiBuilderConfigurations from "../uiBuilderConfigurations.js";
 import type * as userLLMKeys from "../userLLMKeys.js";
@@ -66,6 +67,7 @@ declare const fullApi: ApiFromModules<{
   "lib/utils": typeof lib_utils;
   mcpServers: typeof mcpServers;
   "rateLimits/check": typeof rateLimits_check;
+  systemApiKeys: typeof systemApiKeys;
   templates: typeof templates;
   uiBuilderConfigurations: typeof uiBuilderConfigurations;
   userLLMKeys: typeof userLLMKeys;
