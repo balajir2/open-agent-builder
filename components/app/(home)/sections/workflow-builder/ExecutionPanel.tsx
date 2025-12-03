@@ -393,6 +393,12 @@ export default function ExecutionPanel({
             contentType: data.contentType ?? file.type,
           };
 
+          console.log(`[ExecutionPanel] ✅ File uploaded for variable '${variableName}':`, {
+            storageId: fileMeta.storageId,
+            filename: fileMeta.originalFilename,
+            size: fileMeta.size
+          });
+
           setInputValues(prev => ({ ...prev, [variableName]: fileMeta }));
           setUploadProgress(prev => ({ ...prev, [variableName]: 100 }));
           setTimeout(() => setUploadProgress(prev => ({ ...prev, [variableName]: 0 })), 700);

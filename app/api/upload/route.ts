@@ -28,6 +28,14 @@ export async function POST(request: Request) {
     // Forward Convex response directly
     const respJson = await resp.json();  // ← Convex returns proper JSON
 
+    console.log("[/api/upload] ✅ Upload successful, response:", {
+      status: resp.status,
+      hasStorageId: !!respJson.storageId,
+      storageId: respJson.storageId,
+      filename: respJson.originalFilename,
+      size: respJson.size
+    });
+
     return NextResponse.json(respJson, {
       status: resp.status,
       headers: {

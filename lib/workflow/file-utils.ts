@@ -86,23 +86,53 @@ export async function prefetchFileContents(text: string, state: WorkflowState): 
             const filename = fileObj?.originalFilename || fileObj?.name || null;
 
             // Get file metadata to determine file type
-            const metadata = await convex.query(api.files.getFileMetadata, { storageId });
+            let metadata;
+            try {
+                metadata = await convex.query(api.files.getFileMetadata, { storageId });
+                if (!metadata) {
+                    console.error(`[FileUtils] ❌ No metadata found for storageId: ${storageId}`);
+                    console.error(`[FileUtils] This likely means the file doesn't exist in Convex storage`);
+                    return;
+                }
+                console.log(`[FileUtils] File metadata:`, {
+                    contentType: metadata.contentType,
+                    size: metadata.size,
+                    sha256: metadata.sha256
+                });
+            } catch (err) {
+                console.error(`[FileUtils] ❌ Error fetching metadata for ${storageId}:`, err);
+                return;
+            }
             const contentType = metadata?.contentType || null;
 
             // Get the download URL
-            const url = await convex.query(api.files.getDownloadUrl, { storageId });
-
-            if (!url) {
-                console.warn(`[FileUtils] No download URL found for storageId: ${storageId}`);
+            let url;
+            try {
+                url = await convex.query(api.files.getDownloadUrl, { storageId });
+                if (!url) {
+                    console.error(`[FileUtils] ❌ No download URL returned for storageId: ${storageId}`);
+                    console.error(`[FileUtils] This usually means the file exists but Convex couldn't generate a URL`);
+                    return;
+                }
+                console.log(`[FileUtils] Download URL obtained (length: ${url.length})`);
+            } catch (err) {
+                console.error(`[FileUtils] ❌ Error getting download URL for ${storageId}:`, err);
                 return;
             }
 
             // Fetch the content
+            console.log(`[FileUtils] Fetching file content from URL...`);
             const response = await fetch(url);
             if (!response.ok) {
-                console.warn(`[FileUtils] Failed to fetch file content: ${response.statusText}`);
+                console.error(`[FileUtils] ❌ Failed to fetch file content:`, {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: url.substring(0, 100) + '...'
+                });
                 return;
             }
+            console.log(`[FileUtils] ✅ File fetch successful, response size: ${response.headers.get('content-length') || 'unknown'}`);
+
 
             let content: string;
 

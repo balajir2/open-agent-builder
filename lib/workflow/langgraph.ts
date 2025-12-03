@@ -23,6 +23,7 @@ import { executeHTTPNode } from './executors/http';
 import { executeExtractNode } from './executors/extract';
 import { executeArcadeNode } from './executors/arcade';
 import { createOrUpdateArcadeAuthRecord } from '../arcade/auth-store';
+import { DEFAULT_MODELS } from '@/lib/api/models';
 
 interface ArcadePendingResponse {
   __arcadePendingAuth: true;
@@ -1297,7 +1298,7 @@ export function workflowToLangGraphCode(workflow: Workflow): string {
         return `// ${data.nodeName || node.id} - AI Agent
 const ${node.id} = async (state: typeof StateAnnotation.State) => {
   const response = await anthropic.messages.create({
-    model: "${data.model || 'claude-3-5-sonnet-20241022'}",
+    model: "${data.model || DEFAULT_MODELS.anthropic}",
     max_tokens: 4096,
     messages: [{
       role: 'user',

@@ -13,6 +13,7 @@ import FirecrawlLogo from "@/components/icons/FirecrawlLogo";
 import { toolRegistry, getToolsByCategory } from "@/lib/tools/registry";
 import { ToolConfig } from "@/lib/tools/types";
 import { llmProviders } from "@/lib/config/llm-config";
+import { DEFAULT_MODELS } from "@/lib/api/models";
 
 interface NodePanelProps {
   nodeData: {
@@ -80,7 +81,7 @@ export default function NodePanel({
   const [name, setName] = useState(nodeData?.label || "My agent");
   const [instructions, setInstructions] = useState((nodeData as any)?.instructions || "");
   const [includeChatHistory, setIncludeChatHistory] = useState(true);
-  const [model, setModel] = useState("anthropic/claude-3-5-sonnet-20241022");
+  const [model, setModel] = useState(`anthropic/${DEFAULT_MODELS.anthropic}`);
   const [outputFormat, setOutputFormat] = useState("Text");
   const [customModel, setCustomModel] = useState("");
   const [tokenLimit, setTokenLimit] = useState<number | undefined>(undefined);
@@ -193,7 +194,7 @@ export default function NodePanel({
       setName(data.name || data.nodeName || nodeData.label);
       setInstructions(incomingInstructions);
       setIncludeChatHistory(data.includeChatHistory ?? true);
-      setModel(data.model || "anthropic/claude-3-5-sonnet-20241022");
+      setModel(data.model || `anthropic/${DEFAULT_MODELS.anthropic}`);
       setTokenLimit(data.tokenLimit);
       setOutputFormat(data.outputFormat || "Text");
       setShowSearchSources(data.showSearchSources ?? false);

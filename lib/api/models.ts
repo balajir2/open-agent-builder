@@ -30,9 +30,9 @@ export const SUPPORTED_MODELS = {
  */
 export const DEFAULT_MODELS = {
   openai: llmProviders.find(p => p.id === 'openai')?.defaultModel || 'gpt-4o',
-  anthropic: llmProviders.find(p => p.id === 'anthropic')?.defaultModel || 'claude-3-5-sonnet-20241022',
+  anthropic: llmProviders.find(p => p.id === 'anthropic')?.defaultModel || 'claude-sonnet-4-5-20250929',
   groq: llmProviders.find(p => p.id === 'groq')?.defaultModel || 'gpt-oss-120b',
-  google: llmProviders.find(p => p.id === 'google')?.defaultModel || 'gemini-1.5-pro',
+  google: llmProviders.find(p => p.id === 'google')?.defaultModel || 'gemini-2.0-flash-exp',
 } as const;
 
 /**

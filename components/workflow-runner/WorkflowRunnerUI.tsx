@@ -922,151 +922,92 @@ export default function WorkflowRunnerUI() {
       alert("Nothing to download");
       return;
     }
+
     try {
       setIsDownloading(true);
 
-      const orig = resultRef.current as Element;
-      const clone = orig.cloneNode(true) as HTMLElement;
+      const element = resultRef.current;
+      const innerText = element.innerText || element.textContent || "";
 
-      // --- Page-level visual adjustments (border, padding, background) ---
-      const PAGE_BORDER = "1px solid #e5e7eb"; // subtle gray border
-      const PAGE_PADDING = "28px";
-      const PAGE_BG = "#ffffff";
+      // Generate PDF using text-based approach (avoids html2canvas color() issues)
+      const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 50;
+      const contentWidth = pageWidth - margin * 2;
 
-      // Apply computed width to preserve layout
-      try {
-        const origRect = orig.getBoundingClientRect();
-        clone.style.position = "absolute";
-        clone.style.left = "0px";
-        clone.style.top = "0px";
-        clone.style.transform = `translateX(-10000px)`; // off screen but layoutable
-        clone.style.boxSizing = "border-box";
-        clone.style.width = `${Math.round(origRect.width)}px`;
-        clone.style.maxWidth = `${Math.round(origRect.width)}px`;
-      } catch (e) {
-        // fallback
-        clone.style.position = "absolute";
-        clone.style.left = "0px";
-        clone.style.top = "0px";
+      let y = margin;
+      let currentFontSize = 11;
+      pdf.setFontSize(currentFontSize);
+
+      // Split into lines and process
+      const lines = String(innerText).split('\n');
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+
+        // Skip empty lines but add spacing
+        if (!line) {
+          y += currentFontSize / 2;
+          continue;
+        }
+
+        // Detect headers (markdown or ALL CAPS)
+        let isHeader = false;
+        let headerLevel = 0;
+
+        if (line.startsWith('###')) {
+          isHeader = true;
+          headerLevel = 3;
+        } else if (line.startsWith('##')) {
+          isHeader = true;
+          headerLevel = 2;
+        } else if (line.startsWith('#')) {
+          isHeader = true;
+          headerLevel = 1;
+        } else if (line === line.toUpperCase() && line.length > 3 && line.length < 50) {
+          isHeader = true;
+          headerLevel = 2;
+        }
+
+        // Set font based on header level
+        if (isHeader) {
+          const sizes = [18, 15, 13];
+          currentFontSize = sizes[headerLevel - 1] || 11;
+          pdf.setFontSize(currentFontSize);
+          pdf.setFont('helvetica', 'bold');
+          y += currentFontSize; // Extra space before headers
+        } else {
+          currentFontSize = 11;
+          pdf.setFontSize(currentFontSize);
+          pdf.setFont('helvetica', 'normal');
+        }
+
+        // Remove markdown symbols
+        let cleanLine = line.replace(/^#{1,6}\s*/, '').trim();
+
+        // Wrap text to fit page width
+        const wrappedLines = pdf.splitTextToSize(cleanLine, contentWidth);
+
+        for (const wLine of wrappedLines) {
+          // Check if we need a new page
+          if (y + currentFontSize + 10 > pageHeight - margin) {
+            pdf.addPage();
+            y = margin;
+          }
+
+          pdf.text(wLine, margin, y);
+          y += currentFontSize + 4;
+        }
+
+        // Extra space after headers
+        if (isHeader) {
+          y += currentFontSize / 2;
+        }
       }
 
-      // Insert a wrapper around the clone so we can add border/padding that html2canvas will capture
-      const wrapper = document.createElement("div");
-      wrapper.style.boxSizing = "border-box";
-      wrapper.style.display = "inline-block";
-      wrapper.style.background = PAGE_BG;
-      wrapper.style.padding = PAGE_PADDING;
-      wrapper.style.border = PAGE_BORDER;
-      wrapper.style.borderRadius = "8px";
-      wrapper.style.width = clone.style.width || "auto";
+      pdf.save(filename);
 
-      // Slight overall scale reduction for the page (reduce overall font-size/spacing)
-      // This keeps headings proportional but slightly smaller; you can tune scaleFactor.
-      const scaleFactor = 0.93;
-
-      // Apply sanitization & inline computed styles first (will inline font-size/font-weight/etc.)
-      sanitizeCloneForCanvas(clone, orig);
-
-      // Force strong/b elements to be bold in clone (some font stacks or variable fonts render lighter in canvas)
-      try {
-        const strongEls = clone.querySelectorAll("strong, b");
-        strongEls.forEach((el) => {
-          safeSetStyle(el as HTMLElement, "font-weight", "700");
-        });
-      } catch { /* ignore */ }
-
-      // Preserve heading sizes but apply scaleFactor: for each heading in clone, read matching original computed font-size and set scaled size
-      try {
-        const headingTags = ["h1", "h2", "h3", "h4", "h5", "h6"];
-        headingTags.forEach(tag => {
-          const cloneHeadings = Array.from(clone.querySelectorAll(tag));
-          cloneHeadings.forEach((cEl, idx) => {
-            // find best match in original via our helper to acquire original computed size
-            let origMatch = findBestMatchInOriginal(cEl, orig) || orig.querySelector(tag);
-            if (!origMatch) origMatch = orig as Element;
-            try {
-              const cs = window.getComputedStyle(origMatch as Element);
-              if (cs && cs.fontSize) {
-                // parse px value
-                const px = parseFloat(cs.fontSize || "16");
-                const scaled = Math.max(10, Math.round(px * scaleFactor));
-                safeSetStyle(cEl as HTMLElement, "font-size", `${scaled}px`);
-              }
-              // preserve weight explicitly
-              if (cs && cs.fontWeight) {
-                safeSetStyle(cEl as HTMLElement, "font-weight", cs.fontWeight);
-              }
-            } catch { /* ignore per-element */ }
-          });
-        });
-      } catch (e) {
-        // if anything fails, continue — we still inlined the original computed styles earlier
-        console.warn("Heading-size preservation failed:", e);
-      }
-
-      // Apply a mild global reduction to body-level font size to make the whole page slightly smaller
-      try {
-        // If the computed size is available, scale it; otherwise set a reasonable default
-        const origBody = orig.closest("body") || orig;
-        const bodyCS = window.getComputedStyle(origBody as Element);
-        let baseSize = 14;
-        if (bodyCS && bodyCS.fontSize) baseSize = parseFloat(bodyCS.fontSize || "14");
-        const scaledBase = Math.max(10, Math.round(baseSize * scaleFactor));
-        safeSetStyle(clone as HTMLElement, "font-size", `${scaledBase}px`);
-      } catch { /* ignore */ }
-
-      // Add an explicit page background for html2canvas (helps with transparent areas)
-      safeSetStyle(clone as HTMLElement, "background-color", PAGE_BG);
-      safeSetStyle(clone as HTMLElement, "color", window.getComputedStyle(orig as Element).color || "rgb(0,0,0)");
-
-      // Append clone into wrapper
-      wrapper.appendChild(clone);
-      document.body.appendChild(wrapper);
-
-      // give browser a bit more time to apply styles
-      await new Promise((res) => setTimeout(res, 150));
-
-      try {
-        const canvas = await html2canvas(wrapper, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          backgroundColor: null,
-          foreignObjectRendering: true as any,
-        });
-
-        const imgData = canvas.toDataURL("image/png");
-
-        const pdf = new jsPDF({
-          orientation: "portrait",
-          unit: "pt",
-          format: "a4",
-        });
-
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-
-        const imgWidth = canvas.width;
-        const imgHeight = canvas.height;
-
-        const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-        const renderedWidth = imgWidth * ratio;
-        const renderedHeight = imgHeight * ratio;
-
-        const marginLeft = (pdfWidth - renderedWidth) / 2;
-        const marginTop = (pdfHeight - renderedHeight) / 2;
-
-        pdf.addImage(imgData, "PNG", marginLeft > 0 ? marginLeft : 0, marginTop > 0 ? marginTop : 0, renderedWidth, renderedHeight);
-        pdf.save(filename);
-
-      } catch (hcErr: any) {
-        // If html2canvas fails due to parsing color() or similar, fall back to plain-text PDF.
-        console.warn("html2canvas render failed, falling back to text-only PDF. Error:", hcErr);
-        const innerText = (orig as HTMLElement).innerText || (orig as HTMLElement).textContent || "";
-        fallbackPdfFromPlainText(innerText, filename);
-      } finally {
-        try { document.body.removeChild(wrapper); } catch { }
-      }
     } catch (err: any) {
       console.error("Error creating PDF:", err);
       alert("Failed to create PDF: " + (err instanceof Error ? err.message : String(err)));
@@ -1156,7 +1097,7 @@ export default function WorkflowRunnerUI() {
                 </h2>
               </div>
 
-              <div className="p-6">
+              <div className="flex-1 overflow-y-auto p-6">
                 <div className="mb-6">
                   <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                     {workflowDetails?.name?.split?.("_")?.pop?.() || selectedWorkflowId}
@@ -1447,7 +1388,7 @@ export default function WorkflowRunnerUI() {
                 </div>
               </div>
 
-              <div className="flex-1 p-4 overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-4">
                 {showDownloadSuccess && (
                   <div className="flex items-start gap-2 p-3 mb-4 bg-green-50 rounded-md border border-green-200">
                     <div>
