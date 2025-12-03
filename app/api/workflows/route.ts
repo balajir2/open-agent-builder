@@ -449,8 +449,16 @@ function minimalCleanNodes(nodes: any[]) {
       instructions: node.data?.instructions,
       model: node.data?.model,
       mcpServerIds: node.data?.mcpServerIds,
+      mcpTools: node.data?.mcpTools,
       inputVariables: node.data?.inputVariables,
       outputFormat: node.data?.outputFormat,
+      selectedTools: node.data?.selectedTools, // ✅ ADD THIS!
+      jsonOutputSchema: node.data?.jsonOutputSchema,
+      includeChatHistory: node.data?.includeChatHistory,
+      showSearchSources: node.data?.showSearchSources,
+      tokenLimit: node.data?.tokenLimit,
+      // Include all other node data fields that might be needed
+      ...node.data,
     },
   }));
 }

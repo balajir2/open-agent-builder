@@ -100,6 +100,7 @@ export default function NodePanel({
   const [showStandardTools, setShowStandardTools] = useState(false);
   const lastLoadedNodeId = useRef<string | null>(null);
   const lastSyncedInstructionsRef = useRef<string | null>(null);
+  const lastSavedSelectedToolsRef = useRef<ToolConfig[] | undefined>(undefined);
 
   // Helper to update JSON schema from fields array
   const updateSchemaFromFields = (
@@ -198,7 +199,11 @@ export default function NodePanel({
       setTokenLimit(data.tokenLimit);
       setOutputFormat(data.outputFormat || "Text");
       setShowSearchSources(data.showSearchSources ?? false);
-      setSelectedTools(data.selectedTools || []);
+      // Load selectedTools - use empty array only if undefined AND it's truly a new node
+      const toolsToLoad = Array.isArray(data.selectedTools) ? data.selectedTools : [];
+      setSelectedTools(toolsToLoad);
+      // Update the ref so we know what was loaded
+      lastSavedSelectedToolsRef.current = toolsToLoad.length > 0 ? toolsToLoad : undefined;
       lastSyncedInstructionsRef.current = incomingInstructions;
 
       // Initialize MCP servers from node data
@@ -208,9 +213,6 @@ export default function NodePanel({
       } else if (data.mcpTools && Array.isArray(data.mcpTools)) {
         // Convert mcpTools to server IDs by matching against available MCP servers
         if (mcpServers && mcpServers.length > 0) {
-          console.log('🔍 Matching mcpTools from template:', data.mcpTools);
-          console.log('🔍 Available MCP servers:', mcpServers.map((s: any) => ({ name: s.name, url: s.url })));
-
           const mcpIds = data.mcpTools
             .map((tool: any) => {
               // Try to find matching MCP server by URL or name
@@ -313,6 +315,8 @@ export default function NodePanel({
           })
           .filter(Boolean);
 
+        const selectedToolsToSave = selectedTools.length > 0 ? selectedTools : undefined;
+
         onUpdate(nodeData.id, {
           name,
           nodeName: name,
@@ -325,7 +329,7 @@ export default function NodePanel({
           showSearchSources,
           mcpTools: mcpTools.length > 0 ? mcpTools : undefined,
           mcpServerIds: currentMCPServerIds.length > 0 ? currentMCPServerIds : undefined,
-          selectedTools: selectedTools.length > 0 ? selectedTools : undefined,
+          selectedTools: selectedToolsToSave,
           tokenLimit: tokenLimit,
         });
       } catch (error) {

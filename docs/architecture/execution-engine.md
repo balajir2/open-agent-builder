@@ -282,10 +282,11 @@ sequenceDiagram
     LLM-->>Agent: Final response
 ```
 
-**Supported Providers:**
-- **Anthropic:** Claude 3.5 Haiku, Sonnet 3.5 (full MCP support)
+**Supported Providers (All support MCP & tools):**
+- **Anthropic:** Claude Haiku 4.5, Sonnet 4.5, Opus 4.5
 - **OpenAI:** GPT-4o, GPT-4o-mini
-- **Groq:** Llama 3.1, Mixtral
+- **Google:** Gemini 2.0 Flash Experimental, 2.0 Flash, 2.0 Flash-Lite
+- **Groq:** Llama 3.3 70B, Llama 3.1 8B Instant, GPT OSS 120B, GPT OSS 20B
 
 ### MCP Node
 

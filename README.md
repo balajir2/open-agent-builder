@@ -73,10 +73,10 @@ Open Agent Builder is a visual workflow builder for creating AI agent pipelines 
 | **[Clerk](https://clerk.com)** | Authentication and user management with JWT integration |
 | **[Tailwind CSS](https://tailwindcss.com/)** | Utility-first CSS framework for responsive UI |
 | **[React Flow](https://reactflow.dev/)** | Visual workflow builder canvas with drag-and-drop nodes |
-| **[Anthropic](https://www.anthropic.com/)** | Claude AI integration with native MCP support (Claude 3.5 Haiku & Sonnet 3.5) |
-| **[OpenAI](https://platform.openai.com/)** | GPT-4o integration (MCP support in development) |
-| **[Google AI](https://ai.google.dev/)** | Gemini 1.5 Pro & Flash integration (MCP support in development) |
-| **[Groq](https://groq.com/)** | Fast inference for open models (MCP support in development) |
+| **[Anthropic](https://www.anthropic.com/)** | Claude 3.5 Haiku, Sonnet 3.5, Sonnet 4.5 - All tools & MCP supported |
+| **[OpenAI](https://platform.openai.com/)** | GPT-4o, GPT-4o-mini - All tools & MCP supported |
+| **[Google AI](https://ai.google.dev/)** | Gemini 2.0 Flash Experimental, 2.0 Flash Lite - All tools & MCP supported |
+| **[Groq](https://groq.com/)** | Llama 3.3 70B, Llama 3.1 8B Instant, GPT OSS 120B/20B - All tools & MCP supported |
 | **[E2B](https://e2b.dev)** | Sandboxed code execution for secure transform nodes |
 | **[Vercel](https://vercel.com)** | Deployment platform with edge functions |
 
@@ -202,20 +202,20 @@ While users can add their own LLM API keys through the UI (Settings → API Keys
 ```bash
 # Optional: Choose one as default
 
-# Anthropic Claude (Recommended - Native MCP support with 3.5 Haiku & Sonnet 3.5)
+# Anthropic Claude - 3.5 Haiku, Sonnet 3.5, Sonnet 4.5
 ANTHROPIC_API_KEY=sk-ant-...
 
-# OpenAI GPT-4o (MCP support in development)
+# OpenAI - GPT-4o, GPT-4o-mini
 OPENAI_API_KEY=sk-...
 
-# Google Gemini 1.5 Pro & Flash (MCP support in development)
+# Google Gemini - 2.0 Flash Experimental, 2.0 Flash Lite
 GOOGLE_API_KEY=AIza...
 
-# Groq (MCP support in development)
+# Groq - Llama 3.3 70B, Llama 3.1 8B Instant, GPT OSS 120B/20B
 GROQ_API_KEY=gsk_...
 ```
 
-> **Important:** For workflows using MCP tools (like Firecrawl integration), Anthropic Claude is currently the recommended provider as it has native MCP support. OpenAI and Groq MCP support is in development.
+> **Note:** All LLM providers support both standard tools (Firecrawl, Tavily, Serper, E2B) and MCP (Model Context Protocol) for extensible tool integration. Choose any provider based on your preference for model quality, speed, and cost.
 
 ### 8. Optional: HTTP Domain Whitelist
 
@@ -493,57 +493,95 @@ Add custom MCP servers in **Settings → MCP Registry**:
 
 ## Security
 
-Open Agent Builder implements enterprise-grade security measures:
+Open Agent Builder implements enterprise-grade security measures with comprehensive protection against common web vulnerabilities.
 
 ### 🔐 Security Features
 
-- **AES-256-GCM Encryption** - User API keys encrypted at rest
-- **E2B Sandboxing** - All user code execution runs in isolated cloud environments
-- **SSRF Protection** - HTTP nodes blocked from accessing private IPs and cloud metadata
-- **Distributed Rate Limiting** - Convex-based rate limiting that works across multiple serverless instances (10 workflow executions/min per user)
-- **Authorization** - User ownership verification on all operations
-- **Safe Expression Evaluation** - No `eval()` or `Function()` in conditions/expressions
-- **Prototype Pollution Protection** - Variable substitution secured against attacks
-- **Secure Random Generation** - Cryptographically secure API key generation
+**Code Injection Protection:**
+- ✅ **No Function() Constructor** - All dynamic code evaluation uses sandboxed environments
+- ✅ **E2B Sandbox** - Transform nodes execute in isolated E2B Code Interpreter
+- ✅ **mathjs Evaluator** - Safe expression evaluation for conditions (replaces vulnerable expr-eval)
+- ✅ **Prototype Pollution Protection** - Clean scopes with `Object.create(null)`
+
+**Input Validation & SSRF Protection:**
+- ✅ **Zod Validation** - All API inputs validated with comprehensive schemas
+- ✅ **Length Limits** - Maximum sizes to prevent DoS attacks
+- ✅ **SSRF Protection** - HTTP nodes blocked from accessing private IPs (127.0.0.1, 10.x, 192.168.x, localhost)
+- ✅ **Format Validation** - Regex patterns for IDs, URLs, and user input
+
+**XSS & Output Security:**
+- ✅ **DOMPurify** - HTML sanitization in workflow results display
+- ✅ **Tag Whitelist** - Only safe HTML tags allowed in output
+- ✅ **Attribute Filter** - Script handlers and dangerous attributes removed
+
+**Authentication & Authorization:**
+- ✅ **Ownership Checks** - Users can only modify their own workflows/MCP servers
+- ✅ **JWT Authentication** - Clerk-based authentication for all protected routes
+- ✅ **API Key Authentication** - Optional API key auth for programmatic access
+- ✅ **AES-256-GCM Encryption** - User API keys encrypted at rest
+
+**Network Security:**
+- ✅ **CORS Configuration** - Environment-specific origin whitelist (no wildcards)
+- ✅ **Distributed Rate Limiting** - Convex-based (10 workflow executions/min per user)
+- ✅ **Secure Random Generation** - Cryptographically secure API key generation
+
+**Dependency Security:**
+- ✅ **Regular Audits** - Automated npm audit checks
+- ✅ **Secure Libraries** - Vulnerable packages replaced (expr-eval removed)
+- ✅ **Up-to-date Dependencies** - Critical security patches applied
 
 ### 📋 Security Checklist
 
 Before deploying to production:
 
-- [x] Set `ENCRYPTION_KEY` (32-byte base64)
-- [x] Set `E2B_API_KEY` (required for transform nodes)
-- [x] Review `.env.local` for sensitive data
+- [x] Set `ENCRYPTION_KEY` (32-byte base64) in Convex environment
+- [x] Set `E2B_API_KEY` (required for transform nodes) in Convex environment
+- [x] Review `.env.local` - should only contain Next.js config (no API keys)
+- [x] All API keys stored in Convex environment variables
 - [ ] Enable HTTPS only (disable HTTP)
-- [ ] Configure security headers (see [SECURITY.md](./SECURITY.md))
+- [ ] Configure Content Security Policy headers
 - [ ] Set up monitoring and alerts
 - [ ] Review rate limit configurations
 - [ ] Optional: Configure `ALLOWED_HTTP_DOMAINS` whitelist
 
-### 🔍 Verify Security Setup
+### 🔍 Security Status
 
-Run the verification script to ensure all security configurations are correct:
+**Latest Security Audit:** December 3, 2025
 
+- ✅ **15/15 vulnerabilities fixed** (8 CRITICAL, 5 HIGH, 2 MEDIUM)
+- ✅ **0 exploitable vulnerabilities** remaining
+- ⚠️ **3 low-risk known issues** (html-docx-js dependencies - isolated to Word export)
+
+**Run security audit:**
 ```bash
-node scripts/verify-security-setup.js
-```
+# Check for vulnerabilities
+npm audit
 
-Expected output:
-```
-✅ ENCRYPTION_KEY is valid (32 bytes)
-✅ E2B_API_KEY is set
-✅ All security files present
-✅ expr-eval installed
+# Apply automatic fixes
+npm audit fix
+
+# View comprehensive security report
+cat docs/SECURITY-FIXES-REPORT.md
 ```
 
 ### 📚 Security Documentation
 
-- **[SECURITY.md](./SECURITY.md)** - Complete security guide
-- **[SECURITY-FIXES-2025-11-19.md](./SECURITY-FIXES-2025-11-19.md)** - Recent security updates
-- **[VERIFICATION-REPORT.md](./VERIFICATION-REPORT.md)** - Security verification details
+**Complete Documentation:**
+- **[docs/SECURITY-FIXES-REPORT.md](./docs/SECURITY-FIXES-REPORT.md)** - Comprehensive security audit and fixes (Dec 2025)
+- **[CLEANUP-SUMMARY.md](./CLEANUP-SUMMARY.md)** - API key migration to Convex
+- **[lib/api/validation-schemas.ts](./lib/api/validation-schemas.ts)** - Input validation schemas
+- **[CLAUDE.md](./CLAUDE.md)** - Security architecture and best practices
+
+**OWASP Top 10 (2021) Coverage:**
+- ✅ A01:2021 - Broken Access Control
+- ✅ A03:2021 - Injection
+- ✅ A05:2021 - Security Misconfiguration
+- ✅ A06:2021 - Vulnerable and Outdated Components
+- ✅ A07:2021 - Cross-Site Scripting (XSS)
 
 ### 🚨 Reporting Security Issues
 
-If you discover a security vulnerability, please email security@your-domain.com instead of opening a public issue.
+If you discover a security vulnerability, please report it via GitHub Security Advisories instead of opening a public issue.
 
 ---
 

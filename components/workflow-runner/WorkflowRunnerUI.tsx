@@ -6,7 +6,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import jsPDF from "jspdf";
+import "jspdf-autotable";
 import html2canvas from "html2canvas";
+import DOMPurify from 'dompurify'; // SECURITY FIX: XSS protection
 import {
   Search, X, Save, Check, Download, ChevronDown,
   FileText, FileDown, Loader, CheckCircle,
@@ -913,9 +915,9 @@ export default function WorkflowRunnerUI() {
 
   /**
    * downloadResultAsPDF
-   * - preserves computed styles, headings & boldness
-   * - reduces global font scale slightly (configurable)
-   * - adds a border/padding to the "page" for visual framing
+   * - preserves HTML formatting including tables, headers, bold text
+   * - uses direct DOM parsing and jsPDF native rendering
+   * - maintains visual fidelity with proper structure
    */
   async function downloadResultAsPDF(filename = "workflow-output.pdf") {
     if (!resultRef.current) {
@@ -927,90 +929,396 @@ export default function WorkflowRunnerUI() {
       setIsDownloading(true);
 
       const element = resultRef.current;
-      const innerText = element.innerText || element.textContent || "";
 
-      // Generate PDF using text-based approach (avoids html2canvas color() issues)
-      const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 50;
-      const contentWidth = pageWidth - margin * 2;
+      // Create PDF
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
 
-      let y = margin;
-      let currentFontSize = 11;
-      pdf.setFontSize(currentFontSize);
+      const pageWidth = pdf.internal.pageSize.getWidth(); // 210mm for A4
+      const pageHeight = pdf.internal.pageSize.getHeight(); // 297mm for A4
+      const margin = 20; // Increased from 15mm
+      const contentWidth = 160; // Very conservative: 210 - 50 (extra safety margin)
+      let yPosition = margin;
 
-      // Split into lines and process
-      const lines = String(innerText).split('\n');
+      console.log('PDF dimensions:', { pageWidth, pageHeight, margin, contentWidth });
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-
-        // Skip empty lines but add spacing
-        if (!line) {
-          y += currentFontSize / 2;
-          continue;
-        }
-
-        // Detect headers (markdown or ALL CAPS)
-        let isHeader = false;
-        let headerLevel = 0;
-
-        if (line.startsWith('###')) {
-          isHeader = true;
-          headerLevel = 3;
-        } else if (line.startsWith('##')) {
-          isHeader = true;
-          headerLevel = 2;
-        } else if (line.startsWith('#')) {
-          isHeader = true;
-          headerLevel = 1;
-        } else if (line === line.toUpperCase() && line.length > 3 && line.length < 50) {
-          isHeader = true;
-          headerLevel = 2;
-        }
-
-        // Set font based on header level
-        if (isHeader) {
-          const sizes = [18, 15, 13];
-          currentFontSize = sizes[headerLevel - 1] || 11;
-          pdf.setFontSize(currentFontSize);
-          pdf.setFont('helvetica', 'bold');
-          y += currentFontSize; // Extra space before headers
-        } else {
-          currentFontSize = 11;
-          pdf.setFontSize(currentFontSize);
-          pdf.setFont('helvetica', 'normal');
-        }
-
-        // Remove markdown symbols
-        let cleanLine = line.replace(/^#{1,6}\s*/, '').trim();
-
-        // Wrap text to fit page width
-        const wrappedLines = pdf.splitTextToSize(cleanLine, contentWidth);
-
-        for (const wLine of wrappedLines) {
-          // Check if we need a new page
-          if (y + currentFontSize + 10 > pageHeight - margin) {
-            pdf.addPage();
-            y = margin;
-          }
-
-          pdf.text(wLine, margin, y);
-          y += currentFontSize + 4;
-        }
-
-        // Extra space after headers
-        if (isHeader) {
-          y += currentFontSize / 2;
-        }
+      // Debug: log a sample of the HTML
+      console.log('HTML structure:', element.children.length, 'top-level elements');
+      if (element.children[0]) {
+        console.log('First element:', element.children[0].tagName, element.children[0].textContent?.substring(0, 100));
       }
 
-      pdf.save(filename);
+      // Helper function to clean text for PDF rendering
+      const cleanText = (text: string): string => {
+        return text.replace(/[\u2018\u2019]/g, "'")      // Replace smart quotes
+                   .replace(/[\u201C\u201D]/g, '"')       // Replace smart double quotes
+                   .replace(/[\u2192\u2794\u27A1]/g, '->') // Replace arrows with ->
+                   .replace(/[\u2022\u2023\u25E6\u2043]/g, '*') // Replace bullets with *
+                   .replace(/[\u2013\u2014]/g, '-')       // Replace em/en dashes
+                   .replace(/[\u2026]/g, '...')           // Replace ellipsis
+                   .replace(/[^\x00-\x7F]/g, '')          // Remove any non-ASCII characters
+                   .replace(/\s+/g, ' ')                  // Normalize whitespace
+                   .replace(/\s+\*\s+/g, '\n* ')          // Add line break before each bullet point
+                   .replace(/(\*\s+[^:]+:)\s+(\d+\.)/g, '$1\n$2') // Add line break after section headers before numbered lists
+                   .replace(/(\d+\.\s+[^:]+:)/g, '\n$1') // Add line break before numbered list items with colons
+                   .trim();
+      };
+
+      // Helper function to add new page if needed
+      const checkPageBreak = (requiredSpace: number) => {
+        if (yPosition + requiredSpace > pageHeight - margin) {
+          pdf.addPage();
+          yPosition = margin;
+          return true;
+        }
+        return false;
+      };
+
+      // Helper function to render table
+      const renderTable = (table: HTMLTableElement) => {
+        const rows: string[][] = [];
+        const headerRows: string[][] = [];
+
+        // Extract table data
+        const thead = table.querySelector('thead');
+        const tbody = table.querySelector('tbody');
+
+        if (thead) {
+          thead.querySelectorAll('tr').forEach(tr => {
+            const rowData: string[] = [];
+            tr.querySelectorAll('th, td').forEach(cell => {
+              rowData.push((cell.textContent || '').trim());
+            });
+            headerRows.push(rowData);
+          });
+        }
+
+        if (tbody) {
+          tbody.querySelectorAll('tr').forEach(tr => {
+            const rowData: string[] = [];
+            tr.querySelectorAll('td').forEach(cell => {
+              rowData.push((cell.textContent || '').trim());
+            });
+            rows.push(rowData);
+          });
+        } else {
+          // No tbody, get all rows
+          table.querySelectorAll('tr').forEach((tr, index) => {
+            const rowData: string[] = [];
+            const cells = tr.querySelectorAll('th, td');
+            cells.forEach(cell => {
+              rowData.push((cell.textContent || '').trim());
+            });
+
+            if (index === 0 && tr.querySelector('th')) {
+              headerRows.push(rowData);
+            } else {
+              rows.push(rowData);
+            }
+          });
+        }
+
+        // Use autoTable for proper table rendering
+        if (typeof (pdf as any).autoTable === 'function') {
+          (pdf as any).autoTable({
+            startY: yPosition,
+            head: headerRows.length > 0 ? headerRows : undefined,
+            body: rows,
+            margin: { left: margin, right: margin, top: margin, bottom: margin },
+            styles: {
+              fontSize: 8,
+              cellPadding: 2,
+              overflow: 'linebreak',
+              cellWidth: 'wrap',
+              halign: 'left',
+              valign: 'top',
+            },
+            headStyles: {
+              fillColor: [240, 240, 240],
+              textColor: [0, 0, 0],
+              fontStyle: 'bold',
+              fontSize: 9,
+            },
+            theme: 'grid',
+            tableWidth: 'wrap',
+            pageBreak: 'auto',
+          });
+          yPosition = (pdf as any).lastAutoTable.finalY + 5;
+        } else {
+          // Fallback: simple table rendering with word wrap
+          const colCount = Math.max(
+            ...headerRows.map(r => r.length),
+            ...rows.map(r => r.length)
+          );
+          const colWidth = contentWidth / colCount;
+
+          // Render headers with word wrap
+          headerRows.forEach(row => {
+            let maxHeight = 0;
+            const cellHeights: number[] = [];
+
+            pdf.setFontSize(8);
+            pdf.setFont('helvetica', 'bold');
+
+            // Calculate heights for all cells in row
+            row.forEach((cell, i) => {
+              const lines = pdf.splitTextToSize(cell, colWidth - 4);
+              const height = Math.max(lines.length * 4 + 4, 8);
+              cellHeights.push(height);
+              maxHeight = Math.max(maxHeight, height);
+            });
+
+            checkPageBreak(maxHeight);
+
+            // Draw cells with calculated height
+            row.forEach((cell, i) => {
+              const x = margin + (i * colWidth);
+              pdf.rect(x, yPosition, colWidth, maxHeight);
+              const lines = pdf.splitTextToSize(cell, colWidth - 4);
+              lines.forEach((line: string, lineIdx: number) => {
+                pdf.text(line, x + 2, yPosition + 4 + (lineIdx * 4));
+              });
+            });
+
+            yPosition += maxHeight;
+          });
+
+          // Render body rows with word wrap
+          pdf.setFont('helvetica', 'normal');
+          rows.forEach(row => {
+            let maxHeight = 0;
+            const cellHeights: number[] = [];
+
+            pdf.setFontSize(8);
+
+            // Calculate heights for all cells in row
+            row.forEach((cell, i) => {
+              const lines = pdf.splitTextToSize(cell, colWidth - 4);
+              const height = Math.max(lines.length * 4 + 4, 8);
+              cellHeights.push(height);
+              maxHeight = Math.max(maxHeight, height);
+            });
+
+            checkPageBreak(maxHeight);
+
+            // Draw cells with calculated height
+            row.forEach((cell, i) => {
+              const x = margin + (i * colWidth);
+              pdf.rect(x, yPosition, colWidth, maxHeight);
+              const lines = pdf.splitTextToSize(cell, colWidth - 4);
+              lines.forEach((line: string, lineIdx: number) => {
+                pdf.text(line, x + 2, yPosition + 4 + (lineIdx * 4));
+              });
+            });
+
+            yPosition += maxHeight;
+          });
+
+          yPosition += 5;
+        }
+      };
+
+      // Helper to process text nodes with inline formatting
+      const processTextWithFormatting = (el: Element, fontSize = 10) => {
+        const text = cleanText(el.textContent || '');
+        if (!text) return;
+
+        // Set font BEFORE splitTextToSize for accurate measurement
+        pdf.setFontSize(fontSize);
+        pdf.setFont('helvetica', 'normal');
+
+        // Split by newlines first to handle manual line breaks
+        const paragraphs = text.split('\n');
+        const lineHeight = fontSize * 0.6;
+
+        console.log(`Processing text (${paragraphs.length} paragraphs):`, text.substring(0, 50));
+
+        paragraphs.forEach((paragraph, pIdx) => {
+          if (!paragraph.trim()) return;
+
+          // Use splitTextToSize to ensure proper wrapping within contentWidth
+          const lines = pdf.splitTextToSize(paragraph, contentWidth);
+
+          lines.forEach((line: string, idx: number) => {
+            checkPageBreak(lineHeight + 2);
+            // Ensure font is set before rendering (in case checkPageBreak added a page)
+            pdf.setFontSize(fontSize);
+            pdf.setFont('helvetica', 'normal');
+
+            const textWidth = pdf.getTextWidth(line);
+            console.log(`  Para ${pIdx} Line ${idx}: width=${textWidth.toFixed(2)}mm, contentWidth=${contentWidth}mm`);
+
+            // Render the pre-wrapped line (don't use maxWidth as we already split)
+            pdf.text(line, margin, yPosition);
+            yPosition += lineHeight;
+          });
+
+          // Add extra spacing between paragraphs (after numbered items)
+          if (paragraph.match(/^\d+\./)) {
+            yPosition += 2;
+          }
+        });
+
+        yPosition += 4; // Paragraph spacing
+      };
+
+      // Process each child element
+      const processElement = (el: Element, depth = 0) => {
+        const tagName = el.tagName;
+        const text = cleanText(el.textContent || '');
+
+        if (!text && tagName !== 'TABLE' && tagName !== 'BR' && tagName !== 'HR') return;
+
+        switch (tagName) {
+          case 'H1':
+            checkPageBreak(15);
+            pdf.setFontSize(18);
+            pdf.setFont('helvetica', 'bold');
+            const h1Lines = pdf.splitTextToSize(text, contentWidth);
+            h1Lines.forEach((line: string) => {
+              checkPageBreak(10);
+              pdf.setFontSize(18);
+              pdf.setFont('helvetica', 'bold');
+              pdf.text(line, margin, yPosition);
+              yPosition += 10;
+            });
+            yPosition += 4;
+            break;
+
+          case 'H2':
+            checkPageBreak(12);
+            pdf.setFontSize(14);
+            pdf.setFont('helvetica', 'bold');
+            const h2Lines = pdf.splitTextToSize(text, contentWidth);
+            h2Lines.forEach((line: string) => {
+              checkPageBreak(8);
+              pdf.setFontSize(14);
+              pdf.setFont('helvetica', 'bold');
+              pdf.text(line, margin, yPosition);
+              yPosition += 8;
+            });
+            yPosition += 3;
+            break;
+
+          case 'H3':
+            checkPageBreak(10);
+            pdf.setFontSize(12);
+            pdf.setFont('helvetica', 'bold');
+            const h3Lines = pdf.splitTextToSize(text, contentWidth);
+            h3Lines.forEach((line: string) => {
+              checkPageBreak(7);
+              pdf.setFontSize(12);
+              pdf.setFont('helvetica', 'bold');
+              pdf.text(line, margin, yPosition);
+              yPosition += 7;
+            });
+            yPosition += 2;
+            break;
+
+          case 'TABLE':
+            checkPageBreak(20);
+            renderTable(el as HTMLTableElement);
+            yPosition += 5;
+            break;
+
+          case 'UL':
+          case 'OL':
+            const listItems = el.querySelectorAll('li');
+            listItems.forEach((li, index) => {
+              pdf.setFontSize(10);
+              pdf.setFont('helvetica', 'normal');
+              const bullet = tagName === 'UL' ? '•' : `${index + 1}.`;
+              const itemText = cleanText(li.textContent || '');
+              const lines = pdf.splitTextToSize(`${bullet} ${itemText}`, contentWidth - 5);
+              lines.forEach((line: string, i: number) => {
+                checkPageBreak(6);
+                pdf.setFontSize(10);
+                pdf.setFont('helvetica', 'normal');
+                pdf.text(line, margin + (i > 0 ? 5 : 0), yPosition);
+                yPosition += 6;
+              });
+            });
+            yPosition += 3;
+            break;
+
+          case 'P':
+          case 'SPAN':
+            checkPageBreak(10);
+            processTextWithFormatting(el, 10);
+            break;
+
+          case 'PRE':
+          case 'CODE':
+            checkPageBreak(10);
+            pdf.setFontSize(9);
+            pdf.setFont('courier', 'normal');
+            const codeLines = text.split('\n');
+            codeLines.forEach(line => {
+              // Use splitTextToSize for code lines too
+              const wrappedLines = pdf.splitTextToSize(line || ' ', contentWidth - 4);
+              wrappedLines.forEach((wrappedLine: string) => {
+                checkPageBreak(6);
+                pdf.text(wrappedLine, margin + 2, yPosition);
+                yPosition += 6;
+              });
+            });
+            yPosition += 3;
+            break;
+
+          case 'HR':
+            checkPageBreak(5);
+            pdf.setDrawColor(200, 200, 200);
+            pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+            yPosition += 5;
+            break;
+
+          case 'BR':
+            yPosition += 5;
+            break;
+
+          case 'DIV':
+          case 'SECTION':
+          case 'ARTICLE':
+            // Process children recursively for container elements
+            Array.from(el.children).forEach(child => processElement(child, depth + 1));
+            break;
+
+          default:
+            // For unknown elements, try to process children
+            if (el.children.length > 0) {
+              Array.from(el.children).forEach(child => processElement(child, depth + 1));
+            } else if (text) {
+              // Render text content with proper wrapping
+              checkPageBreak(10);
+              processTextWithFormatting(el, 10);
+            }
+        }
+      };
+
+      // Process all child elements
+      Array.from(element.children).forEach(child => processElement(child));
+
+      // Add timestamp to filename to avoid caching
+      const timestamp = new Date().getTime();
+      const finalFilename = filename.replace('.pdf', `-${timestamp}.pdf`);
+      pdf.save(finalFilename);
 
     } catch (err: any) {
       console.error("Error creating PDF:", err);
-      alert("Failed to create PDF: " + (err instanceof Error ? err.message : String(err)));
+
+      // Fallback to text-based PDF
+      console.log("Falling back to text-based PDF");
+      try {
+        const element = resultRef.current;
+        const innerText = element?.innerText || element?.textContent || "";
+        await fallbackPdfFromPlainText(innerText, filename);
+      } catch (fallbackErr) {
+        console.error("Fallback PDF creation failed:", fallbackErr);
+        alert("Failed to create PDF: " + (err instanceof Error ? err.message : String(err)));
+      }
     } finally {
       setIsDownloading(false);
     }
@@ -1620,16 +1928,22 @@ const formatOutput = (output: any) => {
 
   const resultText = displayAsText(output);
 
+  /**
+   * SECURITY FIX: Sanitize and format text to HTML using DOMPurify
+   * Prevents XSS attacks by sanitizing HTML content before rendering
+   */
   function formatTextToHTML(text: string): string {
     if (!text) return "";
 
     let html = text.trim();
 
+    // Escape HTML in content that's not whitelisted tags
     html = html.replace(
       /<(?!\/?(?:b|strong|i|em|u|p|br|h1|h2|h3|h4|h5|h6|ul|ol|li|table|thead|tbody|tr|th|td|pre|code|hr)\b)[^>]*>/gi,
       (match) => match.replace(/</g, "&lt;").replace(/>/g, "&gt;")
     );
 
+    // Convert markdown-style tables to HTML
     html = html.replace(
       /((?:\|.+\|\n)+)/g,
       (tableBlock) => {
@@ -1643,8 +1957,7 @@ const formatOutput = (output: any) => {
         const headerCells = lines[0]
           .split("|")
           .slice(1, -1)
-          .map((cell) => `<th>${cell.trim()}</th>`)
-
+          .map((cell) => `<th>${DOMPurify.sanitize(cell.trim())}</th>`)
           .join("");
 
         const rows = lines
@@ -1653,7 +1966,7 @@ const formatOutput = (output: any) => {
             const cells = line
               .split("|")
               .slice(1, -1)
-              .map((cell) => `<td>${cell.trim()}</td>`)
+              .map((cell) => `<td>${DOMPurify.sanitize(cell.trim())}</td>`)
               .join("");
             return `<tr>${cells}</tr>`;
           })
@@ -1663,24 +1976,39 @@ const formatOutput = (output: any) => {
       }
     );
 
+    // Convert markdown headings
     html = html.replace(/^#### (.*)$/gm, "<h4>$1</h4>");
     html = html.replace(/^### (.*)$/gm, "<h3>$1</h3>");
     html = html.replace(/^## (.*)$/gm, "<h2>$1</h2>");
     html = html.replace(/^# (.*)$/gm, "<h1>$1</h1>");
 
+    // Convert markdown bold and italic
     html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
     html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
 
+    // Convert line breaks
     html = html.replace(/\n{2,}/g, "</p><p>");
     html = html.replace(/\n/g, "<br/>");
 
+    // Wrap in paragraph if not already a block element
     if (!/^<\s*(h\d|table|ul|ol|pre|p|code|blockquote)/i.test(html.trim())) {
       html = `<p>${html}</p>`;
     }
 
+    // Remove empty paragraphs
     html = html.replace(/<p><\/p>/g, "");
 
-    return html;
+    // SECURITY FIX: Sanitize the final HTML with DOMPurify
+    // This removes any potentially malicious scripts, event handlers, or dangerous content
+    return DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: [
+        'b', 'strong', 'i', 'em', 'u', 'p', 'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
+        'pre', 'code', 'hr', 'blockquote', 'span', 'div'
+      ],
+      ALLOWED_ATTR: ['class', 'style'], // Only allow safe attributes
+      KEEP_CONTENT: true, // Keep text content even if tags are removed
+    });
   }
 
   return (

@@ -120,8 +120,6 @@ const result = transform();
 console.log(JSON.stringify(result));
 `;
 
-    console.log('🔍 E2B code to execute:', codeToExecute);
-
     // Execute in the sandbox using JavaScript
     const execution = await sandbox.runCode(codeToExecute);
 

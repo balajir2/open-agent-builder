@@ -1,8 +1,39 @@
 # CLAUDE.md
 
-**Last Updated:** November 19, 2025
+**Last Updated:** December 3, 2025
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## 🔑 CRITICAL: API Key Architecture Principle
+
+**ALL API keys MUST be stored in Convex environment variables ONLY. NO keys in `.env.local`.**
+
+### Design Principles:
+1. **Single Source of Truth**: All system API keys are stored in Convex environment via `npx convex env set`
+2. **Zero Keys in .env.local**: The `.env.local` file contains ONLY Next.js configuration (Clerk, Convex URL, etc.)
+3. **Convex Retrieval**: Next.js API routes retrieve keys from Convex via `convex/systemApiKeys.ts` queries
+4. **Two-Tier System**:
+   - **Tier 1**: User-specific keys (stored in Convex DB `userLLMKeys` table) - highest priority
+   - **Tier 2**: System keys (stored in Convex environment) - fallback for all users
+
+### Implementation:
+```typescript
+// ❌ WRONG - Never use process.env in API routes
+const apiKey = process.env.ANTHROPIC_API_KEY;
+
+// ✅ CORRECT - Always retrieve from Convex
+const systemKeys = await convexClient.action(api.systemApiKeys.getAllSystemApiKeys);
+const apiKey = systemKeys.anthropic;
+```
+
+**Note:** System API keys are retrieved via Convex **actions** (not queries) because they use Node.js runtime to access `process.env`.
+
+### Why This Matters:
+- **Production Ready**: Keys work across all deployment environments (local, Vercel, etc.)
+- **Team Sync**: All developers automatically get the same system configuration
+- **Security**: Keys stored server-side, never exposed to client or git
+- **Centralized**: One place to manage all API keys
+- **Deployment-Specific**: Different keys for dev vs. prod
 
 ## Overview
 
@@ -322,49 +353,205 @@ MCP servers provide tools to agents (e.g., Firecrawl for web scraping):
 3. **Execution** - `lib/workflow/executors/mcp.ts` calls MCP tools
 4. **Agent Integration** - Agents can use MCP tools via `tools` property
 
-**Currently Supported:**
-- **Anthropic Claude** - Full native MCP support (3.5 Haiku, Sonnet 3.5)
-- **OpenAI, Groq** - MCP support in development
+**All LLM Providers Support MCP & Tools:**
+- **Anthropic Claude** - Haiku 4.5, Sonnet 4.5, Opus 4.5
+- **OpenAI** - GPT-4o, GPT-4o-mini
+- **Google Gemini** - 2.0 Flash Experimental, 2.0 Flash, 2.0 Flash-Lite
+- **Groq** - Llama 3.3 70B, Llama 3.1 8B Instant, GPT OSS 120B, GPT OSS 20B
+
+All models work with both standard tools (Firecrawl, Tavily, Serper, E2B) and MCP protocol.
+
+## Security
+
+### Security Architecture
+
+The Open Agent Builder implements comprehensive security measures to protect against common web vulnerabilities and ensure safe workflow execution.
+
+#### Key Security Features
+
+**1. Code Injection Protection**
+- ✅ **No Function() Constructor** - All dynamic code evaluation uses sandboxed environments
+- ✅ **E2B Sandbox** - Transform nodes execute in isolated E2B Code Interpreter
+- ✅ **mathjs Evaluator** - Safe expression evaluation for if-else and while conditions
+- ✅ **Prototype Pollution Protection** - Clean scopes with `Object.create(null)`
+
+**2. Input Validation (Zod)**
+- ✅ **Type Safety** - All API inputs validated with Zod schemas
+- ✅ **Length Limits** - Maximum sizes to prevent DoS attacks
+- ✅ **Format Validation** - Regex patterns for IDs, URLs, etc.
+- ✅ **SSRF Protection** - Private IP addresses and localhost blocked in HTTP nodes
+
+**3. XSS Protection**
+- ✅ **DOMPurify** - HTML sanitization in workflow results display
+- ✅ **Tag Whitelist** - Only safe HTML tags allowed
+- ✅ **Attribute Filter** - Script handlers and dangerous attributes removed
+
+**4. Authorization & Access Control**
+- ✅ **Ownership Checks** - Users can only modify their own workflows/MCP servers
+- ✅ **JWT Authentication** - Clerk-based authentication for all protected routes
+- ✅ **API Key Authentication** - Optional API key auth for programmatic access
+
+**5. CORS Configuration**
+- ✅ **Origin Whitelist** - Environment-specific allowed origins
+- ✅ **No Wildcards** - Explicit origin validation
+- ✅ **Convex Subdomain Support** - *.convex.cloud and *.convex.site allowed
+
+**6. Dependency Security**
+- ✅ **Regular Audits** - Automated npm audit checks
+- ✅ **Secure Libraries** - Vulnerable packages replaced (expr-eval → mathjs)
+- ✅ **Up-to-date Dependencies** - Critical security patches applied
+
+#### Security Best Practices for Developers
+
+When working on this codebase:
+
+1. **Never use `eval()` or `Function()` constructor** - Use `safeEvaluate()` from `lib/workflow/safe-expression-evaluator.ts`
+2. **Always validate user input** - Use Zod schemas from `lib/api/validation-schemas.ts`
+3. **Sanitize HTML output** - Use DOMPurify before rendering user-generated content
+4. **Check ownership** - Always verify user owns resource before modification
+5. **Use parameterized queries** - Convex queries are safe by default
+6. **Add rate limiting** - Critical endpoints have rate limits via `distributed-rate-limiter.ts`
+
+#### Security Documentation
+
+- **Comprehensive Security Report:** [docs/SECURITY-FIXES-REPORT.md](docs/SECURITY-FIXES-REPORT.md)
+- **API Key Migration:** [CLEANUP-SUMMARY.md](CLEANUP-SUMMARY.md)
+- **Validation Schemas:** [lib/api/validation-schemas.ts](lib/api/validation-schemas.ts)
+
+#### Known Security Considerations
+
+**Low-Risk Known Issues:**
+- `html-docx-js` has vulnerable dependencies (jszip, lodash.merge)
+- Only affects Word document export feature
+- Isolated to server-side, low attack surface
+- Recommended: Replace with alternative library (docx, officegen)
+
+**Security Testing:**
+```bash
+# Run security audit
+npm audit
+
+# Check for vulnerabilities
+npm audit fix
+
+# View security report
+cat docs/SECURITY-FIXES-REPORT.md
+```
 
 ## Configuration
 
+### Two-Tier API Key Architecture
+
+This project uses a **two-tier API key system** that provides both convenience and flexibility:
+
+**Tier 1: System-Level Keys (Convex Environment)**
+- Stored in Convex environment variables
+- Available to ALL users as fallback
+- Set via: `npx convex env set KEY_NAME value`
+- Used when user hasn't provided their own key
+
+**Tier 2: User-Specific Keys (Convex Database)**
+- Stored encrypted in Convex database
+- User-provided keys via Settings UI
+- Takes precedence over system keys
+- Optional - users can rely on system keys
+
 ### Environment Variables
 
-Required in `.env.local`:
+#### Required in `.env.local` (Next.js Configuration)
+
+These keys MUST stay in `.env.local` because Next.js needs them:
 
 ```bash
-# Convex Database
+# Convex Database Connection (REQUIRED - Next.js client needs these)
 NEXT_PUBLIC_CONVEX_URL=https://your-project.convex.cloud
+CONVEX_DEPLOYMENT=dev:your-deployment
+NEXT_PUBLIC_CONVEX_UPLOAD_ACTION_URL=https://your-deployment.convex.site/http/uploadFile
 
-# Clerk Authentication
+# Clerk Authentication (REQUIRED - Next.js proxy.ts needs these)
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
 CLERK_JWT_ISSUER_DOMAIN=https://your-domain.clerk.accounts.dev
 
-# Firecrawl (REQUIRED)
-FIRECRAWL_API_KEY=fc-...
-
-# Security (REQUIRED for Production)
-# Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
-ENCRYPTION_KEY=<32-byte-base64-key>
-
-# E2B Sandbox (REQUIRED for Transform Nodes)
-E2B_API_KEY=e2b_...
-
-# Optional: Default LLM providers (users can add their own in UI)
-ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...
-GROQ_API_KEY=gsk_...
-
-# Optional: HTTP Domain Whitelist (security)
-# ALLOWED_HTTP_DOMAINS=api.example.com,*.trusted.com
-
-# Optional: LangSmith Tracing (for monitoring and debugging workflows)
-# Sign up at https://smith.langchain.com/ to get your API key
+# Optional: LangSmith Tracing (Next.js API routes only)
 LANGCHAIN_TRACING_V2=true
 LANGCHAIN_API_KEY=lsv2_pt_...
 LANGCHAIN_PROJECT=open-agent-builder
 LANGCHAIN_ENDPOINT=https://api.smith.langchain.com
+```
+
+#### Required in Convex Environment (System API Keys)
+
+These keys should be stored in **Convex environment variables**, NOT in `.env.local`:
+
+```bash
+# Set system-level API keys in Convex (available to all users as fallback)
+npx convex env set ENCRYPTION_KEY "<32-byte-base64-key>"
+npx convex env set CLERK_JWT_ISSUER_DOMAIN "https://your-domain.clerk.accounts.dev"
+
+# LLM Providers (system fallback - users can add their own in UI)
+npx convex env set ANTHROPIC_API_KEY "sk-ant-..."
+npx convex env set OPENAI_API_KEY "sk-..."
+npx convex env set GROQ_API_KEY "gsk_..."
+npx convex env set GOOGLE_API_KEY "AIzaSy..."
+
+# Tools & Services (system fallback - users can add their own in UI)
+npx convex env set FIRECRAWL_API_KEY "fc-..."
+npx convex env set E2B_API_KEY "e2b_..."
+npx convex env set TAVILY_API_KEY "tvly-..."
+npx convex env set ARCADE_API_KEY "arcade_..."
+
+# Optional: LangSmith (if you want server-side tracing)
+npx convex env set LANGCHAIN_API_KEY "lsv2_pt_..."
+npx convex env set LANGCHAIN_TRACING_V2 "true"
+npx convex env set LANGCHAIN_PROJECT "open-agent-builder"
+npx convex env set LANGCHAIN_ENDPOINT "https://api.smith.langchain.com"
+```
+
+**Generate ENCRYPTION_KEY:**
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+**List current Convex environment:**
+```bash
+npx convex env list              # Development
+npx convex env list --prod       # Production
+```
+
+#### Migration from .env.local to Convex
+
+If you have API keys in `.env.local` that should be in Convex:
+
+```bash
+# Automated migration (dry run first)
+node scripts/migrate-keys-to-convex.js --dry-run
+
+# Apply migration to development
+node scripts/migrate-keys-to-convex.js
+
+# Apply to production
+node scripts/migrate-keys-to-convex.js --prod
+```
+
+### Why This Architecture?
+
+**✅ Advantages:**
+- **Convenience**: Users can start using workflows immediately with system keys
+- **Flexibility**: Power users can provide their own keys for cost control
+- **Security**: Keys encrypted in Convex, never exposed to client
+- **Production Ready**: Works seamlessly in Vercel/production deployments
+- **Team Friendly**: All developers share system config via Convex
+- **Deployment-Specific**: Different keys for dev vs. prod environments
+
+**How it works in code:**
+```typescript
+// From app/api/workflows/[workflowId]/execute-stream/route.ts
+const apiKeys = {
+  anthropic: (await getLLMApiKey('anthropic', userId))  // User key first
+             ?? process.env.ANTHROPIC_API_KEY,           // Fall back to system
+  // ... etc
+};
 ```
 
 ### LangSmith Monitoring Setup
@@ -373,8 +560,15 @@ To monitor workflow execution in LangSmith:
 
 1. **Sign up** for LangSmith at [https://smith.langchain.com/](https://smith.langchain.com/)
 2. **Get your API key** from the LangSmith dashboard (Settings → API Keys)
-3. **Add to `.env.local`**:
+3. **Set in Convex** (recommended) OR `.env.local`:
    ```bash
+   # Option 1: Convex (recommended for production)
+   npx convex env set LANGCHAIN_TRACING_V2 "true"
+   npx convex env set LANGCHAIN_API_KEY "lsv2_pt_your_api_key_here"
+   npx convex env set LANGCHAIN_PROJECT "open-agent-builder"
+   npx convex env set LANGCHAIN_ENDPOINT "https://api.smith.langchain.com"
+
+   # Option 2: .env.local (for local development only)
    LANGCHAIN_TRACING_V2=true
    LANGCHAIN_API_KEY=lsv2_pt_your_api_key_here
    LANGCHAIN_PROJECT=open-agent-builder
@@ -394,7 +588,14 @@ To monitor workflow execution in LangSmith:
 ### Clerk + Convex Setup
 
 1. Update `convex/auth.config.ts` with your Clerk domain
-2. Run: `npx convex env set CLERK_JWT_ISSUER_DOMAIN "https://your-domain.clerk.accounts.dev"`
+2. Set in **both** `.env.local` AND Convex:
+   ```bash
+   # In .env.local (for Next.js)
+   CLERK_JWT_ISSUER_DOMAIN=https://your-domain.clerk.accounts.dev
+
+   # In Convex (for backend)
+   npx convex env set CLERK_JWT_ISSUER_DOMAIN "https://your-domain.clerk.accounts.dev"
+   ```
 3. Create Clerk JWT template for Convex in Clerk dashboard
 
 ### Next.js 16 Proxy Authentication

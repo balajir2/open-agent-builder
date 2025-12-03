@@ -1173,38 +1173,16 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
   }, [selectedNode, selectedEdgeId, nodes, edges, handleDeleteNode, setNodes, setEdges, isRunning, handleAutoArrange]);
 
   const handleRunWithInput = useCallback(async (input: string) => {
-    console.log('📍 handleRunWithInput called with input:', input);
-
     if (!workflow) {
-      console.error('❌ No workflow to run');
+      console.error('No workflow to run');
       return;
     }
 
-    console.log('✅ Workflow exists:', workflow.name);
-
-    // Save the workflow before running to ensure it exists in Convex
-    console.log('💾 Saving workflow before execution...');
-    toast.info('Saving workflow...', { duration: 1000 });
-
-    const saveSuccess = await saveWorkflowImmediate({
-      nodes: nodes.map(n => ({
-        ...n,
-        type: n.type || 'default',
-        data: {
-          ...n.data,
-          label: typeof n.data.label === 'string' ? n.data.label : 'Node',
-          nodeType: n.data.nodeType || n.type,
-        },
-      })) as any,
-      edges: edges as any,
-    });
-
-    if (!saveSuccess) {
-      toast.error('Failed to save workflow', {
-        description: 'Cannot run workflow until it is saved',
-      });
-      return;
-    }
+    // Wait for any pending NodePanel saves to complete
+    // NodePanel has 500ms debounce → handleUpdateNodeData → updateNodes → saveWorkflow (1000ms debounce)
+    // Total worst case: 500ms (NodePanel) + 1000ms (saveWorkflow) = 1500ms
+    toast.info('Preparing workflow...', { duration: 1600 });
+    await new Promise(resolve => setTimeout(resolve, 1600));
 
     // Create a fresh workflow object with current nodes/edges
     const currentWorkflow = {
@@ -1225,9 +1203,8 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
       })) as any,
     };
 
-    console.log('🏃 Running workflow with', currentWorkflow.nodes.length, 'nodes');
     await runWorkflow(currentWorkflow, input);
-  }, [workflow, nodes, edges, runWorkflow, saveWorkflowImmediate]);
+  }, [workflow, nodes, edges, runWorkflow]);
 
 
 

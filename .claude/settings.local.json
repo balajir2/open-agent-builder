@@ -38,7 +38,21 @@
       "Bash(claude --version:*)",
       "Bash(claude auth status:*)",
       "Bash(gh auth:*)",
-      "Bash(gh pr view:*)"
+      "Bash(gh pr view:*)",
+      "Bash(npm audit:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(npm outdated:*)",
+      "Bash(git log:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(if [ -f \"tsconfig.tsbuildinfo\" ])",
+      "Bash(then rm tsconfig.tsbuildinfo)",
+      "Bash(else echo \"File doesn''t exist\")",
+      "Bash(if [ -f \"convex/tsconfig.tsbuildinfo\" ])",
+      "Bash(then rm convex/tsconfig.tsbuildinfo)",
+      "Bash(if [ -f \".env.local\" ])",
+      "Bash(then grep -E \"^ANTHROPIC_API_KEY=\" .env.local)",
+      "Bash(else echo \".env.local not found\")"
     ],
     "deny": [],
     "ask": []

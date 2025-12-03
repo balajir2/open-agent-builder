@@ -25,7 +25,9 @@ export class ToolFactory {
 
         switch (id) {
             case "tavily-search":
-                if (!apiKeys.tavily) return null;
+                if (!apiKeys.tavily) {
+                    return null;
+                }
                 // Tavily is a retriever, wrap it as a tool
                 const retriever = new TavilySearchAPIRetriever({
                     apiKey: apiKeys.tavily,
@@ -42,7 +44,6 @@ export class ToolFactory {
 
             case "serper-search":
                 if (!apiKeys.serper) {
-                    console.warn('[ToolFactory] Missing Serper API key');
                     return null;
                 }
                 console.log('[ToolFactory] Creating serper_search tool');

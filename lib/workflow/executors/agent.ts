@@ -89,6 +89,7 @@ export async function executeAgentNode(
 
     // 5. Instantiate Standard Tools
     const standardTools: any[] = [];
+
     if (data.selectedTools && Array.isArray(data.selectedTools)) {
       for (const toolConfig of data.selectedTools) {
         try {
@@ -97,8 +98,8 @@ export async function executeAgentNode(
             standardTools.push(tool);
           }
         } catch (error) {
-          // Fix: Handle both id and toolId
-          console.error(`Failed to instantiate tool ${(toolConfig as any).toolId || (toolConfig as any).id}:`, error);
+          const toolId = (toolConfig as any).toolId || (toolConfig as any).id;
+          console.error(`Failed to instantiate tool ${toolId}:`, error);
         }
       }
     }
@@ -552,16 +553,43 @@ export async function executeAgentNode(
       });
 
       if (hasMcpTools || standardTools.length > 0) {
-        const tools = [
-          ...flattenedMcpTools.map(convertMcpToOpenAiTool),
-          ...standardTools.map(tool => convertToOpenAITool(tool))
-        ];
+        // Convert tools and filter out any that failed conversion
+        const mcpConvertedTools = flattenedMcpTools
+          .map(tool => {
+            try {
+              return convertMcpToOpenAiTool(tool);
+            } catch (error) {
+              console.error(`Failed to convert MCP tool ${tool?.name || 'unknown'}:`, error);
+              return null;
+            }
+          })
+          .filter(Boolean);
+
+        const standardConvertedTools = standardTools
+          .map(tool => {
+            try {
+              return convertToOpenAITool(tool);
+            } catch (error) {
+              console.error(`Failed to convert standard tool ${tool?.name || 'unknown'}:`, error);
+              return null;
+            }
+          })
+          .filter(Boolean);
+
+        const tools = [...mcpConvertedTools, ...standardConvertedTools];
+
+        // Only include tools if the array is not empty after conversion
+        const hasValidTools = tools.length > 0;
+
+        console.log(`[Agent] Tool conversion: ${flattenedMcpTools.length} MCP + ${standardTools.length} standard → ${tools.length} valid tools`);
+        if (!hasValidTools) {
+          console.warn('[Agent] No valid tools after conversion - running without tools');
+        }
 
         const response = await client.chat.completions.create({
           model: modelName,
           messages: messages as any,
-          tools,
-          tool_choice: "auto",
+          ...(hasValidTools ? { tools, tool_choice: "auto" } : {}),
           ...(data.tokenLimit ? { max_tokens: maxTokens } : {}),
         });
 
