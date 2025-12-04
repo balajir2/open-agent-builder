@@ -1,0 +1,42 @@
+/* [project]/components/ui/shadcn/button.css [app-client] (css) */
+.button {
+  transition: all .2s, scale .1s, box-shadow .1s;
+}
+
+.button:active {
+  transition: all .2s, scale 50ms, box-shadow 50ms;
+}
+
+.button-primary {
+  background: #ff4c00;
+  box-shadow: inset 0 -6px 12px #f003, 0 2px 4px #ff4d001f, 0 1px 1px #ff4d001f, 0 .5px .5px #ff4d0029, 0 .25px .25px #ff4d0033;
+  background: color(display-p3 .9816 .3634 .0984);
+  box-shadow: inset 0 -6px 12px color(display-p3 .9804 .1127 .098 / .2), 0 2px 4px color(display-p3 .9804 .3647 .098 / .12), 0 1px 1px color(display-p3 .9804 .3647 .098 / .12), 0 .5px .5px color(display-p3 .9804 .3647 .098 / .16), 0 .25px .25px color(display-p3 .9804 .3647 .098 / .2);
+}
+
+.button-primary:hover {
+  box-shadow: inset 0 -6px 12px #f003, 0 4px 8px #ff4d0029, 0 1px 1px #ff4d001f, 0 .5px .5px #ff4d0029, 0 .25px .25px #ff4d0033;
+  box-shadow: inset 0 -6px 12px color(display-p3 .9804 .1127 .098 / .2), 0 4px 8px color(display-p3 .9804 .3647 .098 / .16), 0 1px 1px color(display-p3 .9804 .3647 .098 / .12), 0 .5px .5px color(display-p3 .9804 .3647 .098 / .16), 0 .25px .25px color(display-p3 .9804 .3647 .098 / .2);
+}
+
+.button-primary:active {
+  box-shadow: inset 0 -6px 12px #f003, 0 2px 4px #ff4d001f, 0 1px 1px #ff4d001f, 0 .5px .5px #ff4d0029, 0 .25px .25px #ff4d0033;
+  box-shadow: inset 0 -6px 12px color(display-p3 .9804 .1127 .098 / .2), 0 2px 4px color(display-p3 .9804 .3647 .098 / .12), 0 1px 1px color(display-p3 .9804 .3647 .098 / .12), 0 .5px .5px color(display-p3 .9804 .3647 .098 / .16), 0 .25px .25px color(display-p3 .9804 .3647 .098 / .2);
+}
+
+.button-background {
+  opacity: .06;
+  background: linear-gradient(#fff, #0000);
+  transition: opacity .2s;
+}
+
+.button:hover .button-background {
+  opacity: .08;
+}
+
+.button:active .button-background {
+  opacity: 0;
+  transition: opacity 50ms;
+}
+
+/*# sourceMappingURL=components_ui_shadcn_button_css_bad6b30c._.single.css.map*/

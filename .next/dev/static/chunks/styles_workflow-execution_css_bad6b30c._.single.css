@@ -1,0 +1,104 @@
+/* [project]/styles/workflow-execution.css [app-client] (css) */
+@keyframes pulse-heat {
+  0%, 100% {
+    box-shadow: 0 0 #fa5d1966, 0 0 20px #fa5d1933;
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px #fa5d1900, 0 0 30px #fa5d1900;
+  }
+}
+
+@keyframes glow-heat {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px #fa5d194d);
+  }
+
+  50% {
+    filter: drop-shadow(0 0 8px #fa5d19cc);
+  }
+}
+
+.executing-node {
+  transition: border-color .3s ease-out, box-shadow .3s ease-out;
+  animation: 2s ease-in-out infinite pulse-heat;
+  border-color: #fa5d19 !important;
+}
+
+.completed-node {
+  opacity: 1;
+  transition: border-color .4s ease-out, opacity .4s ease-out;
+  border-color: #9ca3af !important;
+  animation: none !important;
+}
+
+.failed-node {
+  border-color: #ef4444 !important;
+  animation: .4s ease-out shake !important;
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-4px);
+  }
+
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+.react-flow__node.executing-node {
+  z-index: 2 !important;
+}
+
+.react-flow__node.selected {
+  z-index: 1 !important;
+}
+
+.react-flow__edge.active-edge {
+  z-index: 100;
+  animation: 1.5s linear infinite dash, 2s ease-in-out infinite glow-edge;
+  stroke: #fa5d19 !important;
+  stroke-width: 2.5px !important;
+}
+
+.react-flow__edge.active-edge .react-flow__edge-text, .react-flow__edge.selected-edge .react-flow__edge-text {
+  fill: #18181b !important;
+  font-weight: 600 !important;
+}
+
+.react-flow__edge.active-edge .react-flow__edge-textbg, .react-flow__edge.selected-edge .react-flow__edge-textbg {
+  fill: #fff !important;
+  opacity: 1 !important;
+}
+
+.react-flow__edge.selected-edge {
+  stroke: #fa5d19 !important;
+  stroke-width: 2px !important;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -20px;
+  }
+}
+
+@keyframes glow-edge {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px #fa5d1966);
+  }
+
+  50% {
+    filter: drop-shadow(0 0 6px #fa5d19cc);
+  }
+}
+
+.react-flow__viewport {
+  transition: none;
+}
+
+/*# sourceMappingURL=styles_workflow-execution_css_bad6b30c._.single.css.map*/

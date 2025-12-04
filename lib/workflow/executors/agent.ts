@@ -1,4 +1,4 @@
-﻿import { WorkflowNode, WorkflowState } from '../types';
+import { WorkflowNode, WorkflowState } from '../types';
 import { substituteVariables } from '../variable-substitution';
 import { resolveMCPServers, migrateMCPData } from '@/lib/mcp/resolver';
 import { ToolFactory } from './tool-factory';
