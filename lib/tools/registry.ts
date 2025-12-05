@@ -1,4 +1,5 @@
 import { ToolDefinition } from "./types";
+export type { ToolDefinition } from "./types";
 import { Search, Globe, FileText, Database, Layers } from "lucide-react";
 
 export const toolRegistry: ToolDefinition[] = [
