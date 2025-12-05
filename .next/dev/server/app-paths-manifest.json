@@ -1,8 +1,0 @@
-{
-  "/api/config/route": "app/api/config/route.js",
-  "/api/team-workflows/route": "app/api/team-workflows/route.js",
-  "/api/workflows/[workflowId]/execute-stream/route": "app/api/workflows/[workflowId]/execute-stream/route.js",
-  "/api/workflows/[workflowId]/route": "app/api/workflows/[workflowId]/route.js",
-  "/api/workflows/route": "app/api/workflows/route.js",
-  "/page": "app/page.js"
-}
