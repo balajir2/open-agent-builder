@@ -518,7 +518,8 @@ export async function executeAgentNode(
 
                 const existingResult = toolResults.find((tr: any) => tr.tool_use_id === item.id);
                 if (existingResult) {
-                  toolCall.output = existingResult.is_error ? { error: existingResult.content } : (Array.isArray(existingResult.content) ? existingResult.content[0]?.text || existingResult.content : existingResult.content);
+                  const resultAny = existingResult as any;
+                  toolCall.output = resultAny.is_error ? { error: resultAny.content } : (Array.isArray(resultAny.content) ? resultAny.content[0]?.text || resultAny.content : resultAny.content);
                 }
                 return toolCall;
               });
@@ -576,7 +577,7 @@ export async function executeAgentNode(
             model: modelName,
             max_tokens: maxTokens,
             messages: messages as any,
-            tools: allFinalTools,
+            tools: allFinalTools as any,
           });
 
           const toolUses = initialResponse.content.filter((item: any) => item.type === 'tool_use');
@@ -664,7 +665,7 @@ export async function executeAgentNode(
                 model: modelName,
                 max_tokens: maxTokens,
                 messages: currentMessages,
-                tools: allFinalTools,
+                tools: allFinalTools as any,
               });
 
               console.log(`[Agent] Anthropic fallback agentic loop iteration ${iterations + 1}:`, {
@@ -806,7 +807,7 @@ export async function executeAgentNode(
               return null;
             }
           })
-          .filter(Boolean);
+          .filter((t): t is NonNullable<typeof t> => t !== null);
 
         const standardConvertedTools = standardTools
           .map(tool => {
@@ -817,7 +818,7 @@ export async function executeAgentNode(
               return null;
             }
           })
-          .filter(Boolean);
+          .filter((t): t is NonNullable<typeof t> => t !== null);
 
         const tools = [...mcpConvertedTools, ...standardConvertedTools];
 

@@ -529,8 +529,8 @@ export class LangGraphExecutor {
         // SECURITY FIX: Use E2B sandbox instead of Function() constructor
         // Function() allows arbitrary code execution and bypasses security
         // Import and use the secure data executor instead
-        const { executeDataTransformNode } = await import('./executors/data');
-        return await executeDataTransformNode(node, state as WorkflowState, this.apiKeys);
+        const { executeDataNode } = await import('./executors/data');
+        return await executeDataNode(node, state as WorkflowState);
       }
 
       case 'http': {

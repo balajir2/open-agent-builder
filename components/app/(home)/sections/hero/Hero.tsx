@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { Connector } from "@/components/shared/layout/curvy-rect";
-import HeroFlame from "@/components/shared/effects/flame/hero-flame";
+import HeroFlame from "@/components/effects/flame/hero-flame";
 
 import HomeHeroBackground from "./Background/Background";
 import { BackgroundOuterPiece } from "./Background/BackgroundOuterPiece";

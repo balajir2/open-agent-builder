@@ -2,7 +2,7 @@
 
 import React from "react";
 import { cn } from "@/utils/cn";
-import { CoreFlame } from "@/components/shared/effects/flame";
+import { CoreFlame } from "@/components/effects/flame";
 
 interface LoadingStateProps {
   message?: string;

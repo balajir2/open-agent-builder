@@ -65,6 +65,21 @@ export async function POST(
 
     console.log('API: Loaded workflow:', workflow.name);
 
+    // Add required fields if they're missing (for workflows coming from request body)
+    const workflowWithTimestamps: any = {
+      id: workflow.id || workflowId,
+      name: workflow.name || 'Untitled Workflow',
+      nodes: workflow.nodes || [],
+      edges: workflow.edges || [],
+      createdAt: workflow.createdAt || new Date().toISOString(),
+      updatedAt: workflow.updatedAt || new Date().toISOString(),
+      description: workflow.description,
+      category: workflow.category,
+      tags: workflow.tags,
+      estimatedTime: workflow.estimatedTime,
+      difficulty: workflow.difficulty,
+    };
+
     // Get API keys - check user keys first, then fall back to system keys from Convex
     const { getLLMApiKey, getToolApiKey } = await import('@/lib/api/llm-keys') as any;
     const userId = authResult.userId;
@@ -89,7 +104,7 @@ export async function POST(
     };
 
     // Execute workflow using LangGraph
-    const executor = new LangGraphExecutor(workflow, undefined, apiKeys);
+    const executor = new LangGraphExecutor(workflowWithTimestamps, undefined, apiKeys);
     const execution = await executor.execute(input || '');
 
     console.log('API: Execution complete:', execution.status);
@@ -98,7 +113,7 @@ export async function POST(
       success: execution.status === 'completed',
       execution,
       input,
-      workflowName: workflow.name,
+      workflowName: workflowWithTimestamps.name,
     });
   } catch (error) {
     console.error('Workflow execution error:', error);

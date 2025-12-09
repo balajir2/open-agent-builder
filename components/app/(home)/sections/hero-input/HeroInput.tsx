@@ -7,7 +7,7 @@ import Globe from "./_svg/Globe";
 import HeroInputSubmitButton from "./Button/Button";
 import HeroInputTabsMobile from "./Tabs/Mobile/Mobile";
 import HeroInputTabs from "./Tabs/Tabs";
-import AsciiExplosion from "@/components/shared/effects/flame/ascii-explosion";
+import AsciiExplosion from "@/components/effects/flame/ascii-explosion";
 import { Endpoint } from "@/components/shared/Playground/Context/types";
 
 export default function HeroInput() {

@@ -2,7 +2,7 @@
 
 import React from "react";
 import { cn } from "@/utils/cn";
-import { AsciiExplosion } from "@/components/shared/effects/flame";
+import { AsciiExplosion } from "@/components/effects/flame";
 
 interface EmptyStateProps {
   title?: string;

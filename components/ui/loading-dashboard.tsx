@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-import data from "@/components/shared/effects/flame/hero-flame-data.json";
+import data from "@/components/effects/flame/hero-flame-data.json";
 import { cn } from "@/utils/cn";
 import { setIntervalOnVisible } from "@/utils/set-timeout-on-visible";
 

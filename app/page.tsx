@@ -10,8 +10,8 @@ import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
 // Import shared components
 import Button from "@/components/shared/button/Button";
 import { Connector } from "@/components/shared/layout/curvy-rect";
-import HeroFlame from "@/components/shared/effects/flame/hero-flame";
-import AsciiExplosion from "@/components/shared/effects/flame/ascii-explosion";
+import HeroFlame from "@/components/effects/flame/hero-flame";
+import AsciiExplosion from "@/components/effects/flame/ascii-explosion";
 import { HeaderProvider } from "@/components/layout/header/HeaderContext";
 
 // Import hero section components
