@@ -46,6 +46,7 @@ function StyleGuidePageContent() {
   const [loadTemplateId, setLoadTemplateId] = useState<string | null>(null);
 
   // Handle URL params
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (!searchParams) return;
 
