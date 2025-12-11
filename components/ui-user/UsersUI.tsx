@@ -18,7 +18,7 @@ export default function UsersUI() {
   useEffect(() => {
     const fetchTeamWorkflows = async () => {
       try {
-        const res = await fetch("/api/workflows");
+        const res = await fetch("/api/team-workflows");
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.workflows)) {

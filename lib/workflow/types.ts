@@ -2,7 +2,7 @@
 
 export interface WorkflowNode {
   id: string;
-  type: 'agent' | 'mcp' | 'if-else' | 'while' | 'user-approval' | 'transform' | 'set-state' | 'end' | 'start' | 'guardrails' | 'arcade' | 'note';
+  type: 'agent' | 'mcp' | 'if-else' | 'while' | 'user-approval' | 'transform' | 'set-state' | 'end' | 'start' | 'guardrails' | 'arcade' | 'note' | 'extract' | 'http' | 'data-transform';
   position: { x: number; y: number };
   data: NodeData;
 }

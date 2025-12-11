@@ -95,8 +95,23 @@ export async function POST(
       browserless: (userId ? await getToolApiKey('browserless', userId) : undefined) ?? systemKeys.browserless,
     };
 
+    // Add required timestamp fields to match Workflow type interface
+    // Also ensure all nodes have position and data fields (required by Workflow type)
+    const completeWorkflow = {
+      ...workflow,
+      id: workflow.id || workflowId,
+      name: workflow.name || 'Untitled Workflow',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      nodes: workflow.nodes.map(node => ({
+        ...node,
+        position: node.position || { x: 0, y: 0 }, // Ensure position is always defined
+        data: { label: '', ...node.data } as import('@/lib/workflow/types').NodeData, // Ensure data conforms to NodeData type
+      })),
+    };
+
     // Execute workflow using LangGraph
-    const executor = new LangGraphExecutor(workflow, undefined, apiKeys);
+    const executor = new LangGraphExecutor(completeWorkflow, undefined, apiKeys);
     const execution = await executor.execute(input || '');
 
     console.log('API: Execution complete:', execution.status);

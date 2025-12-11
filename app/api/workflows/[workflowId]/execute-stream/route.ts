@@ -215,10 +215,17 @@ export async function POST(
         // LangGraph Execution Path
         const threadId = `thread_${workflowId}_${Date.now()}`;
 
+        // Ensure workflow has required timestamp fields for Workflow type interface
+        const completeWorkflow = {
+          ...workflow,
+          createdAt: workflow.createdAt || new Date().toISOString(),
+          updatedAt: workflow.updatedAt || new Date().toISOString(),
+        };
+
         let executor;
         try {
           executor = new LangGraphExecutor(
-            workflow,
+            completeWorkflow,
             (nodeId, result) => {
               nodeResults[nodeId] = result;
 
