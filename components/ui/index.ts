@@ -1,8 +1,9 @@
 // UI Components
 export * from "./menu";
 export * from "./spinner";
+export * from "./avatar";
 export * from "./shadcn/button";
-export * from "./shadcn/dropdown-menu";
+export * from "./dropdown-menu";
 export * from "./shadcn/tooltip";
 export * from "./shadcn/dialog";
 export * from "./shadcn/sheet";

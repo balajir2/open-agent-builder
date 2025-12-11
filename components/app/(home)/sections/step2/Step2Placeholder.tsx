@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { listTemplates } from "@/lib/workflow/templates";
-import { useUser } from "@clerk/nextjs";
+import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 
 interface Step2PlaceholderProps {
@@ -22,7 +22,8 @@ interface Workflow {
 }
 
 export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWorkflow, onLoadTemplate }: Step2PlaceholderProps) {
-  const { user } = useUser();
+  const { data: session } = useSession();
+  const user = session?.user;
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [teamWorkflows, setTeamWorkflows] = useState<Workflow[]>([]);
   const [activeTab, setActiveTab] = useState<"workflows" | "templates" | "team">("templates");
@@ -37,7 +38,7 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
         if (data.workflows && Array.isArray(data.workflows)) {
           setWorkflows(data.workflows.map((w: any) => ({
             id: w.id,
-            title:cleanName(w.name),
+            title: cleanName(w.name),
             description: w.description,
             createdAt: new Date(w.updatedAt || w.createdAt).toLocaleDateString(),
             userId: w.userId,
@@ -72,7 +73,7 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
   }, []);
 
 
-    function cleanName(name: string) {
+  function cleanName(name: string) {
     let cleaned = name.replace(/^copy of\s*/i, ""); // remove "Copy of"
 
     const parts = cleaned.split("_");

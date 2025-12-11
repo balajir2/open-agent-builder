@@ -44,20 +44,16 @@ export async function resolveMCPServers(serverIds: string[]): Promise<any[]> {
       ids: serverIds as Id<"mcpServers">[],
     });
 
-    // Filter for non-null and enabled servers, then transform to the format expected by executors
-    return servers
-      .filter((s): s is NonNullable<typeof s> => !!s) // Ensure server is not null
-      .filter(server => server.enabled) // Ensure server is enabled
-      .map(server => ({
-        name: server.name,
-        url: server.url,
-        description: server.description,
-        authType: server.authType,
-        accessToken: server.accessToken,
-        availableTools: server.tools || [],
-        headers: server.headers,
-        enabled: server.enabled, // Pass enabled status
-      }));
+    // Transform to the format expected by executors
+    return servers.filter((s): s is NonNullable<typeof s> => !!s).map(server => ({
+      name: server.name,
+      url: server.url,
+      description: server.description,
+      authType: server.authType,
+      accessToken: server.accessToken,
+      availableTools: server.tools || [],
+      headers: server.headers,
+    }));
   } catch (error) {
     console.error('Error resolving MCP servers:', error);
     return [];

@@ -3,7 +3,8 @@
  * This is a pure Node.js library without browser dependencies
  */
 
-import PDFParser from 'pdf2json';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 
 export async function handler(buffer: Buffer): Promise<string> {
     try {
@@ -14,6 +15,9 @@ export async function handler(buffer: Buffer): Promise<string> {
         if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
             return `[PDF error: Invalid buffer provided]`;
         }
+
+        // Load pdf2json
+        const PDFParser = require('pdf2json');
 
         return new Promise((resolve, reject) => {
             const pdfParser = new PDFParser();

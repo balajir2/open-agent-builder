@@ -5,7 +5,8 @@ import { useState, useEffect, Suspense } from "react";
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
+import { SignedIn, SignedOut, SignInButton } from '@/components/shared/auth-helpers';
+import { UserMenu } from "@/components/shared/UserMenu";
 
 // Import shared components
 import Button from "@/components/shared/button/Button";
@@ -98,176 +99,169 @@ function StyleGuidePageContent() {
           />
         </SignedIn>
       ) : (
-      <div className="min-h-screen bg-background-base">
-        {/* Header/Navigation Section */}
-        <HeaderDropdownWrapper />
-        
-        <div className="sticky top-0 left-0 w-full z-[101] bg-background-base header">
-          <div className="absolute top-0 cmw-container border-x border-border-faint h-full pointer-events-none" />
-          
-          <div className="h-1 bg-border-faint w-full left-0 -bottom-1 absolute" />
-          
-          <div className="cmw-container absolute h-full pointer-events-none top-0">
-            <Connector className="absolute -left-[10.5px] -bottom-11" />
-            <Connector className="absolute -right-[10.5px] -bottom-11" />
-          </div>
-          
-          <HeaderWrapper>
-            <div className="max-w-[900px] mx-auto w-full flex justify-between items-center">
-              <div className="flex gap-24 items-center">
-                <HeaderBrandKit />
-              </div>
-              
-              <div className="flex gap-8 items-center">
-                <SignedIn>
-                  <Link href="/ui-user-workflows">
-                    <ButtonUI variant="outline">
-                      UI for Workflows
-                    </ButtonUI>
-                  </Link>
-                </SignedIn>
+        <div className="min-h-screen bg-background-base">
+          {/* Header/Navigation Section */}
+          <HeaderDropdownWrapper />
 
-                {/* UI Builder Link */}
-                <SignedIn>
-                  <Link href="/ui-builder">
-                    <ButtonUI variant="outline">
-                      UI Builder
-                    </ButtonUI>
-                  </Link>
-                </SignedIn>
+          <div className="sticky top-0 left-0 w-full z-[101] bg-background-base header">
+            <div className="absolute top-0 cmw-container border-x border-border-faint h-full pointer-events-none" />
 
-                {/* GitHub Template Button */}
-                <a
-                  className="contents"
-                  href="https://github.com/firecrawl/firecrawl"
-                  target="_blank"
-                >
-                  <ButtonUI variant="secondary">
-                    <GithubIcon />
-                    Use this Template
-                  </ButtonUI>
-                </a>
+            <div className="h-1 bg-border-faint w-full left-0 -bottom-1 absolute" />
 
-                {/* Clerk Auth */}
-                <SignedOut>
-                  <SignInButton mode="modal">
-                    <button className="px-16 py-8 bg-heat-100 hover:bg-heat-200 text-white rounded-8 text-body-medium font-medium transition-all active:scale-[0.98]">
-                      Sign In
-                    </button>
-                  </SignInButton>
-                </SignedOut>
-
-                <SignedIn>
-                  <UserButton
-                    appearance={{
-                      elements: {
-                        avatarBox: "w-32 h-32",
-                      }
-                    }}
-                    afterSignOutUrl="/"
-                  />
-                </SignedIn>
-              </div>
+            <div className="cmw-container absolute h-full pointer-events-none top-0">
+              <Connector className="absolute -left-[10.5px] -bottom-11" />
+              <Connector className="absolute -right-[10.5px] -bottom-11" />
             </div>
-          </HeaderWrapper>
-        </div>
 
-        {/* Hero Section */}
-        <section className="overflow-x-clip" id="home-hero">
-          <div className="pt-28 lg:pt-254 lg:-mt-100 pb-115 relative" id="hero-content">
-            <HomeHeroPixi />
-            <HeroFlame />
-            <BackgroundOuterPiece />
-            <HomeHeroBackground />
+            <HeaderWrapper>
+              <div className="max-w-[900px] mx-auto w-full flex justify-between items-center">
+                <div className="flex gap-24 items-center">
+                  <HeaderBrandKit />
+                </div>
 
-            <AnimatePresence mode="wait">
-              {!showStep2 ? (
-                <motion.div
-                  key="hero"
-                  initial={{ opacity: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.5 }}
-                  className="relative container px-16"
-                >
-                  <HomeHeroBadge />
-                  <HomeHeroTitle />
-
-                  <div className="text-center text-body-large">
-                    <p>
-                      Build intelligent web scraping workflows powered by AI.
-                      <br className="lg-max:hidden" />
-                      Turn any website into structured, agent-ready data.
-                    </p>
-                    <Link
-                      className="bg-black-alpha-4 hover:bg-black-alpha-6 lg:ml-4 rounded-6 px-8 lg:px-6 text-label-large lg-max:py-2 h-30 lg:h-24 block lg-max:mt-8 lg-max:mx-auto lg-max:w-max lg:inline-block gap-4 transition-all"
-                      href="https://firecrawl.dev"
-                      target="_blank"
-                    >
-                      AI agent workflows
+                <div className="flex gap-8 items-center">
+                  <SignedIn>
+                    <Link href="/ui-user-workflows">
+                      <ButtonUI variant="outline">
+                        UI for Workflows
+                      </ButtonUI>
                     </Link>
-                  </div>
-                </motion.div>
-              ) : (
-                <SignedIn>
+                  </SignedIn>
+
+                  {/* UI Builder Link */}
+                  <SignedIn>
+                    <Link href="/ui-builder">
+                      <ButtonUI variant="outline">
+                        UI Builder
+                      </ButtonUI>
+                    </Link>
+                  </SignedIn>
+
+                  {/* GitHub Template Button */}
+                  <a
+                    className="contents"
+                    href="https://github.com/firecrawl/firecrawl"
+                    target="_blank"
+                  >
+                    <ButtonUI variant="secondary">
+                      <GithubIcon />
+                      Use this Template
+                    </ButtonUI>
+                  </a>
+
+                  {/* Auth Buttons */}
+                  <SignedOut>
+                    <SignInButton mode="modal">
+                      <button className="px-16 py-8 bg-heat-100 hover:bg-heat-200 text-white rounded-8 text-body-medium font-medium transition-all active:scale-[0.98]">
+                        Sign In
+                      </button>
+                    </SignInButton>
+                  </SignedOut>
+
+                  <SignedIn>
+                    <UserMenu />
+                  </SignedIn>
+                </div>
+              </div>
+            </HeaderWrapper>
+          </div>
+
+          {/* Hero Section */}
+          <section className="overflow-x-clip" id="home-hero">
+            <div className="pt-28 lg:pt-254 lg:-mt-100 pb-115 relative" id="hero-content">
+              <HomeHeroPixi />
+              <HeroFlame />
+              <BackgroundOuterPiece />
+              <HomeHeroBackground />
+
+              <AnimatePresence mode="wait">
+                {!showStep2 ? (
                   <motion.div
-                    key="step2"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
+                    key="hero"
+                    initial={{ opacity: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
                     transition={{ duration: 0.5 }}
                     className="relative container px-16"
                   >
-                    <Step2Placeholder
-                      onReset={handleReset}
-                      onCreateWorkflow={handleCreateWorkflow}
-                      onLoadWorkflow={(id) => {
-                        setLoadWorkflowId(id);
-                        setLoadTemplateId(null);
-                        setShowWorkflowBuilder(true);
-                        router.push(`/?workflow=${id}`);
-                      }}
-                      onLoadTemplate={(templateId) => {
-                        setLoadTemplateId(templateId);
-                        setLoadWorkflowId(null);
-                        setShowWorkflowBuilder(true);
-                        router.push(`/?template=${templateId}`);
-                      }}
-                    />
-                  </motion.div>
-                </SignedIn>
-              )}
-            </AnimatePresence>
-          </div>
-          
-          {/* Start Building Button */}
-          {!showStep2 && (
-            <motion.div
-              className="flex justify-center -mt-90 relative z-10"
-              initial={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              {/* When signed in - navigate to workflows */}
-              <SignedIn>
-                <button
-                  onClick={handleSubmit}
-                  className="bg-heat-100 hover:bg-heat-200 text-white font-medium px-32 py-12 rounded-10 transition-all active:scale-[0.98] text-body-medium shadow-md cursor-pointer"
-                >
-                  Start building
-                </button>
-              </SignedIn>
+                    <HomeHeroBadge />
+                    <HomeHeroTitle />
 
-              {/* When signed out - open sign-in modal */}
-              <SignedOut>
-                <SignInButton mode="modal">
-                  <button className="bg-heat-100 hover:bg-heat-200 text-white font-medium px-32 py-12 rounded-10 transition-all active:scale-[0.98] text-body-medium shadow-md cursor-pointer">
+                    <div className="text-center text-body-large">
+                      <p>
+                        Build intelligent web scraping workflows powered by AI.
+                        <br className="lg-max:hidden" />
+                        Turn any website into structured, agent-ready data.
+                      </p>
+                      <Link
+                        className="bg-black-alpha-4 hover:bg-black-alpha-6 lg:ml-4 rounded-6 px-8 lg:px-6 text-label-large lg-max:py-2 h-30 lg:h-24 block lg-max:mt-8 lg-max:mx-auto lg-max:w-max lg:inline-block gap-4 transition-all"
+                        href="https://firecrawl.dev"
+                        target="_blank"
+                      >
+                        AI agent workflows
+                      </Link>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <SignedIn>
+                    <motion.div
+                      key="step2"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.5 }}
+                      className="relative container px-16"
+                    >
+                      <Step2Placeholder
+                        onReset={handleReset}
+                        onCreateWorkflow={handleCreateWorkflow}
+                        onLoadWorkflow={(id) => {
+                          setLoadWorkflowId(id);
+                          setLoadTemplateId(null);
+                          setShowWorkflowBuilder(true);
+                          router.push(`/?workflow=${id}`);
+                        }}
+                        onLoadTemplate={(templateId) => {
+                          setLoadTemplateId(templateId);
+                          setLoadWorkflowId(null);
+                          setShowWorkflowBuilder(true);
+                          router.push(`/?template=${templateId}`);
+                        }}
+                      />
+                    </motion.div>
+                  </SignedIn>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Start Building Button */}
+            {!showStep2 && (
+              <motion.div
+                className="flex justify-center -mt-90 relative z-10"
+                initial={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.5 }}
+              >
+                {/* When signed in - navigate to workflows */}
+                <SignedIn>
+                  <button
+                    onClick={handleSubmit}
+                    className="bg-heat-100 hover:bg-heat-200 text-white font-medium px-32 py-12 rounded-10 transition-all active:scale-[0.98] text-body-medium shadow-md cursor-pointer"
+                  >
                     Start building
                   </button>
-                </SignInButton>
-              </SignedOut>
-            </motion.div>
-          )}
-        </section>
-      </div>
+                </SignedIn>
+
+                {/* When signed out - open sign-in modal */}
+                <SignedOut>
+                  <SignInButton mode="modal">
+                    <button className="bg-heat-100 hover:bg-heat-200 text-white font-medium px-32 py-12 rounded-10 transition-all active:scale-[0.98] text-body-medium shadow-md cursor-pointer">
+                      Start building
+                    </button>
+                  </SignInButton>
+                </SignedOut>
+              </motion.div>
+            )}
+          </section>
+        </div>
       )}
     </HeaderProvider>
   );
