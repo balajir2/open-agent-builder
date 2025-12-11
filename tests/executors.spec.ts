@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import * as mcpUtils from '@/lib/workflow/executors/mcp-utils';
-import * as agent from '@/lib/workflow/executors/agent';
+
 import { migrateMCPData } from '@/lib/mcp/resolver';
 import * as mcpServers from '@/convex/mcpServers';
 import { createMockContext } from './utils/mocks';

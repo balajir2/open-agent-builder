@@ -252,7 +252,7 @@ test.describe('Interoperability and E2E Tests', () => {
             data: {
               label: `Agent with ${testStandardTool.label}`,
               model: `${provider.id}/${provider.defaultModel}`,
-              selectedTools: [{ toolId: testStandardTool.id, configuration: {} }], // Agent needs to know about the tool
+              selectedTools: [{ toolId: testStandardTool.id, config: {} }], // Agent needs to know about the tool
               instructions: instructions,
             },
           };
