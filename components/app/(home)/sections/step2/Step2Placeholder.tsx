@@ -29,6 +29,19 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
   const [activeTab, setActiveTab] = useState<"workflows" | "templates" | "team">("templates");
   const templates = listTemplates();
 
+  function cleanName(name: string) {
+    let cleaned = name.replace(/^copy of\s*/i, ""); // remove "Copy of"
+
+    const parts = cleaned.split("_");
+
+    // If pattern: [prefix, number, suffix]
+    if (parts.length === 3 && /^\d+$/.test(parts[1])) {
+      cleaned = `${parts[0]}_${parts[2]}`;
+    }
+
+    return cleaned;
+  }
+
   useEffect(() => {
     const loadWorkflows = async () => {
       try {
@@ -71,20 +84,6 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
     loadWorkflows();
     loadTeamWorkflows();
   }, []);
-
-
-  function cleanName(name: string) {
-    let cleaned = name.replace(/^copy of\s*/i, ""); // remove "Copy of"
-
-    const parts = cleaned.split("_");
-
-    // If pattern: [prefix, number, suffix]
-    if (parts.length === 3 && /^\d+$/.test(parts[1])) {
-      cleaned = `${parts[0]}_${parts[2]}`;
-    }
-
-    return cleaned;
-  }
 
 
   const handleDelete = async (e: React.MouseEvent, id: string, isTeam: boolean) => {
