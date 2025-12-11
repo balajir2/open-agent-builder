@@ -1,7 +1,8 @@
 
 import { test, expect, Page } from '@playwright/test';
 import { llmProviders, LLMProvider } from '@/lib/config/llm-config';
-import { toolRegistry, ToolDefinition } from '@/lib/tools/registry';
+import { toolRegistry } from '@/lib/tools/registry';
+import { ToolDefinition } from '@/lib/tools/types';
 import { executeAgentNode } from '@/lib/workflow/executors/agent';
 import { WorkflowNode, WorkflowState } from '@/lib/workflow/types';
 import { ConvexHttpClient } from 'convex/browser';
