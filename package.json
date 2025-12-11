@@ -2,6 +2,7 @@
   "name": "firecrawl-style-guide",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "predev": "node scripts/check-dependencies.js",
     "dev": "next dev",
