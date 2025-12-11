@@ -1,5 +1,8 @@
 # CLAUDE.md
+<<<<<<< HEAD
 
+=======
+>>>>>>> b37dccc822db82c67a74be329bb163b817499694
 **Last Updated:** December 3, 2025
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.

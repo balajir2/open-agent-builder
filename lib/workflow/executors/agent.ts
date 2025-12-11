@@ -1,4 +1,4 @@
-﻿import { WorkflowNode, WorkflowState } from '../types';
+import { WorkflowNode, WorkflowState } from '../types';
 import { substituteVariables } from '../variable-substitution';
 import { resolveMCPServers, migrateMCPData } from '@/lib/mcp/resolver';
 import { ToolFactory } from './tool-factory';
@@ -262,7 +262,7 @@ export async function executeAgentNode(
             };
           })
         ].filter((tool, index, self) =>
-            index === self.findIndex((t) => t.name === tool.name)
+          index === self.findIndex((t) => t.name === tool.name)
         );
 
         console.log('[Agent] Final Tools passed to LLM:', JSON.stringify(finalTools.map(t => ({ name: t.name, description: t.description })), null, 2));
