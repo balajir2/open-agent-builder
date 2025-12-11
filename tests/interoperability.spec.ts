@@ -1,5 +1,5 @@
 
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 import { llmProviders, LLMProvider } from '@/lib/config/llm-config';
 import { toolRegistry, ToolDefinition } from '@/lib/tools/registry';
 import { executeAgentNode } from '@/lib/workflow/executors/agent';
@@ -35,7 +35,7 @@ const mockApiKeys = {
 // --- Helper Functions for Mocking ---
 
 // Helper function to mock LLM API calls to return a tool_calls response
-async function mockLLMToolCall(page: any, providerId: string, modelName: string, toolName: string, toolArgs: any, expectedTextResponse: string = '') {
+async function mockLLMToolCall(page: Page, providerId: string, modelName: string, toolName: string, toolArgs: any, expectedTextResponse: string = '') {
     const openaiToolCall = {
         id: 'call_mock_id',
         type: 'function',
@@ -84,7 +84,7 @@ async function mockLLMToolCall(page: any, providerId: string, modelName: string,
     };
 
 
-    await page.route(async (url: URL) => {
+    await page.route((url: URL) => {
         if (['openai', 'groq'].includes(providerId) && url.pathname.includes('/chat/completions')) {
             // OpenAI and Groq APIs are compatible for mocking
             return true;
@@ -115,8 +115,8 @@ async function mockLLMToolCall(page: any, providerId: string, modelName: string,
 }
 
 // Helper function to mock tool API calls (both standard and MCP)
-async function mockToolResponse(page: any, toolName: string, toolEndpointUrl: string | undefined, expectedResult: string) {
-    await page.route(async (url: URL) => {
+async function mockToolResponse(page: Page, toolName: string, toolEndpointUrl: string | undefined, expectedResult: string) {
+    await page.route((url: URL) => {
         // For MCP tools, we specifically check the provided toolEndpointUrl
         if (toolEndpointUrl && url.href.startsWith(toolEndpointUrl)) {
             return true;
@@ -252,7 +252,7 @@ test.describe('Interoperability and E2E Tests', () => {
             data: {
               label: `Agent with ${testStandardTool.label}`,
               model: `${provider.id}/${provider.defaultModel}`,
-              selectedTools: [{ toolId: testStandardTool.id, config: {} }], // Agent needs to know about the tool
+              selectedTools: [{ toolId: testStandardTool.id, enabled: true, config: {} }], // Agent needs to know about the tool
               instructions: instructions,
             },
           };
