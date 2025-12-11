@@ -6,7 +6,7 @@
 
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../convex/_generated/api";
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "@/auth";
 
 let convexClient: ConvexHttpClient | null = null;
 
@@ -37,7 +37,7 @@ export function getConvexClient(): ConvexHttpClient {
 }
 
 /**
- * Get an authenticated Convex client with Clerk token
+ * Get an authenticated Convex client with NextAuth token
  * This ensures userId is properly set in Convex context
  */
 export async function getAuthenticatedConvexClient(): Promise<ConvexHttpClient> {
@@ -53,20 +53,21 @@ export async function getAuthenticatedConvexClient(): Promise<ConvexHttpClient> 
   const client = new ConvexHttpClient(url);
 
   try {
-    // Get Clerk auth token
-    const { getToken } = await auth();
-    const token = await getToken({ template: "convex" });
+    // Get NextAuth session
+    const session = await auth();
+    // @ts-ignore - idToken is added in auth.ts callbacks
+    const token = session?.idToken;
 
     // Set the authentication token
     if (token) {
       client.setAuth(token);
     } else {
-      console.warn('No Clerk token available - using unauthenticated client');
+      console.warn('No NextAuth token available - using unauthenticated client');
     }
   } catch (error) {
-    console.error('Failed to get Clerk token:', error);
+    console.error('Failed to get NextAuth token:', error);
     // Continue with unauthenticated client instead of throwing
-    // This allows the app to function even if Clerk auth fails
+    // This allows the app to function even if auth fails
   }
 
   return client;

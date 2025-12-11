@@ -1,37 +1,38 @@
 /**
  * API Authentication Utilities
  * Validates API keys for workflow execution endpoints
- * Supports both Clerk (UI) and API Key (external) authentication
+ * Supports both NextAuth (UI) and API Key (external) authentication
  */
 
 import { NextRequest } from 'next/server';
 import { getConvexClient, api } from '@/lib/convex/client';
-import { auth } from '@clerk/nextjs/server';
+import { auth } from "@/auth";
 
 export interface ApiAuthResult {
   authenticated: boolean;
   userId?: string;
   error?: string;
-  authType?: 'clerk' | 'api-key';
+  authType?: 'next-auth' | 'api-key';
 }
 
 /**
- * Validates authentication - checks Clerk first (for UI), then API key (for external)
+ * Validates authentication - checks NextAuth first (for UI), then API key (for external)
  * This allows both authenticated UI users and API key users to access endpoints
  */
 export async function validateApiKey(request: NextRequest): Promise<ApiAuthResult> {
   try {
-    // First, check for Clerk authentication (UI users)
-    const { userId } = await auth();
-    if (userId) {
+    // First, check for NextAuth session (UI users)
+    const session = await auth();
+    console.log('[Auth] validateApiKey session:', JSON.stringify(session, null, 2));
+    if (session?.user?.id) {
       return {
         authenticated: true,
-        userId,
-        authType: 'clerk'
+        userId: session.user.id,
+        authType: 'next-auth'
       };
     }
 
-    // If no Clerk auth, check for API key (external API users)
+    // If no NextAuth session, check for API key (external API users)
     const authHeader = request.headers.get('Authorization');
 
     if (!authHeader) {

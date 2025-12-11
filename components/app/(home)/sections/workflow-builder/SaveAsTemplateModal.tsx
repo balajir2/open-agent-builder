@@ -6,7 +6,7 @@ import { X, Save, Tag, FolderOpen, Clock, BarChart3, Globe, Lock, Info } from "l
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
-import { useUser } from "@clerk/nextjs";
+import { useSession } from "next-auth/react";
 
 interface SaveAsTemplateModalProps {
   isOpen: boolean;
@@ -39,7 +39,8 @@ export default function SaveAsTemplateModal({
   workflowId,
   workflowName,
 }: SaveAsTemplateModalProps) {
-  const { user } = useUser();
+  const { data: session } = useSession();
+  const user = session?.user;
   const saveAsTemplate = useMutation(api.templates.saveAsTemplate);
 
   const [formData, setFormData] = useState({

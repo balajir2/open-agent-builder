@@ -1,17 +1,16 @@
 /**
  * Convex Authentication Configuration
  *
- * Configures Clerk as the authentication provider for Convex
- * The CLERK_JWT_ISSUER_DOMAIN is set via: npx convex env set
+ * Configures Azure AD as the authentication provider for Convex
  */
 
 export default {
   providers: [
     {
-      // This reads from Convex environment variable (not process.env)
-      // Set via: npx convex env set CLERK_JWT_ISSUER_DOMAIN "https://..."
-      domain: "https://bold-horse-4.clerk.accounts.dev",
-      applicationID: "convex",
+      // The issuer URL for Azure AD
+      // Format: https://login.microsoftonline.com/<Tenant_ID>/v2.0
+      domain: "https://login.microsoftonline.com/9d343c00-4814-47eb-abcd-e3a0761d628b/v2.0",
+      applicationID: process.env.AUTH_MICROSOFT_ID, // Matches the client ID in the JWT
     },
   ],
 };

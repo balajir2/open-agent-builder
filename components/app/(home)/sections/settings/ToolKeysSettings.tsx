@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useUser } from "@clerk/nextjs";
+import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { toolRegistry } from "@/lib/tools/registry";
 import { Loader2, Key, Trash2, Check, AlertCircle } from "lucide-react";
 
 export default function ToolKeysSettings() {
-    const { user } = useUser();
+    const { data: session } = useSession();
+    const user = session?.user;
     const [editingToolId, setEditingToolId] = useState<string | null>(null);
     const [tempKey, setTempKey] = useState("");
     const [isSaving, setIsSaving] = useState(false);
