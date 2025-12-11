@@ -8,7 +8,7 @@
     "dev:all": "concurrently \"npx convex dev\" \"npm run dev\"",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "migrate:dry-run": "node scripts/migrate-keys-to-convex.js --dry-run",
     "migrate:dev": "node scripts/migrate-keys-to-convex.js",
     "migrate:prod": "node scripts/migrate-keys-to-convex.js --prod",
