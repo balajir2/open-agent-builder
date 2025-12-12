@@ -80,7 +80,6 @@ const setupGlobalFetchMock = () => {
                 bodyMatches = requestBody && Object.keys(mock.match.body).every(key => {
                     const mockValue = mock.match.body[key];
                     const actualValue = requestBody[key];
-                    // Simple deep check for params object
                     if (key === 'params' && typeof mockValue === 'object' && typeof actualValue === 'object') {
                         return Object.keys(mockValue).every(paramKey => actualValue[paramKey] === mockValue[paramKey]);
                     }
@@ -89,7 +88,13 @@ const setupGlobalFetchMock = () => {
             }
 
             if (urlMatches && methodMatches && bodyMatches) {
-                return new Response(JSON.stringify(mock.response.body), {
+                let responseBody = mock.response.body;
+                if (typeof responseBody === 'function') {
+                    // If the body is a function, execute it to get the dynamic response
+                    responseBody = responseBody(requestBody);
+                }
+                
+                return new Response(JSON.stringify(responseBody), {
                     status: mock.response.status || 200,
                     headers: { 'Content-Type': mock.response.contentType || 'application/json' },
                 });
