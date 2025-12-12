@@ -9,7 +9,7 @@ import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 
 // --- Test Configuration ---
-const CONVEX_URL = process.env.CONVEX_URL!;
+const CONVEX_URL = process.env.CONVEX_URL || process.env.NEXT_PUBLIC_CONVEX_URL!;
 const TEST_USER_ID = 'test-user-id-for-interoperability-tests';
 
 // Ensure Convex URL and test secret is set
@@ -166,32 +166,87 @@ test.describe('Interoperability and E2E Tests', () => {
   // Test matrix for LLMs vs. Standard Tools
   test.describe('LLM Interop with Standard Tools', () => {
     llmProviders.forEach(provider => {
-      const testStandardTool = standardTools.find(tool => tool.id === 'serper-search');
-      if (testStandardTool) {
-        test(`should execute successfully with ${provider.name} using ${testStandardTool.label}`, async () => {
-          const toolName = testStandardTool.name;
-          const expectedResult = `Result from ${toolName} search`;
-          const instructions = `Search for "test query" using the ${toolName} tool.`;
+      standardTools.forEach(tool => {
+        // Some tools may not be suitable for this generic test, skip them if needed.
+        if (!tool.name || tool.id.startsWith('special-case')) {
+          return;
+        }
 
+        test(`should execute successfully with ${provider.name} using ${tool.label}`, async () => {
+          const toolName = tool.name;
+          const expectedResult = `Mocked result for ${toolName}`;
+          const instructions = `Use the ${toolName} tool to get information about 'test'.`;
+          
+          // 1. Dynamically generate mock arguments from the tool's schema
+          const mockArgs: { [key: string]: any } = {};
+          const functionParams = tool.parameters?.properties ?? {};
+          for (const key in functionParams) {
+            if (tool.parameters?.required?.includes(key)) {
+              const param = functionParams[key];
+              if (param.type === 'string') {
+                mockArgs[key] = `test-${key}`;
+              } else if (param.type === 'number') {
+                mockArgs[key] = 1;
+              } else if (param.type === 'boolean') {
+                mockArgs[key] = true;
+              } else {
+                mockArgs[key] = 'test'; // Default fallback
+              }
+            }
+          }
+           if (Object.keys(mockArgs).length === 0) {
+             mockArgs['query'] = 'test query'; // fallback for tools with no defined required args
+           }
+
+          // 2. Mock the LLM to call the current tool
           addFetchMock({ url: /(api\.openai\.com|api\.anthropic\.com|generativelanguage\.googleapis\.com)/, method: 'POST' }, {
-            body: { choices: [{ message: { tool_calls: [{ id: 'call_mock_llm_standard', type: 'function', function: { name: toolName, arguments: JSON.stringify({ query: 'test query' }) } }], content: instructions } }] },
+            body: (requestBody: any) => {
+              const messages = requestBody.messages || [];
+              const lastMessage = messages[messages.length - 1];
+               if (lastMessage && lastMessage.role === 'tool') {
+                    return { choices: [{ message: { content: `The tool returned: ${expectedResult}` } }] };
+               }
+              return {
+                choices: [{
+                  message: {
+                    tool_calls: [{
+                      id: `call_mock_${toolName}`,
+                      type: 'function',
+                      function: { name: toolName, arguments: JSON.stringify(mockArgs) }
+                    }],
+                    content: null
+                  }
+                }]
+              };
+            }
           });
 
-          addFetchMock({ url: /google\.serper\.dev/, method: 'POST' }, {
-              body: { organic: [{ title: expectedResult }] },
+          // 3. Add a generic mock for ANY non-LLM API call (i.e., the tool's own API call)
+          addFetchMock({ url: /^(?!.*(openai\.com|anthropic\.com|googleapis\.com)).*$/ }, {
+              body: { result: expectedResult, data: expectedResult, content: expectedResult, organic: [{ title: expectedResult }] }, // Common success fields
           });
 
-          const node: WorkflowNode = { id: 'agent-standard-tool', type: 'agent', position: { x: 0, y: 0 }, data: { label: `Agent with ${testStandardTool.label}`, model: `${provider.id}/${provider.defaultModel}`, selectedTools: [{ toolId: testStandardTool.id, enabled: true, config: {} }], instructions } };
+          // 4. Execute the agent node
+          const node: WorkflowNode = {
+            id: `agent-${tool.id}`, type: 'agent', position: { x: 0, y: 0 },
+            data: {
+              label: `Agent with ${tool.label}`,
+              model: `${provider.id}/${provider.defaultModel}`,
+              selectedTools: [{ toolId: tool.id, enabled: true, config: {} }],
+              instructions,
+            }
+          };
           const state: WorkflowState = { chatHistory: [], variables: {} };
 
           const result = await executeAgentNode(node, state, mockApiKeys as any);
-
+          
+          // 5. Assert the results
           expect(result).toBeDefined();
           expect(result.__agentValue).toContain(expectedResult);
           expect(result.__agentToolCalls).toHaveLength(1);
           expect(result.__agentToolCalls[0].name).toBe(toolName);
         });
-      }
+      });
     });
   });
 
@@ -314,12 +369,15 @@ test.describe('Interoperability and E2E Tests', () => {
         const state: WorkflowState = { chatHistory: [], variables: {} };
         const result = await executeAgentNode(node, state, mockApiKeys as any);
 
+        console.log('Final Agent Result:', JSON.stringify(result, null, 2));
+        
         expect(result).toBeDefined();
         // The final response should now contain the text generated after the tool call.
         expect(result.__agentValue).toContain(customToolResult);
         expect(result.__agentToolCalls).toHaveLength(1);
         expect(result.__agentToolCalls[0].name).toBe(customToolName);
-        expect(result.__agentToolCalls[0].output).toContain(customToolResult);
+        // Stricter check for the output
+        expect(result.__agentToolCalls[0].output).toBe(customToolResult);
     });
 
     test('Step 4: should delete the custom MCP server', async () => {
