@@ -158,6 +158,28 @@ export const deleteMCPServer = mutation({
   },
 });
 
+// New test-only mutation for cleaning up test data using a secure secret
+export const deleteMCPServerForTest = mutation({
+    args: {
+        id: v.id("mcpServers"),
+        secret: v.string(),
+    },
+    handler: async (ctx, { id, secret }) => {
+        const testSecret = process.env.CONVEX_TEST_SECRET;
+        if (!testSecret || secret !== testSecret) {
+            throw new Error("Unauthorized: Invalid test secret provided. Make sure CONVEX_TEST_SECRET is set as a Convex environment variable and passed correctly from tests.");
+        }
+
+        const server = await ctx.db.get(id);
+        if (!server) {
+            return { success: true, message: "Server not found, presumed deleted." };
+        }
+
+        await ctx.db.delete(id);
+        return { success: true };
+    },
+});
+
 // Test MCP connection and discover tools
 export const testConnection = action({
   args: {

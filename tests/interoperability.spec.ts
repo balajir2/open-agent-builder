@@ -163,8 +163,6 @@ test.describe('Interoperability and E2E Tests', () => {
   // 1. Setup: Before all tests, initialize clients and fetch data
   test.beforeAll(async () => {
     convexClient = new ConvexHttpClient(CONVEX_URL);
-    // Authenticate with deploy key for admin privileges
-    convexClient.setAuth(CONVEX_DEPLOY_KEY);
 
     // Fetch standard tools
     standardTools = toolRegistry; // Using the imported toolRegistry for now
@@ -173,7 +171,7 @@ test.describe('Interoperability and E2E Tests', () => {
     // Clean up any existing servers for TEST_USER_ID first to ensure a clean state.
     const existingServers = await convexClient.query(api.mcpServers.listUserMCPs, { userId: TEST_USER_ID });
     for (const server of existingServers) {
-        await convexClient.mutation(api.mcpServers.deleteMCPServer, { id: server._id });
+        await convexClient.mutation(api.mcpServers.deleteMCPServerForTest, { id: server._id, secret: process.env.CONVEX_TEST_SECRET! });
     }
 
     // Add some dummy MCP servers for testing enabled/disabled scenarios
@@ -213,7 +211,7 @@ test.describe('Interoperability and E2E Tests', () => {
     if (convexClient) {
         const existingServers = await convexClient.query(api.mcpServers.listUserMCPs, { userId: TEST_USER_ID });
         for (const server of existingServers) {
-            await convexClient.mutation(api.mcpServers.deleteMCPServer, { id: server._id });
+            await convexClient.mutation(api.mcpServers.deleteMCPServerForTest, { id: server._id, secret: process.env.CONVEX_TEST_SECRET! });
         }
     }
   });
@@ -408,7 +406,7 @@ test.describe('Interoperability and E2E Tests', () => {
     });
 
     test('Step 4: should delete the custom MCP server', async () => {
-      const result = await convexClient.mutation(api.mcpServers.deleteMCPServer, { id: newServerId });
+      const result = await convexClient.mutation(api.mcpServers.deleteMCPServerForTest, { id: newServerId, secret: process.env.CONVEX_TEST_SECRET! });
       expect(result.success).toBe(true);
     });
 
