@@ -304,6 +304,15 @@ test.describe('Interoperability and E2E Tests', () => {
     const customToolResult = 'Custom tool executed successfully from lifecycle test';
     const customInstructions = `Use the ${customToolName} tool.`;
 
+    // Before this suite runs, ensure a clean slate by deleting all servers for the user.
+    test.beforeAll(async () => {
+        const convex = new ConvexHttpClient(CONVEX_URL);
+        const existingServers = await convex.query(api.mcpServers.listUserMCPs, { userId: TEST_USER_ID });
+        for (const server of existingServers) {
+            await convex.mutation(api.mcpServers.deleteMCPServerForTest, { id: server._id, secret: process.env.CONVEX_TEST_SECRET! });
+        }
+    });
+
     // Ensure a clean state before this specific test suite runs
     test.beforeAll(async () => {
         const convex = new ConvexHttpClient(CONVEX_URL);
