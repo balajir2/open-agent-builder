@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import crypto from 'crypto';
 import { executeAgentNode } from '@/lib/workflow/executors/agent';
 import { WorkflowNode, WorkflowState } from '@/lib/workflow/types';
 import { ConvexHttpClient } from 'convex/browser';
@@ -7,7 +8,7 @@ import { Id } from '@/convex/_generated/dataModel';
 
 // --- Test Configuration ---
 const CONVEX_URL = process.env.CONVEX_URL || process.env.NEXT_PUBLIC_CONVEX_URL!;
-const TEST_USER_ID = 'test-user-id-for-mcp-lifecycle-tests'; // A separate user ID for true isolation
+const TEST_USER_ID = `test-user-lifecycle-${crypto.randomBytes(6).toString('hex')}`; // Unique user for this test run
 
 if (!CONVEX_URL) {
   throw new Error('CONVEX_URL environment variable is not set.');
@@ -106,7 +107,21 @@ test.describe.serial('Custom MCP Server Lifecycle', () => {
     });
 
     test.beforeEach(() => {
+        // Clear fetch mocks for the next test
         dynamicFetchMocks.length = 0;
+
+        // Force a re-import of agent and tool modules to clear any cached global state.
+        // This is the definitive fix for the state pollution that occurs when Playwright
+        // runs test files sequentially in the same worker process (as it does in CI).
+        Object.keys(require.cache).forEach(key => {
+            if (
+                key.includes('lib/workflow/executors/agent') ||
+                key.includes('lib/tools/registry') ||
+                key.includes('lib/mcp')
+            ) {
+                delete require.cache[key];
+            }
+        });
     });
 
     test('Step 1: should add a new custom MCP server', async () => {
