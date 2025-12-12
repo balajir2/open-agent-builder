@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
+import { SignedIn, SignedOut, SignInButton } from '@/components/shared/auth-helpers';
+import { UserMenu } from "@/components/shared/UserMenu";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
@@ -77,14 +78,7 @@ export default function UIBuilderContent() {
                             </SignedOut>
 
                             <SignedIn>
-                                <UserButton
-                                    appearance={{
-                                        elements: {
-                                            avatarBox: "w-32 h-32",
-                                        }
-                                    }}
-                                    afterSignOutUrl="/"
-                                />
+                                <UserMenu />
                             </SignedIn>
                         </div>
                     </div>

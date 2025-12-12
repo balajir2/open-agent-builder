@@ -70,8 +70,15 @@ export async function POST(
     const userId = authResult.userId;
 
     // Get system API keys from Convex environment
+    // Get system API keys from Convex environment
     const convex = await getAuthenticatedConvexClient();
-    const systemKeys = await convex.action(api.systemApiKeys.getAllSystemApiKeys);
+    let systemKeys: any = {};
+    try {
+      systemKeys = await convex.action(api.systemApiKeys.getAllSystemApiKeys);
+    } catch (err) {
+      console.warn('Failed to fetch system API keys:', err);
+      // Continue without system keys
+    }
 
     const apiKeys = {
       anthropic: (userId ? await getLLMApiKey('anthropic', userId) : undefined) ?? systemKeys.anthropic,
@@ -89,8 +96,23 @@ export async function POST(
       gamma: (userId ? await getToolApiKey('gamma-api', userId) : undefined) ?? systemKeys.gamma,
     };
 
+    // Add required timestamp fields to match Workflow type interface
+    // Also ensure all nodes have position and data fields (required by Workflow type)
+    const completeWorkflow = {
+      ...workflow,
+      id: workflow.id || workflowId,
+      name: workflow.name || 'Untitled Workflow',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      nodes: workflow.nodes.map(node => ({
+        ...node,
+        position: node.position || { x: 0, y: 0 }, // Ensure position is always defined
+        data: { label: '', ...node.data } as import('@/lib/workflow/types').NodeData, // Ensure data conforms to NodeData type
+      })),
+    };
+
     // Execute workflow using LangGraph
-    const executor = new LangGraphExecutor(workflow, undefined, apiKeys);
+    const executor = new LangGraphExecutor(completeWorkflow, undefined, apiKeys);
     const execution = await executor.execute(input || '');
 
     console.log('API: Execution complete:', execution.status);

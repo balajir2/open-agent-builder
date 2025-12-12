@@ -1,4 +1,4 @@
-﻿import { WorkflowNode, WorkflowState } from '../types';
+import { WorkflowNode, WorkflowState, AgentExecutionResult } from '../types';
 import { substituteVariables } from '../variable-substitution';
 import { resolveMCPServers, migrateMCPData } from '@/lib/mcp/resolver';
 import { ToolFactory } from './tool-factory';
@@ -14,7 +14,7 @@ export async function executeAgentNode(
   node: WorkflowNode,
   state: WorkflowState,
   apiKeys?: { anthropic?: string; groq?: string; openai?: string; firecrawl?: string; arcade?: string; google?: string }
-): Promise<any> {
+): Promise<AgentExecutionResult> {
   const { data } = node;
 
   // Log available keys (security: only log names)

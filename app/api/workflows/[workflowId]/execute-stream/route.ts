@@ -170,7 +170,13 @@ export async function POST(
         const userId = authResult.userId;
 
         // Get system API keys from Convex environment
-        const systemKeys = await convex.action(api.systemApiKeys.getAllSystemApiKeys);
+        let systemKeys: any = {};
+        try {
+          systemKeys = await convex.action(api.systemApiKeys.getAllSystemApiKeys);
+        } catch (err) {
+          console.warn('Failed to fetch system API keys:', err);
+          // Continue without system keys
+        }
 
         const apiKeys = {
           anthropic: (userId ? await getLLMApiKey('anthropic', userId) : undefined) ?? systemKeys.anthropic,
@@ -210,10 +216,17 @@ export async function POST(
         // LangGraph Execution Path
         const threadId = `thread_${workflowId}_${Date.now()}`;
 
+        // Ensure workflow has required timestamp fields for Workflow type interface
+        const completeWorkflow = {
+          ...workflow,
+          createdAt: workflow.createdAt || new Date().toISOString(),
+          updatedAt: workflow.updatedAt || new Date().toISOString(),
+        };
+
         let executor;
         try {
           executor = new LangGraphExecutor(
-            workflow,
+            completeWorkflow,
             (nodeId, result) => {
               nodeResults[nodeId] = result;
 

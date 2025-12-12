@@ -5,6 +5,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import html2canvas from "html2canvas";
@@ -17,6 +18,7 @@ import {
 import { getDocumentSaveLocation } from '@/utils/document-export';
 import { FileLocationModal } from '@/components/ui/FileLocationModal';
 import { useRouter, useSearchParams } from "next/navigation";
+import htmlDocx from 'html-docx-js/dist/html-docx';
 
 // Type definitions for input requirements and validation
 interface InputRequirement {
@@ -345,12 +347,25 @@ export default function WorkflowRunnerUI() {
   const [downloadLocation, setDownloadLocation] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [inputValidation, setInputValidation] = useState<Record<string, InputValidation>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [savedInputPresets, setSavedInputPresets] = useState<Record<string, Record<string, string>>>({});
   const [currentPresetName, setCurrentPresetName] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
   const formatDropdownRef = useRef<HTMLDivElement>(null);
+  const downloadButtonRef = useRef<HTMLButtonElement>(null);
+  const [downloadMenuPosition, setDownloadMenuPosition] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (showDownloadMenu && downloadButtonRef.current) {
+      const rect = downloadButtonRef.current.getBoundingClientRect();
+      setDownloadMenuPosition({
+        top: rect.bottom + window.scrollY + 8,
+        left: rect.right + window.scrollX - 200
+      });
+    }
+  }, [showDownloadMenu]);
 
   // Upload state per document variable
   const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({});
@@ -954,17 +969,17 @@ export default function WorkflowRunnerUI() {
       // Helper function to clean text for PDF rendering
       const cleanText = (text: string): string => {
         return text.replace(/[\u2018\u2019]/g, "'")      // Replace smart quotes
-                   .replace(/[\u201C\u201D]/g, '"')       // Replace smart double quotes
-                   .replace(/[\u2192\u2794\u27A1]/g, '->') // Replace arrows with ->
-                   .replace(/[\u2022\u2023\u25E6\u2043]/g, '*') // Replace bullets with *
-                   .replace(/[\u2013\u2014]/g, '-')       // Replace em/en dashes
-                   .replace(/[\u2026]/g, '...')           // Replace ellipsis
-                   .replace(/[^\x00-\x7F]/g, '')          // Remove any non-ASCII characters
-                   .replace(/\s+/g, ' ')                  // Normalize whitespace
-                   .replace(/\s+\*\s+/g, '\n* ')          // Add line break before each bullet point
-                   .replace(/(\*\s+[^:]+:)\s+(\d+\.)/g, '$1\n$2') // Add line break after section headers before numbered lists
-                   .replace(/(\d+\.\s+[^:]+:)/g, '\n$1') // Add line break before numbered list items with colons
-                   .trim();
+          .replace(/[\u201C\u201D]/g, '"')       // Replace smart double quotes
+          .replace(/[\u2192\u2794\u27A1]/g, '->') // Replace arrows with ->
+          .replace(/[\u2022\u2023\u25E6\u2043]/g, '*') // Replace bullets with *
+          .replace(/[\u2013\u2014]/g, '-')       // Replace em/en dashes
+          .replace(/[\u2026]/g, '...')           // Replace ellipsis
+          .replace(/[^\x00-\x7F]/g, '')          // Remove any non-ASCII characters
+          .replace(/\s+/g, ' ')                  // Normalize whitespace
+          .replace(/\s+\*\s+/g, '\n* ')          // Add line break before each bullet point
+          .replace(/(\*\s+[^:]+:)\s+(\d+\.)/g, '$1\n$2') // Add line break after section headers before numbered lists
+          .replace(/(\d+\.\s+[^:]+:)/g, '\n$1') // Add line break before numbered list items with colons
+          .trim();
       };
 
       // Helper function to add new page if needed
@@ -1324,7 +1339,37 @@ export default function WorkflowRunnerUI() {
     }
   }
 
-  const handleDownloadResults = async () => {
+  async function downloadResultAsDOCX(filename = "workflow-output.docx") {
+    if (!resultRef.current) {
+      alert("Nothing to download");
+      return;
+    }
+    try {
+      setIsDownloading(true);
+      const element = resultRef.current;
+      const htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif;font-size:11pt;line-height:1.5}h1{font-size:18pt;font-weight:bold;margin-top:12pt;margin-bottom:6pt}h2{font-size:14pt;font-weight:bold;margin-top:10pt;margin-bottom:5pt}h3{font-size:12pt;font-weight:bold;margin-top:8pt;margin-bottom:4pt}p{margin-top:0;margin-bottom:8pt}table{border-collapse:collapse;width:100%;margin:10pt 0}th,td{border:1px solid #000;padding:4pt 8pt;text-align:left}th{background-color:#f0f0f0;font-weight:bold}ul,ol{margin:8pt 0;padding-left:20pt}li{margin-bottom:4pt}strong,b{font-weight:bold}em,i{font-style:italic}pre,code{font-family:'Courier New',monospace;background-color:#f5f5f5;padding:4pt}</style></head><body>${element.innerHTML}</body></html>`;
+      const converted = htmlDocx.asBlob(htmlContent);
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(converted);
+      const timestamp = new Date().getTime();
+      link.download = filename.replace('.docx', `-${timestamp}.docx`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+      setDownloadLocation(getDocumentSaveLocation());
+      setShowDownloadSuccess(true);
+      setTimeout(() => setShowDownloadSuccess(false), 5000);
+    } catch (error) {
+      console.error("Error generating DOCX:", error);
+      alert(`Failed to generate DOCX: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setIsDownloading(false);
+      setShowLocationModal(true);
+    }
+  }
+
+  const handleDownloadResults = async (format: 'pdf' | 'docx' = 'pdf') => {
     if (workflowResponses.length === 0) return;
 
     setIsDownloading(true);
@@ -1336,13 +1381,17 @@ export default function WorkflowRunnerUI() {
     const safeName = (workflowName || 'workflow').replace(/\s+/g, '-').toLowerCase();
 
     try {
-      await downloadResultAsPDF(`workflow-results-${safeName}.pdf`);
+      if (format === 'docx') {
+        await downloadResultAsDOCX(`workflow-results-${safeName}.docx`);
+      } else {
+        await downloadResultAsPDF(`workflow-results-${safeName}.pdf`);
+      }
       setDownloadLocation(getDocumentSaveLocation());
       setShowDownloadSuccess(true);
       setTimeout(() => setShowDownloadSuccess(false), 5000);
     } catch (error) {
-      console.error("Error generating PDF:", error);
-      alert(`Failed to generate PDF: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`Error generating ${format.toUpperCase()}:`, error);
+      alert(`Failed to generate ${format.toUpperCase()}: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setIsDownloading(false);
       setShowLocationModal(true);
@@ -1382,7 +1431,7 @@ export default function WorkflowRunnerUI() {
         backgroundAttachment: 'fixed',
       }}
     >
-      <div className="flex-1 w-full h-full overflow-hidden py-4">
+      <div className="flex-1 w-full h-full py-4">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 h-full">
           <div className="col-span-1 lg:col-span-2 relative rounded-lg overflow-hidden transition-all duration-300 ease-in-out hover:shadow-2xl border border-indigo-100">
             <div
@@ -1649,7 +1698,7 @@ export default function WorkflowRunnerUI() {
             </div>
           </div>
 
-          <div className="col-span-1 lg:col-span-3 relative rounded-lg overflow-hidden transition-all duration-300 ease-in-out hover:shadow-2xl border border-indigo-100">
+          <div className="col-span-1 lg:col-span-3 relative rounded-lg transition-all duration-300 ease-in-out hover:shadow-2xl border border-indigo-100">
             <div
               className="absolute inset-0 pointer-events-none"
               aria-hidden="true"
@@ -1670,29 +1719,90 @@ export default function WorkflowRunnerUI() {
                   </span>
                 </h2>
 
-                <div className=" flex items-center gap-2 px-5 py-5">
+
+                <div className="flex items-center gap-2 px-5 py-5 relative">
                   <button
-                    onClick={() => handleDownloadResults()}
+                    ref={downloadButtonRef}
+                    onClick={() => setShowDownloadMenu(!showDownloadMenu)}
                     disabled={workflowResponses.length === 0 || isDownloading}
-                    title={workflowResponses.length === 0 ? "No results to download" : "Download results as PDF"}
-                    className={`flex items-center gap-2 px-5 py-5 rounded-md text-sm font-medium transition-all focus:outline-none
+                    title={workflowResponses.length === 0 ? "No results to download" : "Download results"}
+                    className={`flex items-center gap-3 px-6 py-3 rounded-lg text-sm font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500
                     ${workflowResponses.length > 0 && !isDownloading
-                        ? 'bg-indigo-700 text-white shadow-sm hover:brightness-105 active:scale-95'
+                        ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md hover:shadow-lg hover:from-indigo-700 hover:to-indigo-800 active:scale-95'
                         : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                   >
                     {isDownloading ? (
                       <>
-                        <Loader className="w-15 h-15 animate-spin" />
+                        <Loader className="w-4 h-4 animate-spin" />
                         <span>Downloading...</span>
                       </>
                     ) : (
                       <>
-                        <FileDown className="w-15 h-15" />
-                        <span>Download PDF</span>
+                        <FileDown className="w-4 h-4" />
+                        <span>Download</span>
+                        <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showDownloadMenu ? 'rotate-180' : ''}`} />
                       </>
                     )}
                   </button>
 
+
+                  {showDownloadMenu && workflowResponses.length > 0 && !isDownloading && createPortal(
+                    <div className="relative z-[9999]">
+                      <div
+                        className="fixed inset-0 bg-transparent"
+                        onClick={() => setShowDownloadMenu(false)}
+                      />
+                      <div
+                        className="fixed bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+                        style={{
+                          top: downloadMenuPosition.top,
+                          left: downloadMenuPosition.left,
+                          width: 200
+                        }}
+                      >
+                        <div className="bg-gray-50/80 backdrop-blur-sm px-4 py-3 border-b border-gray-100">
+                          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                            Download Format
+                          </h3>
+                        </div>
+
+                        <div className="p-2 space-y-1">
+                          <button
+                            onClick={() => {
+                              handleDownloadResults('pdf');
+                              setShowDownloadMenu(false);
+                            }}
+                            className="w-full text-left px-3 py-3 hover:bg-slate-50 transition-colors duration-150 flex items-center gap-3 group rounded-lg"
+                          >
+                            <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center transition-colors group-hover:bg-red-100 flex-shrink-0">
+                              <FileDown className="w-5 h-5 text-red-600" />
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900 text-sm whitespace-nowrap">PDF Document</div>
+                              <div className="text-xs text-gray-500">Best for sharing</div>
+                            </div>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              handleDownloadResults('docx');
+                              setShowDownloadMenu(false);
+                            }}
+                            className="w-full text-left px-3 py-3 hover:bg-slate-50 transition-colors duration-150 flex items-center gap-3 group rounded-lg"
+                          >
+                            <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center transition-colors group-hover:bg-blue-100 flex-shrink-0">
+                              <FileText className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900 text-sm whitespace-nowrap">Word Document</div>
+                              <div className="text-xs text-gray-500">Editable format</div>
+                            </div>
+                          </button>
+                        </div>
+                      </div>
+                    </div>,
+                    document.body
+                  )}
                 </div>
               </div>
 

@@ -14,6 +14,7 @@ export const BackgroundOuterPiece = () => {
   const { dropdownContent } = useHeaderContext();
   const { headerHeight } = useHeaderHeight();
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     const heroContent = document.getElementById("hero-content");
     if (!heroContent) {
