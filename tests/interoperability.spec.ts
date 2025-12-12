@@ -1,4 +1,3 @@
-
 import { test, expect, Page } from '@playwright/test';
 import { llmProviders, LLMProvider } from '@/lib/config/llm-config';
 import { toolRegistry } from '@/lib/tools/registry';
@@ -11,15 +10,14 @@ import { Id } from '@/convex/_generated/dataModel';
 
 // --- Test Configuration ---
 const CONVEX_URL = process.env.CONVEX_URL!;
-const CONVEX_DEPLOY_KEY = process.env.CONVEX_DEPLOY_KEY!;
 const TEST_USER_ID = 'test-user-id-for-interoperability-tests';
 
-// Ensure Convex URL is set
+// Ensure Convex URL and test secret is set
 if (!CONVEX_URL) {
   throw new Error('CONVEX_URL environment variable is not set.');
 }
-if (!CONVEX_DEPLOY_KEY) {
-    throw new Error('CONVEX_DEPLOY_KEY environment variable is not set for admin access in tests.');
+if (!process.env.CONVEX_TEST_SECRET) {
+    throw new Error('CONVEX_TEST_SECRET environment variable is not set for tests.');
 }
 
 // Mock API Keys for agent execution
@@ -194,8 +192,8 @@ test.describe('Interoperability and E2E Tests', () => {
         enabled: false,
     };
 
-    await convexClient.mutation(api.mcpServers.addMCPServer, dummyEnabledServer);
-    await convexClient.mutation(api.mcpServers.addMCPServer, dummyDisabledServer);
+    await convexClient.mutation(api.mcpServers.addMCPServerForTest, { secret: process.env.CONVEX_TEST_SECRET!, serverData: dummyEnabledServer });
+    await convexClient.mutation(api.mcpServers.addMCPServerForTest, { secret: process.env.CONVEX_TEST_SECRET!, serverData: dummyDisabledServer });
 
     try {
       allMCPs = await convexClient.query(api.mcpServers.listUserMCPs, { userId: TEST_USER_ID });
@@ -362,7 +360,7 @@ test.describe('Interoperability and E2E Tests', () => {
 
 
     test('Step 1: should add a new custom MCP server', async () => {
-      newServerId = await convexClient.mutation(api.mcpServers.addMCPServer, customServer);
+      newServerId = await convexClient.mutation(api.mcpServers.addMCPServerForTest, { secret: process.env.CONVEX_TEST_SECRET!, serverData: customServer });
       expect(newServerId).toBeDefined();
     });
 
