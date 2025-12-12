@@ -255,20 +255,66 @@ test.describe('Interoperability and E2E Tests', () => {
     });
 
     test('Step 3: should execute a workflow with the custom MCP server', async () => {
+        // Mock for the LLM API call. This mock is state-aware to break agentic loops.
         addFetchMock({ url: /(api\.openai\.com|api\.anthropic\.com|generativelanguage\.googleapis\.com)/, method: 'POST' }, {
-            body: { choices: [{ message: { tool_calls: [{ id: 'call_mock_llm_lifecycle', type: 'function', function: { name: customToolName, arguments: JSON.stringify({ message: 'hello' }) } }], content: customInstructions } }] },
-        });
-        addFetchMock({ url: customServer.url, method: 'POST', body: { method: 'tools/list' } }, { body: { result: { tools: [{ name: customToolName, description: 'A mock tool' }] } } });
-        addFetchMock({ url: customServer.url, method: 'POST', body: { method: 'tools/call', params: { name: customToolName } } }, { body: { result: { content: [{ type: 'text', text: customToolResult }] } } });
+            body: (requestBody: any) => {
+                const messages = requestBody.messages || [];
+                const lastMessage = messages[messages.length - 1];
 
-        const node: WorkflowNode = { id: 'agent-custom-mcp', type: 'agent', position: { x: 0, y: 0 }, data: { label: 'Agent with Custom MCP', model: 'openai/gpt-4o', mcpServerIds: [newServerId], instructions: customInstructions } };
+                // If the last message is a tool result, the agent has executed the tool.
+                // Now, the LLM should respond with a final answer based on that result.
+                if (lastMessage && lastMessage.role === 'tool') {
+                    return {
+                        choices: [{
+                            message: {
+                                content: `The tool call was successful. The result is: "${customToolResult}"`
+                            }
+                        }]
+                    };
+                }
+
+                // Otherwise, this is the first call. Instruct the agent to call a tool.
+                return {
+                    choices: [{
+                        message: {
+                            tool_calls: [{
+                                id: 'call_mock_llm_lifecycle',
+                                type: 'function',
+                                function: { name: customToolName, arguments: JSON.stringify({ message: 'hello' }) }
+                            }],
+                            content: null
+                        }
+                    }]
+                };
+            }
+        });
+
+        // Mock for MCP server to list and execute the tool
+        addFetchMock({ url: customServer.url, method: 'POST', body: { method: 'tools/list' } }, {
+            body: { result: { tools: [{ name: customToolName, description: 'A mock tool' }] } }
+        });
+        addFetchMock({ url: customServer.url, method: 'POST', body: { method: 'tools/call', params: { name: customToolName } } }, {
+            body: { result: { content: [{ type: 'text', text: customToolResult }] } }
+        });
+
+        const node: WorkflowNode = {
+            id: 'agent-custom-mcp', type: 'agent', position: { x: 0, y: 0 },
+            data: {
+                label: 'Agent with Custom MCP',
+                model: 'openai/gpt-4o', // The mock above will catch this
+                mcpServerIds: [newServerId],
+                instructions: customInstructions,
+            },
+        };
         const state: WorkflowState = { chatHistory: [], variables: {} };
         const result = await executeAgentNode(node, state, mockApiKeys as any);
 
         expect(result).toBeDefined();
+        // The final response should now contain the text generated after the tool call.
         expect(result.__agentValue).toContain(customToolResult);
         expect(result.__agentToolCalls).toHaveLength(1);
         expect(result.__agentToolCalls[0].name).toBe(customToolName);
+        expect(result.__agentToolCalls[0].output).toContain(customToolResult);
     });
 
     test('Step 4: should delete the custom MCP server', async () => {
