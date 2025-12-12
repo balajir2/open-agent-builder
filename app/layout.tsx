@@ -8,6 +8,7 @@ import ColorStyles from "@/components/shared/color-styles/color-styles";
 import Scrollbar from "@/components/ui/scrollbar";
 import { BigIntProvider } from "@/components/providers/BigIntProvider";
 import "styles/main.css";
+import SessionManager from "@/components/auth/SessionManager";
 
 
 
@@ -38,6 +39,7 @@ export default function RootLayout({
       >
         <BigIntProvider>
           <ConvexClientProvider>
+            <SessionManager />
             <main className="overflow-x-clip">{children}</main>
             <Scrollbar />
             <Toaster position="bottom-right" />
