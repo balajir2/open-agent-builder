@@ -38,6 +38,8 @@ export const getSystemApiKey = action({
       'scraperapi': 'SCRAPERAPI_API_KEY',
       'browserless': 'BROWSERLESS_API_KEY',
       'arcade': 'ARCADE_API_KEY',
+      'gamma': 'GAMMA_API_KEY',
+      'gamma-api': 'GAMMA_API_KEY',
       'encryption': 'ENCRYPTION_KEY',
     };
 
@@ -73,6 +75,7 @@ export const getAllSystemApiKeys = action({
       serpapi: process.env.SERPAPI_API_KEY || null,
       scraperapi: process.env.SCRAPERAPI_API_KEY || null,
       browserless: process.env.BROWSERLESS_API_KEY || null,
+      gamma: process.env.GAMMA_API_KEY || null,
     };
   },
 });

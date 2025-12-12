@@ -1056,71 +1056,37 @@ export default function NodePanel({
                 </div>
               )}
 
-              {/* Tool Selector */}
+              {/* Standard Tools Dropdown */}
               {showStandardTools && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mb-12 p-12 bg-[#f4f4f5] rounded-12 border border-border-faint"
-                >
-                  {['web-search', 'scraping', 'extraction'].map(category => {
-                    const tools = getToolsByCategory(category);
-                    if (tools.length === 0) return null;
-
-                    return (
-                      <div key={category} className="mb-12 last:mb-0">
-                        <h5 className="text-xs font-semibold text-black-alpha-48 uppercase tracking-wider mb-6">
-                          {category.replace('-', ' ')}
-                        </h5>
-                        <div className="space-y-4">
-                          {tools.map(tool => {
-                            const isSelected = selectedTools.some(t => t.toolId === tool.id);
-                            return (
-                              <button
-                                key={tool.id}
-                                onClick={() => {
-                                  if (!isSelected) {
-                                    // Initialize with defaults
-                                    const initialConfig: Record<string, any> = {};
-                                    tool.fields.forEach(f => {
-                                      if (f.defaultValue !== undefined) initialConfig[f.name] = f.defaultValue;
-                                    });
-
-                                    setSelectedTools(prev => [...prev, {
-                                      toolId: tool.id,
-                                      enabled: true,
-                                      config: initialConfig
-                                    }]);
-                                    setShowStandardTools(false);
-                                  }
-                                }}
-                                disabled={isSelected}
-                                className={`w-full text-left px-10 py-8 rounded-8 flex items-center gap-8 transition-colors ${isSelected
-                                  ? 'opacity-50 cursor-not-allowed bg-black-alpha-4'
-                                  : 'hover:bg-white hover:shadow-sm'
-                                  }`}
-                              >
-                                {tool.icon && <tool.icon className="w-14 h-14 text-black-alpha-64" />}
-                                <div>
-                                  <div className="text-sm font-medium text-accent-black">{tool.label}</div>
-                                  <div className="text-xs text-black-alpha-48">{tool.description}</div>
-                                </div>
-                              </button>
-                            );
-                          })}
+                <div className="mt-8 p-8 bg-background-base border border-border-faint rounded-10 space-y-8 max-h-[300px] overflow-y-auto">
+                  {toolRegistry
+                    .filter(tool => !selectedTools.some(t => t.toolId === tool.id))
+                    .map((tool) => (
+                      <button
+                        key={tool.id}
+                        onClick={() => {
+                          setSelectedTools(prev => [...prev, { toolId: tool.id, enabled: true, config: {} }]);
+                          setShowStandardTools(false);
+                        }}
+                        className="w-full text-left px-8 py-6 rounded-6 text-sm transition-colors hover:bg-black-alpha-4 text-accent-black flex items-center gap-8"
+                      >
+                        {tool.icon && <tool.icon className="w-14 h-14 text-black-alpha-64" />}
+                        <div>
+                          <div className="font-medium">{tool.label}</div>
+                          {tool.description && (
+                            <div className="text-xs text-black-alpha-48 mt-1">{tool.description}</div>
+                          )}
                         </div>
-                      </div>
-                    );
-                  })}
-                </motion.div>
+                      </button>
+                    ))}
+                </div>
               )}
             </div>
 
             {/* Output Format Field */}
             <div>
               <label className="block text-sm font-medium text-black-alpha-48 mb-8">
-                Output format
+                Output Format
               </label>
               <select
                 value={outputFormat}
@@ -1323,8 +1289,9 @@ export default function NodePanel({
               )}
             </details>
           </div>
-        </motion.aside>
-      )}
-    </AnimatePresence>
+        </motion.aside >
+      )
+      }
+    </AnimatePresence >
   );
 }

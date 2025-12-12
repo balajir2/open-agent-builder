@@ -185,6 +185,7 @@ export async function POST(
           serpapi: (userId ? await getToolApiKey('serpapi-search', userId) : undefined) ?? systemKeys.serpapi,
           scraperapi: (userId ? await getToolApiKey('scraperapi', userId) : undefined) ?? systemKeys.scraperapi,
           browserless: (userId ? await getToolApiKey('browserless', userId) : undefined) ?? systemKeys.browserless,
+          gamma: (userId ? await getToolApiKey('gamma-api', userId) : undefined) ?? systemKeys.gamma,
         };
 
         console.log('[Route] Debug API Keys:', {

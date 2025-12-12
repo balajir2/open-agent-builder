@@ -63,7 +63,7 @@ export default function ToolKeysSettings() {
     }
 
     // Group tools by category
-    const categories = ['web-search', 'scraping'];
+    const categories = ['web-search', 'scraping', 'ai-generation'];
 
     return (
         <div className="space-y-12">

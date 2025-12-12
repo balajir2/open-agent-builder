@@ -16,6 +16,7 @@ export interface APIKeys {
   serpapi?: string;
   scraperapi?: string;
   browserless?: string;
+  gamma?: string;  // Gamma API for presentations
 }
 
 /**
@@ -36,6 +37,7 @@ export function getServerAPIKeys(): APIKeys {
     serpapi: process.env.SERPAPI_API_KEY,
     scraperapi: process.env.SCRAPERAPI_API_KEY,
     browserless: process.env.BROWSERLESS_API_KEY,
+    gamma: process.env.GAMMA_API_KEY,
   };
 }
 

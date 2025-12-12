@@ -20,6 +20,21 @@ export async function executeAgentNode(
   // Log available keys (security: only log names)
   console.log('[Agent] Available API Keys:', Object.keys(apiKeys || {}).filter(k => !!(apiKeys as any)[k]));
   console.log('[Agent] Selected Tools Config:', JSON.stringify(data.selectedTools || [], null, 2));
+  // console.log('[Agent] 🔍 DIAGNOSTIC: Checking for Gamma AI...');
+  // if (data.selectedTools && Array.isArray(data.selectedTools)) {
+  //   const hasGamma = data.selectedTools.some((t: any) =>
+  //     (t.toolId === 'gamma-api' || t.id === 'gamma-api')
+  //   );
+  //   console.log(`[Agent] 🔍 Gamma AI in selectedTools: ${hasGamma ? '✅ YES' : '❌ NO'}`);
+  //   if (hasGamma) {
+  //     const gammaTool = data.selectedTools.find((t: any) =>
+  //       (t.toolId === 'gamma-api' || t.id === 'gamma-api')
+  //     );
+  //     console.log('[Agent] 🔍 Gamma AI config:', JSON.stringify(gammaTool, null, 2));
+  //   }
+  // } else {
+  //   console.log('[Agent] 🔍 selectedTools is not an array or is undefined');
+  // }
 
   try {
     // 1. Migrate data if using old format
@@ -91,17 +106,23 @@ export async function executeAgentNode(
     const standardTools: any[] = [];
 
     if (data.selectedTools && Array.isArray(data.selectedTools)) {
+      console.log(`[Agent] Processing ${data.selectedTools.length} selected tools...`);
       for (const toolConfig of data.selectedTools) {
+        const toolId = (toolConfig as any).toolId || (toolConfig as any).id;
+        console.log(`[Agent] Creating tool: ${toolId}`, JSON.stringify(toolConfig, null, 2));
         try {
           const tool = await ToolFactory.createTool(toolConfig, apiKeys || {});
           if (tool) {
+            console.log(`[Agent] ✓ Successfully created tool: ${tool.name}`);
             standardTools.push(tool);
+          } else {
+            console.warn(`[Agent] ✗ Tool creation returned null for: ${toolId}`);
           }
         } catch (error) {
-          const toolId = (toolConfig as any).toolId || (toolConfig as any).id;
-          console.error(`Failed to instantiate tool ${toolId}:`, error);
+          console.error(`[Agent] ✗ Failed to instantiate tool ${toolId}:`, error);
         }
       }
+      console.log(`[Agent] Total standard tools created: ${standardTools.length}`);
     }
 
     // Debug logging
@@ -262,7 +283,7 @@ export async function executeAgentNode(
             };
           })
         ].filter((tool, index, self) =>
-            index === self.findIndex((t) => t.name === tool.name)
+          index === self.findIndex((t) => t.name === tool.name)
         );
 
         console.log('[Agent] Final Tools passed to LLM:', JSON.stringify(finalTools.map(t => ({ name: t.name, description: t.description })), null, 2));

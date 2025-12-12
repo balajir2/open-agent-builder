@@ -93,7 +93,7 @@ export const WorkflowStateAnnotation = Annotation.Root({
 export class LangGraphExecutor {
   private workflow: Workflow;
   private graph: any; // Compiled StateGraph
-  private apiKeys?: { anthropic?: string; groq?: string; openai?: string; firecrawl?: string; arcade?: string };
+  private apiKeys?: { anthropic?: string; groq?: string; openai?: string; firecrawl?: string; arcade?: string; gamma?: string };
   private onNodeUpdate?: (nodeId: string, result: NodeExecutionResult) => void;
   private checkpointer: MemorySaver;
   private parallelNodeIds = new Set<string>();
@@ -106,7 +106,7 @@ export class LangGraphExecutor {
   constructor(
     workflow: Workflow,
     onNodeUpdate?: (nodeId: string, result: NodeExecutionResult) => void,
-    apiKeys?: { anthropic?: string; groq?: string; openai?: string; firecrawl?: string; arcade?: string }
+    apiKeys?: { anthropic?: string; groq?: string; openai?: string; firecrawl?: string; arcade?: string; gamma?: string }
   ) {
     this.workflow = workflow;
     this.onNodeUpdate = onNodeUpdate;
@@ -524,20 +524,22 @@ export class LangGraphExecutor {
         return await executeMCPNode(node, state as WorkflowState, this.apiKeys?.firecrawl);
       }
 
+      case 'gamma-ai': {
+        const { executeGammaNode } = await import('./executors/gamma');
+        return await executeGammaNode(node, state as WorkflowState, this.apiKeys?.gamma);
+      }
+
       case 'transform':
       case 'data-transform': {
         // SECURITY FIX: Use E2B sandbox instead of Function() constructor
         // Function() allows arbitrary code execution and bypasses security
         // Import and use the secure data executor instead
-        const { executeDataTransformNode } = await import('./executors/data');
-        return await executeDataTransformNode(node, state as WorkflowState, this.apiKeys);
+        const { executeDataNode } = await import('./executors/data');
+        return await executeDataNode(node, state as WorkflowState);
       }
 
       case 'http': {
-        const url = data.httpUrl || '';
-        const method = data.httpMethod || 'GET';
-        const response = await fetch(url, { method });
-        return await response.json();
+        return await executeHTTPNode(node, state as WorkflowState);
       }
 
       case 'if-else': {

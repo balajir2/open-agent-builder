@@ -35,6 +35,7 @@ import {
   MoreHorizontal,
   Server,
   MousePointer2,
+  Layers,
 } from "lucide-react";
 import NodePanel from "./NodePanel";
 import MCPPanel from "./MCPPanel";
@@ -47,6 +48,7 @@ import ToolsNodePanel from "./ToolsNodePanel";
 import NoteNodePanel from "./NoteNodePanel";
 import HTTPNodePanel from "./HTTPNodePanel";
 import ExtractNodePanel from "./ExtractNodePanel";
+import GammaNodePanel from "./GammaNodePanel";
 import StartNodePanel from "./StartNodePanel";
 import WorkflowNameEditor from "./WorkflowNameEditor";
 import SettingsPanel from "./SettingsPanelSimple";
@@ -125,6 +127,7 @@ const nodeCategories = [
     category: "Tools",
     nodes: [
       { type: "mcp", label: "MCP", color: "bg-[#FFEFA4] dark:bg-[#FFDD40]", icon: Plug },
+      { type: "gamma-ai", label: "Gamma AI", color: "bg-purple-500", icon: Layers },
     ],
   },
   {
@@ -273,7 +276,7 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
     isOpen: false,
     title: "",
     description: "",
-    onConfirm: () => {},
+    onConfirm: () => { },
   });
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
@@ -774,10 +777,10 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
         const nextClassName = isCurrentlyRunning
           ? 'executing-node'
           : result?.status === 'completed'
-          ? 'completed-node'
-          : result?.status === 'failed'
-          ? 'failed-node'
-          : '';
+            ? 'completed-node'
+            : result?.status === 'failed'
+              ? 'failed-node'
+              : '';
 
         const currentClassName = node.className || '';
         const isRunningChanged = (node.data as any)?.isRunning !== isCurrentlyRunning;
@@ -1009,11 +1012,11 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
       eds.map((edge) =>
         edge.id === edgeId
           ? {
-              ...edge,
-              label,
-              labelBgStyle: { fill: 'white', fillOpacity: 1 },
-              labelStyle: { fill: '#18181b', fontWeight: 600, fontSize: 12 }
-            }
+            ...edge,
+            label,
+            labelBgStyle: { fill: 'white', fillOpacity: 1 },
+            labelStyle: { fill: '#18181b', fontWeight: 600, fontSize: 12 }
+          }
           : edge
       )
     );
@@ -1517,11 +1520,10 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
         {!isRunning ? (
           <button
             onClick={handlePreview}
-            className={`px-16 py-8 border rounded-8 text-body-medium transition-colors flex items-center gap-8 ${
-              showExecution
-                ? 'bg-heat-100 text-white border-heat-100'
-                : 'bg-accent-white text-accent-black border-border-faint hover:bg-black-alpha-4'
-            }`}
+            className={`px-16 py-8 border rounded-8 text-body-medium transition-colors flex items-center gap-8 ${showExecution
+              ? 'bg-heat-100 text-white border-heat-100'
+              : 'bg-accent-white text-accent-black border-border-faint hover:bg-black-alpha-4'
+              }`}
           >
             <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -1560,96 +1562,96 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
           transition={{ duration: 0.5, delay: 0.2 }}
           className="w-200 lg:w-200 md:w-180 sm:w-160 m-20 rounded-16 border border-border-faint bg-accent-white p-16 shadow-lg flex-shrink-0 z-10 self-start max-h-[calc(100vh-80px)] overflow-y-auto"
         >
-        <div className="mb-24">
-          <button
-            onClick={onBack}
-            className="text-body-small text-black-alpha-48 hover:text-accent-black transition-colors flex items-center gap-8"
-          >
-            <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back
-          </button>
-        </div>
+          <div className="mb-24">
+            <button
+              onClick={onBack}
+              className="text-body-small text-black-alpha-48 hover:text-accent-black transition-colors flex items-center gap-8"
+            >
+              <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back
+            </button>
+          </div>
 
-        {/* Node Types */}
-        <div className="space-y-12">
-          {nodeCategories.map((category) => (
-            <div key={category.category}>
-              <h3 className="text-xs font-semibold text-black-alpha-64 uppercase tracking-wide mb-8">
-                {category.category}
-              </h3>
-              <div className="space-y-2">
-                {category.nodes.map((node) => {
-                  const Icon = node.icon;
-                  return (
-                    <motion.div
-                      key={node.type}
-                      draggable
-                      onDragStart={(e) => onDragStart(e as any, node.type, node.label, node.color)}
-                      className="rounded-8 px-10 py-8 hover:bg-black-alpha-4 transition-all cursor-move flex items-center gap-10"
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <div className={`w-24 h-24 rounded-6 ${node.color} flex items-center justify-center flex-shrink-0`}>
-                        <Icon className="w-14 h-14 text-white" strokeWidth={2.5} />
-                      </div>
-                      <span className="text-sm font-medium text-accent-black">{node.label}</span>
-                    </motion.div>
-                  );
-                })}
+          {/* Node Types */}
+          <div className="space-y-12">
+            {nodeCategories.map((category) => (
+              <div key={category.category}>
+                <h3 className="text-xs font-semibold text-black-alpha-64 uppercase tracking-wide mb-8">
+                  {category.category}
+                </h3>
+                <div className="space-y-2">
+                  {category.nodes.map((node) => {
+                    const Icon = node.icon;
+                    return (
+                      <motion.div
+                        key={node.type}
+                        draggable
+                        onDragStart={(e) => onDragStart(e as any, node.type, node.label, node.color)}
+                        className="rounded-8 px-10 py-8 hover:bg-black-alpha-4 transition-all cursor-move flex items-center gap-10"
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <div className={`w-24 h-24 rounded-6 ${node.color} flex items-center justify-center flex-shrink-0`}>
+                          <Icon className="w-14 h-14 text-white" strokeWidth={2.5} />
+                        </div>
+                        <span className="text-sm font-medium text-accent-black">{node.label}</span>
+                      </motion.div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
 
-        <div className="mt-32" />
-      </motion.aside>
+          <div className="mt-32" />
+        </motion.aside>
 
-      {/* Main Canvas */}
-      <motion.main
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
-        className="flex-1 relative"
-        ref={reactFlowWrapper}
-      >
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onDrop={onDrop}
-          onDragOver={onDragOver}
-          onNodeClick={onNodeClick}
-          onNodeContextMenu={onNodeContextMenu}
-          onEdgeClick={onEdgeClick}
-          onEdgeDoubleClick={onEdgeDoubleClick}
-          onPaneClick={onPaneClick}
-          defaultEdgeOptions={{
-            type: 'smoothstep',
-            style: { strokeWidth: 2, cursor: 'pointer' },
-            interactionWidth: 20, // Make edges easier to click
-          }}
-          className="bg-background-base"
-          proOptions={{ hideAttribution: true }}
+        {/* Main Canvas */}
+        <motion.main
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+          className="flex-1 relative"
+          ref={reactFlowWrapper}
         >
-          <Background
-            color="#E5E5E5"
-            gap={20}
-            size={1}
-          />
-          <Controls
-            className="!bg-accent-white !border-border-faint"
-          />
-          <MiniMap
-            className="!bg-accent-white !border-border-faint"
-            nodeColor="#FA5D19"
-          />
-        </ReactFlow>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            onNodeClick={onNodeClick}
+            onNodeContextMenu={onNodeContextMenu}
+            onEdgeClick={onEdgeClick}
+            onEdgeDoubleClick={onEdgeDoubleClick}
+            onPaneClick={onPaneClick}
+            defaultEdgeOptions={{
+              type: 'smoothstep',
+              style: { strokeWidth: 2, cursor: 'pointer' },
+              interactionWidth: 20, // Make edges easier to click
+            }}
+            className="bg-background-base"
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background
+              color="#E5E5E5"
+              gap={20}
+              size={1}
+            />
+            <Controls
+              className="!bg-accent-white !border-border-faint"
+            />
+            <MiniMap
+              className="!bg-accent-white !border-border-faint"
+              nodeColor="#FA5D19"
+            />
+          </ReactFlow>
 
-      </motion.main>
+        </motion.main>
 
         {/* Right Side Panels */}
         {showTestEndpoint && workflow ? (
@@ -1702,6 +1704,13 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
             mode="configure"
             onClose={() => setSelectedNode(null)}
             onUpdate={handleUpdateNodeData}
+          />
+        ) : (selectedNode?.data as any)?.nodeType === 'gamma-ai' ? (
+          <GammaNodePanel
+            node={selectedNode}
+            onClose={() => setSelectedNode(null)}
+            onUpdate={handleUpdateNodeData}
+            onDelete={handleDeleteNode}
           />
         ) : (selectedNode?.data as any)?.nodeType?.includes('if') || (selectedNode?.data as any)?.nodeType?.includes('while') || (selectedNode?.data as any)?.nodeType?.includes('approval') ? (
           <LogicNodePanel
@@ -1777,7 +1786,7 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
               setShowMCPSelector(false);
               setTargetAgentForMCP(null);
             }}
-            onUpdate={() => {}}
+            onUpdate={() => { }}
             onAddToAgent={(mcpConfig) => {
               if (targetAgentForMCP) {
                 const currentTools = (targetAgentForMCP.data as any).mcpTools || [];

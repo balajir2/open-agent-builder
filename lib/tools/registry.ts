@@ -1,5 +1,5 @@
 import { ToolDefinition } from "./types";
-import { Search, Globe, FileText, Database, Layers } from "lucide-react";
+import { Search, Globe, FileText, Database } from "lucide-react";
 
 export const toolRegistry: ToolDefinition[] = [
     // --- Web Search Tools ---
@@ -200,6 +200,8 @@ export const toolRegistry: ToolDefinition[] = [
             }
         ]
     },
+
+
 
     // --- Content Extraction ---
     {

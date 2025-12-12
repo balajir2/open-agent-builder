@@ -56,8 +56,18 @@ export async function executeHTTPNode(
 
     // Build request body
     let body: string | undefined = undefined;
+    console.log('🔍 HTTP Node Debug - Raw httpBody from node data:', nodeData.httpBody);
+    console.log('🔍 HTTP Node Debug - Method:', method);
+
     if ((method === 'POST' || method === 'PUT' || method === 'PATCH') && nodeData.httpBody) {
       body = substituteVariables(nodeData.httpBody, state);
+      console.log('🔍 HTTP Node Debug - Body after variable substitution:', body);
+    } else {
+      console.log('🔍 HTTP Node Debug - Body NOT set because:', {
+        isPostPutPatch: method === 'POST' || method === 'PUT' || method === 'PATCH',
+        hasHttpBody: !!nodeData.httpBody,
+        httpBodyValue: nodeData.httpBody
+      });
     }
 
     console.log('HTTP Request:', { method, url, headers, body });

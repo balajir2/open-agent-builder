@@ -314,6 +314,165 @@ export class ToolFactory {
                     }, { name: "firecrawl_scrape" }),
                 });
 
+            // case "gamma-api":
+            //     console.log('🚨🚨🚨 GAMMA AI TOOL CREATION STARTED 🚨🚨🚨');
+            //     console.error('🚨🚨🚨 GAMMA AI TOOL CREATION STARTED (ERROR LOG) 🚨🚨🚨');
+            //     console.log('[ToolFactory] Creating gamma-api tool');
+            //     console.log('[ToolFactory] Gamma API key present:', !!apiKeys.gamma);
+            //     console.log('[ToolFactory] Tool config:', JSON.stringify(toolConfig, null, 2));
+
+            //     if (!apiKeys.gamma) {
+            //         console.error('[ToolFactory] Missing Gamma API key - tool will not be created');
+            //         return null;
+            //     }
+
+            //     return new DynamicTool({
+            //         name: "gamma_create_presentation",
+            //         description: "Create a presentation or document using Gamma AI. Input should be a JSON string with 'prompt' field describing what to create. Example: {\"prompt\": \"Create a presentation about AI trends\"}. The tool will create the generation and poll for completion (max 5 minutes). If timeout occurs, it continues in background and returns the generation ID for later retrieval.",
+            //         func: wrapToolFunction(async (input: string) => {
+            //             console.log('[gamma-api] ========== TOOL EXECUTION STARTED ==========');
+            //             console.log('[gamma-api] Input received:', input);
+            //             console.log('[gamma-api] Tool config:', JSON.stringify(toolConfig, null, 2));
+
+            //             // Check if there's a configured prompt in toolConfig
+            //             const configuredPrompt = toolConfig.config?.prompt || toolConfig.prompt;
+            //             console.log('[gamma-api] Configured prompt from toolConfig:', configuredPrompt);
+
+            //             // Parse input
+            //             let prompt: string;
+
+            //             // Priority: 1) Configured prompt, 2) Input from agent
+            //             if (configuredPrompt) {
+            //                 prompt = configuredPrompt;
+            //                 console.log('[gamma-api] Using configured prompt');
+            //             } else {
+            //                 try {
+            //                     const parsed = JSON.parse(input);
+            //                     prompt = parsed.prompt || input;
+            //                     console.log('[gamma-api] Parsed JSON input, extracted prompt');
+            //                 } catch {
+            //                     // If not JSON, treat entire input as prompt
+            //                     prompt = input;
+            //                     console.log('[gamma-api] Using raw input as prompt');
+            //                 }
+            //             }
+
+            //             console.log('[gamma-api] Final prompt (first 200 chars):', prompt.substring(0, 200));
+            //             console.log('[gamma-api] Prompt length:', prompt.length);
+
+            //             // Step 1: Create generation
+            //             console.log('[gamma-api] Step 1: Creating generation...');
+
+            //             // Step 1: Create generation with hardcoded headers
+            //             const createResponse = await fetch(
+            //                 'https://public-api.gamma.app/v0.2/generations',
+            //                 {
+            //                     method: 'POST',
+            //                     headers: {
+            //                         'Authorization': `Bearer ${apiKeys.gamma}`,
+            //                         'Content-Type': 'application/json',
+            //                     },
+            //                     body: JSON.stringify({ text: prompt }),
+            //                 }
+            //             );
+
+            //             console.log('[gamma-api] Create response status:', createResponse.status);
+
+            //             if (!createResponse.ok) {
+            //                 const error = await createResponse.text();
+            //                 console.error('[gamma-api] Create generation failed:', error);
+            //                 throw new Error(`Gamma API error: ${createResponse.status} - ${error}`);
+            //             }
+
+            //             const createResult = await createResponse.json();
+            //             console.log('[gamma-api] Create result:', JSON.stringify(createResult, null, 2));
+
+            //             const generationId = createResult.id;
+
+            //             if (!generationId) {
+            //                 console.error('[gamma-api] No generation ID in response');
+            //                 throw new Error('No generation ID returned from Gamma API');
+            //             }
+
+            //             console.log('[gamma-api] ✓ Generation created successfully. ID:', generationId);
+
+            //             // Step 2: Poll for completion (max 5 minutes)
+            //             console.log('[gamma-api] Step 2: Polling for completion (max 5 minutes)...');
+            //             const maxWaitTime = 5 * 60 * 1000; // 5 minutes
+            //             const pollInterval = 2000; // 2 seconds
+            //             const startTime = Date.now();
+            //             let pollCount = 0;
+
+            //             while (Date.now() - startTime < maxWaitTime) {
+            //                 // Wait before polling
+            //                 await new Promise(resolve => setTimeout(resolve, pollInterval));
+            //                 pollCount++;
+
+            //                 // Step 3: Check generation status
+            //                 console.log(`[gamma-api] Poll #${pollCount}: Checking status...`);
+            //                 const statusResponse = await fetch(
+            //                     `https://public-api.gamma.app/v0.2/generations/${generationId}`,
+            //                     {
+            //                         headers: {
+            //                             'Authorization': `Bearer ${apiKeys.gamma}`,
+            //                         },
+            //                     }
+            //                 );
+
+            //                 console.log(`[gamma-api] Poll #${pollCount}: Status response code:`, statusResponse.status);
+
+            //                 if (!statusResponse.ok) {
+            //                     const error = await statusResponse.text();
+            //                     console.warn(`[gamma-api] Poll #${pollCount}: Status check failed:`, error);
+            //                     continue; // Continue polling despite error
+            //                 }
+
+            //                 const status = await statusResponse.json();
+            //                 console.log(`[gamma-api] Poll #${pollCount}: Status data:`, JSON.stringify(status, null, 2));
+            //                 console.log(`[gamma-api] Poll #${pollCount}: Current state:`, status.state || status.status);
+
+            //                 // Check if completed
+            //                 if (status.state === 'completed' || status.status === 'completed') {
+            //                     console.log('[gamma-api] ✓✓✓ Generation COMPLETED successfully! ✓✓✓');
+            //                     console.log('[gamma-api] URL:', status.url || status.webUrl);
+            //                     const result = {
+            //                         success: true,
+            //                         generationId,
+            //                         state: 'completed',
+            //                         url: status.url || status.webUrl,
+            //                         data: status,
+            //                     };
+            //                     console.log('[gamma-api] Returning result:', JSON.stringify(result, null, 2));
+            //                     return result;
+            //                 }
+
+            //                 // Check if failed
+            //                 if (status.state === 'failed' || status.status === 'failed') {
+            //                     console.error('[gamma-api] ✗✗✗ Generation FAILED ✗✗✗');
+            //                     console.error('[gamma-api] Error:', status.error);
+            //                     throw new Error(`Generation failed: ${status.error || 'Unknown error'}`);
+            //                 }
+
+            //                 // Continue polling if still processing
+            //                 const elapsed = Math.round((Date.now() - startTime) / 1000);
+            //                 console.log(`[gamma-api] Still processing... (${elapsed}s elapsed)`);
+            //             }
+
+            //             // Timeout reached - continue in background
+            //             console.log('[gamma-api] ⏱ Timeout reached (5 minutes), continuing in background');
+            //             const timeoutResult = {
+            //                 success: false,
+            //                 generationId,
+            //                 state: 'processing',
+            //                 message: 'Generation is still processing in background. Use the generation ID to check status later.',
+            //                 checkUrl: `https://public-api.gamma.app/v0.2/generations/${generationId}`,
+            //             };
+            //             console.log('[gamma-api] Returning timeout result:', JSON.stringify(timeoutResult, null, 2));
+            //             console.log('[gamma-api] ========== TOOL EXECUTION ENDED (TIMEOUT) ==========');
+            //             return timeoutResult;
+            //         }, { name: "gamma_create_presentation" }),
+            //     });
+
             default:
                 console.warn(`Unknown tool ID: ${id}`);
                 return null;

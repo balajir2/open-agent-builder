@@ -391,6 +391,7 @@ export const nodeTypes = {
   start: CustomNode,
   agent: CustomNode,
   mcp: CustomNode,
+  'gamma-ai': CustomNode,
   extract: CustomNode,
   end: CustomNode,
   note: CustomNode,
