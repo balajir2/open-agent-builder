@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   plugins: {
     "postcss-import": {
       // Resolve @/ alias to make imports work during build
