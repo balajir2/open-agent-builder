@@ -3,8 +3,7 @@
  * This is a pure Node.js library without browser dependencies
  */
 
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
+
 
 export async function handler(buffer: Buffer): Promise<string> {
     try {
@@ -17,7 +16,7 @@ export async function handler(buffer: Buffer): Promise<string> {
         }
 
         // Load pdf2json
-        const PDFParser = require('pdf2json');
+        const { default: PDFParser } = await import('pdf2json');
 
         return new Promise((resolve, reject) => {
             const pdfParser = new PDFParser();

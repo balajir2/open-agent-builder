@@ -1,11 +1,15 @@
 import { v } from "convex/values";
-import { query, mutation, action } from "./_generated/server";
+import { query, mutation, action, internalMutation } from "./_generated/server";
 import { api } from "./_generated/api";
 
 /**
  * Centralized MCP Server Registry Operations
  * Single source of truth for all MCP configurations
  */
+
+// #################################################################
+// # Regular, User-Facing Queries and Mutations
+// #################################################################
 
 // Get all MCP servers for a user
 export const listUserMCPs = query({
@@ -72,8 +76,12 @@ export const addMCPServer = mutation({
     tools: v.optional(v.array(v.string())),
     headers: v.optional(v.any()),
   },
-  handler: async ({ db }, args) => {
-    const serverId = await db.insert("mcpServers", {
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity || identity.subject !== args.userId) {
+        throw new Error("Unauthorized: You can only add servers for your own user.");
+    }
+    const serverId = await ctx.db.insert("mcpServers", {
       ...args,
       connectionStatus: "untested",
       enabled: true,
@@ -157,6 +165,63 @@ export const deleteMCPServer = mutation({
     return { success: true };
   },
 });
+
+
+// #################################################################
+// # Test-only Mutations - Secured by Test Secret
+// #################################################################
+
+const checkTestSecret = (secret?: string) => {
+    const testSecret = process.env.CONVEX_TEST_SECRET;
+    if (!testSecret || secret !== testSecret) {
+        throw new Error("Unauthorized: Invalid test secret provided. Ensure CONVEX_TEST_SECRET is set as a Convex environment variable and passed correctly from tests.");
+    }
+};
+
+export const addMCPServerForTest = mutation({
+    args: {
+        secret: v.string(),
+        serverData: v.object({
+            userId: v.string(),
+            name: v.string(),
+            url: v.string(),
+            description: v.optional(v.string()),
+            category: v.string(),
+            authType: v.string(),
+            enabled: v.boolean(),
+        })
+    },
+    handler: async ({ db }, { secret, serverData }) => {
+        checkTestSecret(secret);
+        return await db.insert("mcpServers", {
+            ...serverData,
+            connectionStatus: "untested",
+            isOfficial: false,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        });
+    },
+});
+
+export const deleteMCPServerForTest = mutation({
+    args: {
+        id: v.id("mcpServers"),
+        secret: v.string(),
+    },
+    handler: async (ctx, { id, secret }) => {
+        checkTestSecret(secret);
+        const server = await ctx.db.get(id);
+        if (server) {
+            await ctx.db.delete(id);
+        }
+        return { success: true };
+    },
+});
+
+
+// #################################################################
+// # Actions and Other Logic
+// #################################################################
 
 // Test MCP connection and discover tools
 export const testConnection = action({

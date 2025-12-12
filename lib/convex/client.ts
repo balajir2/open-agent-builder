@@ -1,12 +1,6 @@
-/**
- * Convex Client for Server-Side Operations
- *
- * This replaces Upstash Redis for workflow storage
- */
 
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../convex/_generated/api";
-import { auth } from "@/auth";
 
 let convexClient: ConvexHttpClient | null = null;
 
@@ -52,7 +46,16 @@ export async function getAuthenticatedConvexClient(): Promise<ConvexHttpClient> 
 
   const client = new ConvexHttpClient(url);
 
+  // In test environments (like Playwright), we don't want to initialize NextAuth.
+  // The tests that need auth should use admin keys directly.
+  if (process.env.NODE_ENV === "test" || process.env.CI) {
+    console.warn("Skipping NextAuth initialization in test/CI environment.");
+    return client;
+  }
+
   try {
+    // Dynamically import auth only when not in a test environment
+    const { auth } = await import("@/auth");
     // Get NextAuth session
     const session = await auth();
     // @ts-ignore - idToken is added in auth.ts callbacks
