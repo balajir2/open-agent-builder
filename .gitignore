@@ -33,11 +33,14 @@ tsc_output*.log
 
 # local env files
 .env
-.env.*
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Keep environment templates
+!.env.local.dev
+!.env.local.prod
 
 # vercel
 /.vercel

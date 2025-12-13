@@ -54,8 +54,8 @@ Open Agent Builder is a visual workflow builder for creating AI agent pipelines 
 
 ### Enterprise Features
 - **LangGraph execution engine** for reliable state management
-- **Clerk authentication** for secure multi-user access
-- **Convex database** for persistent storage
+- **Azure AD authentication** via Microsoft Entra ID for secure enterprise access
+- **Convex database** for persistent storage with real-time sync
 - **API endpoints** for programmatic execution
 - **Human-in-the-loop** approvals for sensitive operations
 
@@ -70,7 +70,7 @@ Open Agent Builder is a visual workflow builder for creating AI agent pipelines 
 | **[TypeScript](https://www.typescriptlang.org/)** | Type-safe development across the stack |
 | **[LangGraph](https://github.com/langchain-ai/langgraph)** | Workflow orchestration engine with state management, conditional routing, and human-in-the-loop support |
 | **[Convex](https://convex.dev)** | Real-time database with automatic reactivity for workflows, executions, and user data |
-| **[Clerk](https://clerk.com)** | Authentication and user management with JWT integration |
+| **[Azure AD](https://azure.microsoft.com/en-us/services/active-directory/)** | Enterprise authentication via Microsoft Entra ID with NextAuth.js |
 | **[Tailwind CSS](https://tailwindcss.com/)** | Utility-first CSS framework for responsive UI |
 | **[React Flow](https://reactflow.dev/)** | Visual workflow builder canvas with drag-and-drop nodes |
 | **[Anthropic](https://www.anthropic.com/)** | Claude 3.5 Haiku, Sonnet 3.5, Sonnet 4.5 - All tools & MCP supported |
@@ -89,7 +89,7 @@ Before you begin, you'll need:
 1. **Node.js 18+** installed on your machine
 2. **Firecrawl API key** (Required for web scraping) - [Get one here](https://firecrawl.dev)
 3. **Convex account** - [Sign up free](https://convex.dev)
-4. **Clerk account** - [Sign up free](https://clerk.com)
+4. **Azure AD tenant** - Microsoft 365 or Azure subscription with admin access
 
 > **Note:** LLM API keys can be added directly in the UI via Settings → API Keys after setup. For MCP tool support, Anthropic Claude (3.5 Haiku or Sonnet 3.5) is currently recommended as the default option.
 
@@ -111,51 +111,41 @@ This will:
 
 Keep the Convex dev server running in a separate terminal.
 
-### 3. Set Up Clerk (Authentication)
+### 3. Set Up Azure AD Authentication
 
-Clerk provides secure user authentication and management.
+Azure AD (Microsoft Entra ID) provides enterprise-grade authentication.
 
-1. Go to [clerk.com](https://clerk.com) and create a new application
-2. In your Clerk dashboard:
-   - Go to **API Keys**
-   - Copy your keys
-3. Go to **JWT Templates** → **Convex**:
-   - Click "Apply"
-   - Copy the issuer URL
+1. **Register an Application** in Azure Portal:
+   - Go to [Azure Portal](https://portal.azure.com) → Azure Active Directory → App registrations
+   - Click "New registration"
+   - Name: "Open Agent Builder"
+   - Supported account types: "Accounts in this organizational directory only"
+   - Redirect URI: Web → `http://localhost:3000/api/auth/callback/azure-ad`
+   - Click "Register"
 
-Add to your `.env.local`:
+2. **Configure the App Registration**:
+   - Copy the **Application (client) ID** → This is your `AUTH_MICROSOFT_ID`
+   - Copy the **Directory (tenant) ID** → This is your `AUTH_MICROSOFT_TENANT_ID`
+   - Go to "Certificates & secrets" → "New client secret"
+   - Add description and expiry → Copy the **Value** → This is your `AUTH_MICROSOFT_SECRET`
 
-```bash
-# Clerk Authentication
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
-
-# Clerk + Convex Integration
-CLERK_JWT_ISSUER_DOMAIN=https://your-clerk-domain.clerk.accounts.dev
-```
-
-### 4. Configure Convex Authentication
-
-Edit `convex/auth.config.ts` and update the domain:
-
-```typescript
-export default {
-  providers: [
-    {
-      domain: "https://your-clerk-domain.clerk.accounts.dev", // Your Clerk issuer URL
-      applicationID: "convex",
-    },
-  ],
-};
-```
-
-Then push the auth config to Convex:
+3. **Add to `.env.local`**:
 
 ```bash
-npx convex dev
+# Azure Authentication
+AUTH_MICROSOFT_ID=your-application-client-id
+AUTH_MICROSOFT_SECRET=your-client-secret-value
+AUTH_MICROSOFT_TENANT_ID=your-directory-tenant-id
+AUTH_SECRET=$(openssl rand -base64 32)  # Generate a secure secret
 ```
 
-### 5. Set Up Firecrawl (Required)
+4. **Set in Convex** (for backend validation):
+
+```bash
+npx convex env set AUTH_MICROSOFT_ID "your-application-client-id"
+```
+
+### 4. Set Up Firecrawl (Required)
 
 **Firecrawl is the core web scraping engine** that powers most workflows.
 
@@ -169,7 +159,7 @@ FIRECRAWL_API_KEY=fc-...
 
 > **Note:** Users can also add their own Firecrawl keys in Settings → API Keys, but having a default key in `.env.local` enables the template workflows.
 
-### 6. Set Up Security (Required for Production)
+### 5. Set Up Security (Required for Production)
 
 **Critical security configurations required before deployment:**
 

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-**Last Updated:** December 3, 2025
+**Last Updated:** December 13, 2025
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Design Principles:
 1. **Single Source of Truth**: All system API keys are stored in Convex environment via `npx convex env set`
-2. **Zero Keys in .env.local**: The `.env.local` file contains ONLY Next.js configuration (Clerk, Convex URL, etc.)
+2. **Zero Keys in .env.local**: The `.env.local` file contains ONLY Next.js configuration (Azure Auth, Convex URL, etc.)
 3. **Convex Retrieval**: Next.js API routes retrieve keys from Convex via `convex/systemApiKeys.ts` queries
 4. **Two-Tier System**:
    - **Tier 1**: User-specific keys (stored in Convex DB `userLLMKeys` table) - highest priority
@@ -37,7 +37,7 @@ const apiKey = systemKeys.anthropic;
 
 ## Overview
 
-Open Agent Builder is a visual workflow builder for creating AI agent pipelines powered by Firecrawl. It uses Next.js 16, React 19, LangGraph for workflow orchestration, Convex for real-time database, and Clerk for authentication. The project includes both a visual workflow builder and a UI Builder for creating custom interfaces.
+Open Agent Builder is a visual workflow builder for creating AI agent pipelines powered by Firecrawl. It uses Next.js 16, React 19, LangGraph for workflow orchestration, Convex for real-time database, and Azure AD (Microsoft Entra ID) for authentication. The project includes both a visual workflow builder and a UI Builder for creating custom interfaces.
 
 ## Essential Commands
 
@@ -69,8 +69,11 @@ npx convex dev
 # Deploy Convex to production
 npx convex deploy
 
-# Set Convex environment variables
-npx convex env set CLERK_JWT_ISSUER_DOMAIN "https://your-domain.clerk.accounts.dev"
+# Set Convex environment variables (development)
+npx convex env set AUTH_MICROSOFT_ID "your-azure-app-id"
+
+# Set Convex environment variables (production)
+npx convex env set AUTH_MICROSOFT_ID "your-azure-app-id" --prod
 ```
 
 ### Testing
@@ -216,15 +219,17 @@ open-agent-builder/
 
 ### Authentication Flow
 
-1. **Clerk** handles user authentication in browser
-2. **proxy.ts** validates JWT tokens for protected routes
-3. **Convex** receives authenticated requests with `userId`
-4. **API Routes** can use API key authentication for programmatic access
+1. **Azure AD (Microsoft Entra ID)** handles user authentication via NextAuth.js
+2. **middleware.ts** protects routes and validates sessions
+3. **auth.ts** configures Microsoft provider with tenant-specific authentication
+4. **Convex** receives authenticated requests with `userId` from session
+5. **API Routes** can use API key authentication for programmatic access
 
 **Important:**
-- User-facing routes require Clerk authentication
-- `/api/workflows/{id}/execute*` routes support both Clerk and API key auth
+- User-facing routes require Azure AD authentication
+- `/api/workflows/{id}/execute*` routes support both session and API key auth
 - MCP server configurations are user-scoped
+- Sessions are encrypted using `AUTH_SECRET` environment variable
 
 ### UI Builder Architecture
 
@@ -464,14 +469,15 @@ These keys MUST stay in `.env.local` because Next.js needs them:
 
 ```bash
 # Convex Database Connection (REQUIRED - Next.js client needs these)
-NEXT_PUBLIC_CONVEX_URL=https://your-project.convex.cloud
 CONVEX_DEPLOYMENT=dev:your-deployment
+NEXT_PUBLIC_CONVEX_URL=https://your-project.convex.cloud
 NEXT_PUBLIC_CONVEX_UPLOAD_ACTION_URL=https://your-deployment.convex.site/http/uploadFile
 
-# Clerk Authentication (REQUIRED - Next.js proxy.ts needs these)
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
-CLERK_JWT_ISSUER_DOMAIN=https://your-domain.clerk.accounts.dev
+# Azure Authentication (REQUIRED - NextAuth.js needs these)
+AUTH_MICROSOFT_ID=your-azure-app-registration-client-id
+AUTH_MICROSOFT_SECRET=your-azure-app-secret
+AUTH_MICROSOFT_TENANT_ID=your-azure-tenant-id
+AUTH_SECRET=your-nextauth-secret
 
 # Optional: LangSmith Tracing (Next.js API routes only)
 LANGCHAIN_TRACING_V2=true
@@ -487,7 +493,8 @@ These keys should be stored in **Convex environment variables**, NOT in `.env.lo
 ```bash
 # Set system-level API keys in Convex (available to all users as fallback)
 npx convex env set ENCRYPTION_KEY "<32-byte-base64-key>"
-npx convex env set CLERK_JWT_ISSUER_DOMAIN "https://your-domain.clerk.accounts.dev"
+npx convex env set AUTH_MICROSOFT_ID "your-azure-app-id"
+npx convex env set CONVEX_TEST_SECRET "<test-secret-key>"
 
 # LLM Providers (system fallback - users can add their own in UI)
 npx convex env set ANTHROPIC_API_KEY "sk-ant-..."
@@ -585,26 +592,39 @@ To monitor workflow execution in LangSmith:
 - State transitions between nodes
 - Error details and stack traces
 
-### Clerk + Convex Setup
+### Azure AD + NextAuth Setup
 
-1. Update `convex/auth.config.ts` with your Clerk domain
-2. Set in **both** `.env.local` AND Convex:
+1. **Azure App Registration**: Create an app registration in Azure Portal
+   - Note the Application (client) ID → `AUTH_MICROSOFT_ID`
+   - Note the Directory (tenant) ID → `AUTH_MICROSOFT_TENANT_ID`
+   - Create a client secret → `AUTH_MICROSOFT_SECRET`
+   - Add redirect URI: `http://localhost:3000/api/auth/callback/azure-ad` (dev)
+   - Add redirect URI: `https://your-domain.com/api/auth/callback/azure-ad` (prod)
+
+2. **Configure Environment Variables**:
    ```bash
-   # In .env.local (for Next.js)
-   CLERK_JWT_ISSUER_DOMAIN=https://your-domain.clerk.accounts.dev
-
-   # In Convex (for backend)
-   npx convex env set CLERK_JWT_ISSUER_DOMAIN "https://your-domain.clerk.accounts.dev"
+   # In .env.local (for NextAuth.js)
+   AUTH_MICROSOFT_ID=your-client-id
+   AUTH_MICROSOFT_SECRET=your-client-secret
+   AUTH_MICROSOFT_TENANT_ID=your-tenant-id
+   AUTH_SECRET=$(openssl rand -base64 32)  # Generate secure secret
    ```
-3. Create Clerk JWT template for Convex in Clerk dashboard
 
-### Next.js 16 Proxy Authentication
+3. **Set in Convex** (for backend validation):
+   ```bash
+   npx convex env set AUTH_MICROSOFT_ID "your-client-id"
+   ```
 
-This project uses `proxy.ts` (not `middleware.ts`) for Next.js 16 compatibility:
+4. **Update auth.ts**: Configure Microsoft provider with your tenant settings
 
-- **Public routes** - No authentication required
-- **Protected routes** - Require Clerk authentication
-- **API key routes** - Support API key authentication (bypass Clerk)
+### Next.js Middleware Authentication
+
+This project uses `middleware.ts` for route protection:
+
+- **Public routes** - Home, sign-in pages (no auth required)
+- **Protected routes** - All authenticated pages use NextAuth session
+- **API routes** - Support both session auth and API key auth
+- **Session validation** - Automatic token refresh and session management
 
 ## Common Development Tasks
 
