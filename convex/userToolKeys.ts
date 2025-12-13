@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query, internalQuery, internalMutation } from "./_generated/server";
+import { mutation, query, internalQuery, internalMutation, action } from "./_generated/server";
 
 /**
  * Get all Tool keys for a user (metadata only, no decryption)
@@ -102,5 +102,64 @@ export const upsertKey = internalMutation({
             });
             return id;
         }
+    },
+});
+
+/**
+ * Get configured tools status (system + user keys combined)
+ * Returns list of tool IDs that are configured (either system or user level)
+ */
+export const getConfiguredToolsStatus = action({
+    args: {
+        userId: v.string(),
+    },
+    handler: async (ctx, args) => {
+        // Get user's configured tool keys
+        const userKeys = await ctx.runQuery(ctx.internal.userToolKeys.getEncryptedKey, {
+            userId: args.userId,
+            toolId: 'dummy', // We'll query all instead
+        }).catch(() => null);
+
+        // Get all user keys via a proper query
+        const allUserKeys = await ctx.db
+            .query("userToolKeys")
+            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+            .collect();
+
+        const configuredToolIds = new Set<string>();
+        const toolSources: Record<string, 'system' | 'user'> = {};
+
+        // Add user-configured tools
+        allUserKeys.forEach(key => {
+            if (key.isActive) {
+                configuredToolIds.add(key.toolId);
+                toolSources[key.toolId] = 'user';
+            }
+        });
+
+        // Check system-level keys
+        const systemToolMap: Record<string, string> = {
+            'firecrawl': 'FIRECRAWL_API_KEY',
+            'tavily-search': 'TAVILY_API_KEY',
+            'serper-search': 'SERPER_API_KEY',
+            'serpapi-search': 'SERPAPI_API_KEY',
+            'scraperapi': 'SCRAPERAPI_API_KEY',
+            'browserless': 'BROWSERLESS_API_KEY',
+            'gamma-api': 'GAMMA_API_KEY',
+            'e2b': 'E2B_API_KEY',
+            'arcade': 'ARCADE_API_KEY',
+        };
+
+        Object.entries(systemToolMap).forEach(([toolId, envKey]) => {
+            if (process.env[envKey] && !configuredToolIds.has(toolId)) {
+                configuredToolIds.add(toolId);
+                toolSources[toolId] = 'system';
+            }
+        });
+
+        return {
+            configuredToolIds: Array.from(configuredToolIds),
+            toolSources,
+        };
     },
 });

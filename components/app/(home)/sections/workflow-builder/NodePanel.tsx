@@ -57,10 +57,31 @@ export default function NodePanel({
     user?.id ? { userId: user.id } : "skip"
   );
 
-  // Fetch configured tool keys
+  // Fetch configured tool keys (user-level)
   const configuredToolKeys = useQuery(api.userToolKeys.getUserToolKeys,
     user?.id ? { userId: user.id } : "skip"
   );
+
+  // Fetch system-level configuration
+  const [systemConfig, setSystemConfig] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(data => {
+        setSystemConfig({
+          'firecrawl': data.firecrawlConfigured,
+          'tavily-search': data.tavilyConfigured,
+          'serper-search': data.serperConfigured,
+          'serpapi-search': data.serpApiConfigured,
+          'scraperapi': data.scraperapiConfigured,
+          'browserless': data.browserlessConfigured,
+          'gamma-api': data.gammaConfigured,
+          'e2b': data.e2bConfigured,
+          'arcade': data.arcadeConfigured,
+        });
+      })
+      .catch(err => console.error('Failed to fetch system config:', err));
+  }, []);
 
   // Get available models - show all providers, with indicators for configured keys
   const getAvailableModels = () => {
@@ -1011,23 +1032,32 @@ export default function NodePanel({
                                   // Global Field (API Key) - Show status instead of input
                                   <div className="flex items-center justify-between bg-accent-white border border-border-faint rounded-6 px-10 py-6">
                                     <div className="flex items-center gap-6">
-                                      {configuredToolKeys?.some(k => k.toolId === toolConfig.toolId && k.isActive) ? (
-                                        <>
-                                          <div className="w-6 h-6 rounded-full bg-green-500" />
-                                          <span className="text-xs text-accent-black font-medium">Ready to use</span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <div className="w-6 h-6 rounded-full bg-orange-500" />
-                                          <span className="text-xs text-orange-600 font-medium">API Key required</span>
-                                        </>
-                                      )}
+                                      {(() => {
+                                        const hasUserKey = configuredToolKeys?.some(k => k.toolId === toolConfig.toolId && k.isActive);
+                                        const hasSystemKey = systemConfig[toolConfig.toolId];
+                                        const isConfigured = hasUserKey || hasSystemKey;
+                                        const source = hasUserKey ? 'your key' : hasSystemKey ? 'system key' : null;
+
+                                        return isConfigured ? (
+                                          <>
+                                            <div className="w-6 h-6 rounded-full bg-green-500" />
+                                            <span className="text-xs text-accent-black font-medium">Ready to use ({source})</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <div className="w-6 h-6 rounded-full bg-orange-500" />
+                                            <span className="text-xs text-orange-600 font-medium">API Key required</span>
+                                          </>
+                                        );
+                                      })()}
                                     </div>
                                     <button
                                       onClick={() => onOpenSettings?.()}
                                       className="text-[10px] font-medium text-heat-100 hover:text-heat-200 hover:underline"
                                     >
-                                      Configure in Settings
+                                      {configuredToolKeys?.some(k => k.toolId === toolConfig.toolId && k.isActive)
+                                        ? 'Manage Key'
+                                        : 'Add Your Key'}
                                     </button>
                                   </div>
                                 ) : (

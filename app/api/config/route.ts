@@ -1,21 +1,36 @@
 import { NextResponse } from 'next/server';
+import { ConvexHttpClient } from 'convex/browser';
+import { api } from '@/convex/_generated/api';
 
 /**
- * API route to securely provide environment variables
- * Only exposes API keys from .env.local, never from client
+ * API route to check if system-level API keys are configured
+ * Checks Convex environment variables for system keys
  */
 export async function GET() {
   try {
+    // Initialize Convex client to check system keys
+    const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+
+    // Get all system-level API keys from Convex environment
+    const systemKeys = await convex.action(api.systemApiKeys.getAllSystemApiKeys);
+
     const config = {
-      anthropicConfigured: !!process.env.ANTHROPIC_API_KEY,
-      groqConfigured: !!process.env.GROQ_API_KEY,
-      openaiConfigured: !!process.env.OPENAI_API_KEY,
-      googleConfigured: !!process.env.GOOGLE_API_KEY,
-      firecrawlConfigured: !!process.env.FIRECRAWL_API_KEY,
-      arcadeConfigured: !!process.env.ARCADE_API_KEY,
+      anthropicConfigured: !!systemKeys.anthropic,
+      groqConfigured: !!systemKeys.groq,
+      openaiConfigured: !!systemKeys.openai,
+      googleConfigured: !!systemKeys.google,
+      firecrawlConfigured: !!systemKeys.firecrawl,
+      arcadeConfigured: !!systemKeys.arcade,
+      e2bConfigured: !!systemKeys.e2b,
+      tavilyConfigured: !!systemKeys.tavily,
+      serperConfigured: !!systemKeys.serper,
+      serpApiConfigured: !!systemKeys.serpapi,
+      scraperapiConfigured: !!systemKeys.scraperapi,
+      browserlessConfigured: !!systemKeys.browserless,
+      gammaConfigured: !!systemKeys.gamma,
       hasKeys: !!(
-        (process.env.ANTHROPIC_API_KEY || process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY || process.env.GOOGLE_API_KEY) &&
-        process.env.FIRECRAWL_API_KEY
+        (systemKeys.anthropic || systemKeys.groq || systemKeys.openai || systemKeys.google) &&
+        systemKeys.firecrawl
       ),
     };
 
