@@ -6,7 +6,8 @@
 
 import { NextRequest } from 'next/server';
 import { getConvexClient, api } from '@/lib/convex/client';
-import { auth } from "@/auth";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
 
 export interface ApiAuthResult {
   authenticated: boolean;
@@ -22,7 +23,7 @@ export interface ApiAuthResult {
 export async function validateApiKey(request: NextRequest): Promise<ApiAuthResult> {
   try {
     // First, check for NextAuth session (UI users)
-    const session = await auth();
+    const session = await getServerSession(authOptions);
     console.log('[Auth] validateApiKey session:', JSON.stringify(session, null, 2));
     if (session?.user?.id) {
       return {
