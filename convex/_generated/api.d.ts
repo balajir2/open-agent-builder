@@ -19,8 +19,8 @@ import type * as functions_cache_cleanupExpired from "../functions/cache/cleanup
 import type * as functions_cache_delete from "../functions/cache/delete.js";
 import type * as functions_cache_get from "../functions/cache/get.js";
 import type * as functions_cache_set from "../functions/cache/set.js";
-import type * as http from "../http.js";
 import type * as http_uploadFile from "../http/uploadFile.js";
+import type * as http from "../http.js";
 import type * as lib_encryption from "../lib/encryption.js";
 import type * as lib_utils from "../lib/utils.js";
 import type * as mcpServers from "../mcpServers.js";
@@ -41,6 +41,14 @@ import type {
   FunctionReference,
 } from "convex/server";
 
+/**
+ * A utility for referencing Convex functions in your app's API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   apiKeys: typeof apiKeys;
@@ -53,8 +61,8 @@ declare const fullApi: ApiFromModules<{
   "functions/cache/delete": typeof functions_cache_delete;
   "functions/cache/get": typeof functions_cache_get;
   "functions/cache/set": typeof functions_cache_set;
-  http: typeof http;
   "http/uploadFile": typeof http_uploadFile;
+  http: typeof http;
   "lib/encryption": typeof lib_encryption;
   "lib/utils": typeof lib_utils;
   mcpServers: typeof mcpServers;
@@ -69,30 +77,14 @@ declare const fullApi: ApiFromModules<{
   userToolKeysActions: typeof userToolKeysActions;
   workflows: typeof workflows;
 }>;
+declare const fullApiWithMounts: typeof fullApi;
 
-/**
- * A utility for referencing Convex functions in your app's public API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = api.myModule.myFunction;
- * ```
- */
 export declare const api: FilterApi<
-  typeof fullApi,
+  typeof fullApiWithMounts,
   FunctionReference<any, "public">
 >;
-
-/**
- * A utility for referencing Convex functions in your app's internal API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = internal.myModule.myFunction;
- * ```
- */
 export declare const internal: FilterApi<
-  typeof fullApi,
+  typeof fullApiWithMounts,
   FunctionReference<any, "internal">
 >;
 
