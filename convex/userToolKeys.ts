@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, internalQuery, internalMutation, action } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 /**
  * Get all Tool keys for a user (metadata only, no decryption)
@@ -105,6 +106,19 @@ export const upsertKey = internalMutation({
     },
 });
 
+// Internal query to get all user keys for a user
+export const getAllUserKeys = internalQuery({
+    args: {
+        userId: v.string(),
+    },
+    handler: async (ctx, args) => {
+        return await ctx.db
+            .query("userToolKeys")
+            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+            .collect();
+    },
+});
+
 /**
  * Get configured tools status (system + user keys combined)
  * Returns list of tool IDs that are configured (either system or user level)
@@ -114,23 +128,16 @@ export const getConfiguredToolsStatus = action({
         userId: v.string(),
     },
     handler: async (ctx, args) => {
-        // Get user's configured tool keys
-        const userKeys = await ctx.runQuery(ctx.internal.userToolKeys.getEncryptedKey, {
+        // Get all user keys via internal query
+        const allUserKeys = await ctx.runQuery(internal.userToolKeys.getAllUserKeys, {
             userId: args.userId,
-            toolId: 'dummy', // We'll query all instead
-        }).catch(() => null);
-
-        // Get all user keys via a proper query
-        const allUserKeys = await ctx.db
-            .query("userToolKeys")
-            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
-            .collect();
+        });
 
         const configuredToolIds = new Set<string>();
         const toolSources: Record<string, 'system' | 'user'> = {};
 
         // Add user-configured tools
-        allUserKeys.forEach(key => {
+        allUserKeys.forEach((key) => {
             if (key.isActive) {
                 configuredToolIds.add(key.toolId);
                 toolSources[key.toolId] = 'user';
