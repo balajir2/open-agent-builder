@@ -7,7 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **BREAKING:** Migrated authentication from Clerk to Azure AD (Microsoft Entra ID)
+  - Replaced Clerk authentication with NextAuth.js Microsoft provider
+  - Updated authentication flow to use session-based authentication
+  - Replaced `proxy.ts` with `middleware.ts` for route protection
+  - All user authentication now requires Azure AD tenant credentials
+- Updated all documentation to reflect Azure AD authentication flow
+- Environment configuration system now uses templates (`.env.local.dev`, `.env.local.prod`)
+- Production deployment now uses separate Convex deployment (`sensible-ermine-579`)
+- Development and production environments now fully separated with distinct configurations
+
 ### Added
+- Azure AD (Microsoft Entra ID) authentication via NextAuth.js
+- Environment configuration templates for development and production
+- Comprehensive production deployment guide (`DEPLOYMENT.md`)
+- Quality improvements documentation (`QUALITY-IMPROVEMENTS.md`)
+- Two-tier API key architecture fully documented
+- Production Convex deployment (`sensible-ermine-579`)
+- Development Convex deployment (`disciplined-quail-9`)
+- Session management with encrypted NextAuth sessions
+- Support for both session auth and API key auth in API routes
+- Environment switching system between dev and prod
 - Comprehensive documentation reorganization with `/docs` directory structure
 - Installation guide, quick-start tutorial, and configuration guide
 - Distributed rate limiting using Convex for multi-instance deployments
@@ -49,6 +70,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated example JSON configurations in workflow guides with correct model IDs
 
 ### Fixed
+- **CRITICAL:** Fixed TypeScript compilation errors preventing production build
+  - Fixed missing `use-toast.ts` hook implementation
+  - Corrected import paths for flame effect components
+  - Fixed workflow timestamp handling for API routes compatibility
+  - Fixed tool type filtering for OpenAI/Groq models with proper type guards
+  - Fixed data node executor function name mismatch (`executeDataNode`)
 - **CRITICAL:** Fixed agent executor syntax error causing all agent executions to fail (`lib/workflow/executors/agent.ts`)
 - **CRITICAL:** Fixed MCP authentication issues preventing Adarsh MCP and other MCP servers from executing
   - Fixed authentication token property inconsistency: MCP resolver provides `accessToken` but MCP utils expected `authToken`
@@ -91,6 +118,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed incorrect Convex API path in distributed rate limiter causing rate limits to be bypassed
 - Updated default Anthropic model to `claude-3-5-sonnet-20241022` to fix 500 Internal Server Error
 
+### Security
+- Separated encryption keys for development and production environments
+- Removed all secrets from git-tracked files
+- Implemented placeholder values in environment templates
+- Added GitHub secret scanning protection compliance
+- Production-grade encryption key generation for user API keys
+- Secure session management with `AUTH_SECRET` encryption
+
+### Removed
+- Clerk authentication dependencies
+- `proxy.ts` authentication file (replaced with `middleware.ts`)
+- Development API keys from environment templates
+- Hardcoded production secrets from repository
+
+### Migration Required
+- **Azure AD Setup**: Users must configure Azure AD app registration (see [DEPLOYMENT.md](DEPLOYMENT.md))
+- **Environment Variables**: Update `.env.local` with Azure AD credentials (see migration guide below)
+- **Convex Configuration**: Set `AUTH_MICROSOFT_ID` in Convex environment
+- **Session Secret**: Generate new `AUTH_SECRET` for production
+
 ## [1.0.0] - 2025-11-21
 
 ### Added
@@ -130,7 +177,95 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Migration Guide
 
-### Upgrading to Latest Version
+### Migrating from Clerk to Azure AD (Unreleased → v2.0.0)
+
+This is a **breaking change** that requires manual migration steps.
+
+#### Prerequisites
+- Azure AD tenant (Microsoft 365 or Azure subscription)
+- Admin access to create app registrations
+- Existing Clerk-based installation
+
+#### Migration Steps
+
+1. **Create Azure AD App Registration**
+
+   Follow the Azure Portal setup:
+   - Navigate to Azure Active Directory → App registrations
+   - Create new registration named "Open Agent Builder"
+   - Note: Application (client) ID, Directory (tenant) ID
+   - Create client secret, note the secret value
+   - Add redirect URIs:
+     - `http://localhost:3000/api/auth/callback/azure-ad` (development)
+     - `https://your-domain.com/api/auth/callback/azure-ad` (production)
+
+2. **Update Environment Variables**
+
+   Replace Clerk variables with Azure AD:
+
+   ```bash
+   # Remove these (Clerk)
+   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
+   CLERK_SECRET_KEY=...
+   CLERK_JWT_ISSUER_DOMAIN=...
+
+   # Add these (Azure AD)
+   AUTH_MICROSOFT_ID=your-application-client-id
+   AUTH_MICROSOFT_SECRET=your-client-secret-value
+   AUTH_MICROSOFT_TENANT_ID=your-directory-tenant-id
+   AUTH_SECRET=$(openssl rand -base64 32)  # Generate new
+   ```
+
+3. **Update Convex Environment**
+
+   ```bash
+   # Development
+   npx convex env set AUTH_MICROSOFT_ID "your-application-client-id"
+
+   # Production
+   npx convex env set AUTH_MICROSOFT_ID "your-application-client-id" --prod
+   ```
+
+4. **Remove Clerk Dependencies**
+
+   ```bash
+   npm uninstall @clerk/nextjs
+   npm install next-auth@latest
+   ```
+
+5. **Deploy Updated Code**
+
+   ```bash
+   # Deploy Convex changes
+   npx convex deploy --prod
+
+   # Deploy Next.js app
+   vercel --prod  # or your deployment method
+   ```
+
+6. **Verify Migration**
+   - Test sign-in with Azure AD credentials
+   - Verify workflows execute correctly
+   - Check user sessions are maintained
+   - Test API key authentication still works
+
+#### Breaking Changes
+- All users must re-authenticate with Azure AD
+- Clerk-based session data is not migrated
+- User IDs may change (use email for continuity if needed)
+- Authentication UI has changed to Microsoft sign-in
+
+#### Rollback Plan
+If migration fails, you can rollback:
+1. Restore previous environment variables
+2. Redeploy previous code version
+3. Users can authenticate with Clerk again
+
+For detailed instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
+
+---
+
+### Upgrading to Latest Version (General)
 
 If you're upgrading from an earlier version:
 
@@ -152,6 +287,7 @@ If you're upgrading from an earlier version:
 4. **Check Environment Variables**
    - Ensure `ENCRYPTION_KEY` is set (32-byte base64)
    - Ensure `E2B_API_KEY` is set for Transform nodes
+   - Ensure `AUTH_SECRET` is set for session encryption
    - Review new optional variables in [Configuration Guide](./docs/getting-started/configuration.md)
 
 ---
