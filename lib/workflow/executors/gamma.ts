@@ -19,10 +19,25 @@ export async function executeGammaNode(
         }
 
         // Substitute variables in prompt
-        const prompt = substituteVariables(data.prompt || 'Create a presentation about AI', state);
+        const originalPrompt = data.prompt || 'Create a presentation about AI';
+        const prompt = substituteVariables(originalPrompt, state);
 
-        console.log('[GammaNode] Executing Gamma AI node with prompt:', prompt.substring(0, 100));
-        console.log('[GammaNode] API Key provided:', apiKey ? `Yes (Length: ${apiKey.length}, Starts with: ${apiKey.substring(0, 4)}...)` : 'No');
+        // Build API request body with all parameters
+        const requestBody: any = {
+            inputText: prompt,
+            textMode: data.textMode || 'generate',
+            format: data.format || 'presentation',
+        };
+
+        // Add optional parameters if provided
+        if (data.numCards) requestBody.numCards = parseInt(data.numCards);
+        if (data.textAmount) requestBody.textOptions = { amount: data.textAmount };
+        if (data.imageSource) requestBody.imageOptions = { source: data.imageSource };
+        if (data.language) {
+            requestBody.textOptions = { ...requestBody.textOptions, language: data.language };
+        }
+
+        console.log('[GammaNode] Generating with format:', requestBody.format, 'cards:', requestBody.numCards || 10);
 
         // Step 1: Create generation
         const createResponse = await fetch(
@@ -33,7 +48,7 @@ export async function executeGammaNode(
                     'X-API-KEY': apiKey,
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ inputText: prompt }),
+                body: JSON.stringify(requestBody),
             }
         );
 
@@ -43,7 +58,6 @@ export async function executeGammaNode(
         }
 
         const createResult = await createResponse.json();
-        console.log('[GammaNode] Create result:', JSON.stringify(createResult, null, 2));
 
         // Try to find ID in various places
         const generationId = createResult.id || createResult.generationId || createResult.data?.id;
@@ -52,10 +66,10 @@ export async function executeGammaNode(
             throw new Error('No generation ID returned from Gamma API. Response: ' + JSON.stringify(createResult));
         }
 
-        console.log('[GammaNode] Generation created. ID:', generationId);
+        console.log('[GammaNode] Generation started:', generationId);
 
         // Wait 1 minute before checking status as requested
-        console.log('[GammaNode] Waiting 1 minute before starting polling...');
+        console.log('[GammaNode] Polling for completion...');
         await new Promise(resolve => setTimeout(resolve, 60 * 1000));
 
         // Step 2: Poll for completion (max 5 minutes total, so 4 more minutes)

@@ -412,6 +412,9 @@ export class LangGraphExecutor {
             usage: usage
           });
 
+        } else if (output && typeof output === 'object' && output !== null && '__variableUpdates' in output) {
+          // Extract variable updates from non-agent nodes (Gamma, Extract, Arcade, etc.)
+          variableUpdates = (output as any).__variableUpdates || {};
         }
 
         // Update result

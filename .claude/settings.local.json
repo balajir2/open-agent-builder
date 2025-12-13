@@ -60,7 +60,12 @@
       "Bash(git rm:*)",
       "Bash(GIT_SEQUENCE_EDITOR=\"sed -i ''1s/pick/edit/''\" git rebase -i HEAD~2)",
       "Bash(git filter-branch:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(cmd.exe /c \"taskkill /F /PID 9296\")",
+      "Bash(timeout:*)",
+      "Bash(cmd.exe /c \"taskkill /F /PID 26308\")",
+      "Bash(ping:*)",
+      "Bash(cmd.exe /c \"taskkill /F /IM node.exe\")"
     ],
     "deny": [],
     "ask": []

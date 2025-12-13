@@ -201,10 +201,11 @@ open-agent-builder/
 - `user-approval` - Human-in-the-loop pause
 - `end` - Terminal node
 
-**Additional Node Types (4):**
+**Additional Node Types (5):**
 - `set-state` - Direct state variable manipulation
 - `guardrails` - Content moderation and safety checks
 - `arcade` - Arcade tool integration
+- `gamma-ai` - Gamma AI presentation/document generation
 - `note` - Documentation and annotation nodes
 
 ### Database Schema (Convex)
@@ -365,6 +366,57 @@ MCP servers provide tools to agents (e.g., Firecrawl for web scraping):
 - **Groq** - Llama 3.3 70B, Llama 3.1 8B Instant, GPT OSS 120B, GPT OSS 20B
 
 All models work with both standard tools (Firecrawl, Tavily, Serper, E2B) and MCP protocol.
+
+### Gamma AI Integration
+
+The Gamma AI node enables generation of professional presentations, documents, and webpages from workflow data.
+
+**Key Features:**
+- **Output Formats**: Presentations, documents, webpages
+- **Variable Integration**: Full support for `{{variableName}}` syntax
+- **Configurable Parameters**: Format, text mode, card count, text amount, image source, language
+- **Real-time Generation**: Automatic polling with 1-minute wait + 30-second intervals
+- **URL Output**: Shareable Gamma.app links stored in `lastOutput`
+
+**Configuration:**
+```typescript
+// Gamma node parameters
+{
+  prompt: 'Generate a presentation using data from {{lastOutput}}',
+  format: 'presentation' | 'document' | 'webpage',
+  textMode: 'generate' | 'paste',
+  numCards: 10,                    // Number of slides/sections
+  textAmount: 'brief' | 'medium' | 'detailed',
+  imageSource: 'aiGenerated' | 'search' | 'none',
+  language: 'en'                   // ISO 639-1 code
+}
+```
+
+**API Key Setup:**
+```bash
+# System-level key (fallback for all users)
+npx convex env set GAMMA_API_KEY "sk-gamma_..."
+
+# Users can also add their own keys via Settings UI
+```
+
+**Implementation:**
+- **Executor**: `lib/workflow/executors/gamma.ts`
+- **UI Panel**: `components/app/(home)/sections/workflow-builder/GammaNodePanel.tsx`
+- **LangGraph Integration**: Case handler in `lib/workflow/langgraph.ts`
+
+**Output:**
+The Gamma node returns a `__variableUpdates` object that updates `lastOutput` with the generated URL. This enables downstream nodes to reference the presentation:
+```typescript
+{
+  success: true,
+  generationId: 'abc123',
+  url: 'https://gamma.app/docs/[id]',
+  __variableUpdates: { lastOutput: 'https://gamma.app/docs/[id]' }
+}
+```
+
+For detailed implementation docs, see [docs/GAMMA-NODE-IMPLEMENTATION.md](docs/GAMMA-NODE-IMPLEMENTATION.md).
 
 ## Security
 

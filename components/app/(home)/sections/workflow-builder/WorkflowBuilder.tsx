@@ -1708,6 +1708,7 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
         ) : (selectedNode?.data as any)?.nodeType === 'gamma-ai' ? (
           <GammaNodePanel
             node={selectedNode}
+            nodes={nodes}
             onClose={() => setSelectedNode(null)}
             onUpdate={handleUpdateNodeData}
             onDelete={handleDeleteNode}

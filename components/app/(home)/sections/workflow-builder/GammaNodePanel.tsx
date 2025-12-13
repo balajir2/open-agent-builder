@@ -3,9 +3,11 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 import type { Node } from "@xyflow/react";
+import VariableReferencePicker from "./VariableReferencePicker";
 
 interface GammaNodePanelProps {
     node: Node | null;
+    nodes?: Node[]; // All nodes for variable reference
     onUpdate: (nodeId: string, updates: any) => void;
     onClose: () => void;
     onDelete?: (nodeId: string) => void;
@@ -13,12 +15,20 @@ interface GammaNodePanelProps {
 
 export default function GammaNodePanel({
     node,
+    nodes,
     onUpdate,
     onClose,
     onDelete,
 }: GammaNodePanelProps) {
     const nodeData = node?.data as any;
-    const [prompt, setPrompt] = useState(nodeData?.prompt || 'Generate a presentation about...');
+    const [prompt, setPrompt] = useState(nodeData?.prompt || 'Generate a presentation using data from {{lastOutput}}');
+    const [format, setFormat] = useState(nodeData?.format || 'presentation');
+    const [textMode, setTextMode] = useState(nodeData?.textMode || 'generate');
+    const [numCards, setNumCards] = useState(nodeData?.numCards || '10');
+    const [textAmount, setTextAmount] = useState(nodeData?.textAmount || 'medium');
+    const [imageSource, setImageSource] = useState(nodeData?.imageSource || 'aiGenerated');
+    const [language, setLanguage] = useState(nodeData?.language || 'en');
+    const [showAdvanced, setShowAdvanced] = useState(false);
     const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Debounced update
@@ -28,8 +38,14 @@ export default function GammaNodePanel({
         }
 
         updateTimeoutRef.current = setTimeout(() => {
-            onUpdate(nodeData?.id, {
+            onUpdate(node.id, {
                 prompt,
+                format,
+                textMode,
+                numCards,
+                textAmount,
+                imageSource,
+                language,
                 nodeType: 'gamma-ai',
             });
         }, 300);
@@ -39,7 +55,7 @@ export default function GammaNodePanel({
                 clearTimeout(updateTimeoutRef.current);
             }
         };
-    }, [prompt, nodeData?.id]);
+    }, [prompt, format, textMode, numCards, textAmount, imageSource, language, node.id, onUpdate]);
 
     return (
         <AnimatePresence>
@@ -86,20 +102,153 @@ export default function GammaNodePanel({
                     <div className="flex-1 overflow-y-auto p-20 space-y-24">
                         {/* Prompt */}
                         <div>
-                            <label className="block text-label-small text-black-alpha-48 mb-8">
-                                Prompt
-                            </label>
+                            <div className="flex items-center justify-between mb-8">
+                                <label className="block text-label-small text-black-alpha-48">
+                                    Prompt
+                                </label>
+                                {nodes && (
+                                    <VariableReferencePicker
+                                        nodes={nodes}
+                                        currentNodeId={node?.id || ""}
+                                        onSelect={(ref) => setPrompt(prompt + ` {{${ref}}}`)}
+                                    />
+                                )}
+                            </div>
                             <textarea
                                 value={prompt}
                                 onChange={(e) => setPrompt(e.target.value)}
-                                placeholder="Describe what you want to generate..."
+                                placeholder="Create a presentation about {{lastOutput}}"
                                 rows={6}
-                                className="w-full px-12 py-10 bg-background-base border border-border-faint rounded-8 text-body-medium text-accent-black focus:outline-none focus:border-heat-100 transition-colors resize-none"
+                                className="w-full px-12 py-10 bg-background-base border border-border-faint rounded-8 text-body-medium text-accent-black focus:outline-none focus:border-heat-100 transition-colors resize-none font-mono text-14"
                             />
                             <p className="text-body-small text-black-alpha-32 mt-6">
-                                Provide a detailed description for the content you want to generate.
+                                Use the "Insert Variable" button to add outputs from previous nodes.
                             </p>
                         </div>
+
+                        {/* Format Selection */}
+                        <div>
+                            <label className="block text-label-small text-black-alpha-48 mb-8">
+                                Output Format
+                            </label>
+                            <select
+                                value={format}
+                                onChange={(e) => setFormat(e.target.value)}
+                                className="w-full px-12 py-10 bg-background-base border border-border-faint rounded-8 text-body-medium text-accent-black focus:outline-none focus:border-heat-100 transition-colors"
+                            >
+                                <option value="presentation">Presentation</option>
+                                <option value="document">Document</option>
+                                <option value="webpage">Webpage</option>
+                                <option value="social">Social Media</option>
+                            </select>
+                        </div>
+
+                        {/* Text Mode */}
+                        <div>
+                            <label className="block text-label-small text-black-alpha-48 mb-8">
+                                Text Mode
+                            </label>
+                            <select
+                                value={textMode}
+                                onChange={(e) => setTextMode(e.target.value)}
+                                className="w-full px-12 py-10 bg-background-base border border-border-faint rounded-8 text-body-medium text-accent-black focus:outline-none focus:border-heat-100 transition-colors"
+                            >
+                                <option value="generate">Generate - Rewrite and expand content</option>
+                                <option value="condense">Condense - Summarize input text</option>
+                                <option value="preserve">Preserve - Keep exact text</option>
+                            </select>
+                        </div>
+
+                        {/* Advanced Options Toggle */}
+                        <button
+                            onClick={() => setShowAdvanced(!showAdvanced)}
+                            className="flex items-center gap-8 text-body-small text-heat-100 hover:text-heat-120 transition-colors"
+                        >
+                            <svg className={`w-16 h-16 transition-transform ${showAdvanced ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                            Advanced Options
+                        </button>
+
+                        {showAdvanced && (
+                            <div className="space-y-20 pl-24 border-l-2 border-heat-100">
+                                {/* Number of Cards */}
+                                <div>
+                                    <label className="block text-label-small text-black-alpha-48 mb-8">
+                                        Number of Cards
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={numCards}
+                                        onChange={(e) => setNumCards(e.target.value)}
+                                        min="1"
+                                        max="60"
+                                        className="w-full px-12 py-10 bg-background-base border border-border-faint rounded-8 text-body-medium text-accent-black focus:outline-none focus:border-heat-100 transition-colors"
+                                    />
+                                    <p className="text-body-small text-black-alpha-32 mt-4">Range: 1-60 (Pro), 1-75 (Ultra)</p>
+                                </div>
+
+                                {/* Text Amount */}
+                                <div>
+                                    <label className="block text-label-small text-black-alpha-48 mb-8">
+                                        Text Amount
+                                    </label>
+                                    <select
+                                        value={textAmount}
+                                        onChange={(e) => setTextAmount(e.target.value)}
+                                        className="w-full px-12 py-10 bg-background-base border border-border-faint rounded-8 text-body-medium text-accent-black focus:outline-none focus:border-heat-100 transition-colors"
+                                    >
+                                        <option value="brief">Brief</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="detailed">Detailed</option>
+                                        <option value="extensive">Extensive</option>
+                                    </select>
+                                </div>
+
+                                {/* Image Source */}
+                                <div>
+                                    <label className="block text-label-small text-black-alpha-48 mb-8">
+                                        Image Source
+                                    </label>
+                                    <select
+                                        value={imageSource}
+                                        onChange={(e) => setImageSource(e.target.value)}
+                                        className="w-full px-12 py-10 bg-background-base border border-border-faint rounded-8 text-body-medium text-accent-black focus:outline-none focus:border-heat-100 transition-colors"
+                                    >
+                                        <option value="aiGenerated">AI Generated</option>
+                                        <option value="unsplash">Unsplash</option>
+                                        <option value="giphy">Giphy</option>
+                                        <option value="webFreeToUse">Web - Free to Use</option>
+                                        <option value="noImages">No Images</option>
+                                    </select>
+                                </div>
+
+                                {/* Language */}
+                                <div>
+                                    <label className="block text-label-small text-black-alpha-48 mb-8">
+                                        Output Language
+                                    </label>
+                                    <select
+                                        value={language}
+                                        onChange={(e) => setLanguage(e.target.value)}
+                                        className="w-full px-12 py-10 bg-background-base border border-border-faint rounded-8 text-body-medium text-accent-black focus:outline-none focus:border-heat-100 transition-colors"
+                                    >
+                                        <option value="en">English</option>
+                                        <option value="es">Spanish</option>
+                                        <option value="fr">French</option>
+                                        <option value="de">German</option>
+                                        <option value="it">Italian</option>
+                                        <option value="pt">Portuguese</option>
+                                        <option value="zh">Chinese</option>
+                                        <option value="ja">Japanese</option>
+                                        <option value="ko">Korean</option>
+                                        <option value="ar">Arabic</option>
+                                        <option value="hi">Hindi</option>
+                                        <option value="ru">Russian</option>
+                                    </select>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Info Box */}
                         <div className="p-16 bg-accent-white rounded-12 border border-border-faint">
