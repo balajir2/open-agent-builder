@@ -1,7 +1,8 @@
 "use client";
 
 import WorkflowRunnerUI from "@/components/workflow-runner/WorkflowRunnerUI";
-import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
+import { SignedIn, SignedOut, SignInButton } from "@/components/shared/auth-helpers";
+import { UserMenu } from "@/components/shared/UserMenu";
 import HeaderBrandKit from "@/components/layout/header/BrandKit/BrandKit";
 import HeaderWrapper from "@/components/layout/header/Wrapper/Wrapper";
 import HeaderDropdownWrapper from "@/components/layout/header/Dropdown/Wrapper/Wrapper";
@@ -64,14 +65,7 @@ export default function WorkflowRunnerPage() {
                 </SignedOut>
 
                 <SignedIn>
-                  <UserButton
-                    appearance={{
-                      elements: {
-                        avatarBox: "w-32 h-32",
-                      },
-                    }}
-                    afterSignOutUrl="/"
-                  />
+                  <UserMenu />
                 </SignedIn>
               </div>
             </div>

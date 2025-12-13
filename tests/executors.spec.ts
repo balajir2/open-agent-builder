@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import * as mcpUtils from '@/lib/workflow/executors/mcp-utils';
-import * as agent from '@/lib/workflow/executors/agent';
+
 import { migrateMCPData } from '@/lib/mcp/resolver';
 import * as mcpServers from '@/convex/mcpServers';
 import { createMockContext } from './utils/mocks';
@@ -32,12 +32,12 @@ test.describe('Agent Executor', () => {
         const resolver = require('@/lib/mcp/resolver');
         const mcpExecutorUtils = require('@/lib/workflow/executors/mcp-utils');
         
-        resolver.resolveMCPServers = jest.fn().mockResolvedValue([
+        resolver.resolveMCPServers = async () => ([
             { name: 'Server1', url: 'https://server1.com', tools: ['tool_a'] },
             { name: 'Server2', url: 'https://server2.com', tools: ['tool_b'] }
         ]);
 
-        mcpExecutorUtils.fetchMcpTools = jest.fn().mockImplementation(async (server: any) => {
+        mcpExecutorUtils.fetchMcpTools = async (server: any) => {
             if (server.name === 'Server1') {
                 return [{ name: 'tool_a', description: 'Tool A from Server 1' }];
             }
@@ -45,7 +45,7 @@ test.describe('Agent Executor', () => {
                 return [{ name: 'tool_b', description: 'Tool B from Server 2' }];
             }
             return [];
-        });
+        };
 
         const node = {
             id: 'test-agent-node',

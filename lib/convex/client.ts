@@ -1,12 +1,6 @@
-/**
- * Convex Client for Server-Side Operations
- *
- * This replaces Upstash Redis for workflow storage
- */
 
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../convex/_generated/api";
-import { auth } from "@clerk/nextjs/server";
 
 let convexClient: ConvexHttpClient | null = null;
 
@@ -37,7 +31,7 @@ export function getConvexClient(): ConvexHttpClient {
 }
 
 /**
- * Get an authenticated Convex client with Clerk token
+ * Get an authenticated Convex client with NextAuth token
  * This ensures userId is properly set in Convex context
  */
 export async function getAuthenticatedConvexClient(): Promise<ConvexHttpClient> {
@@ -52,21 +46,31 @@ export async function getAuthenticatedConvexClient(): Promise<ConvexHttpClient> 
 
   const client = new ConvexHttpClient(url);
 
+  // In test environments (like Playwright), we don't want to initialize NextAuth.
+  // The tests that need auth should use admin keys directly.
+  if (process.env.NODE_ENV === "test" || process.env.CI) {
+    console.warn("Skipping NextAuth initialization in test/CI environment.");
+    return client;
+  }
+
   try {
-    // Get Clerk auth token
-    const { getToken } = await auth();
-    const token = await getToken({ template: "convex" });
+    // Dynamically import auth only when not in a test environment
+    const { auth } = await import("@/auth");
+    // Get NextAuth session
+    const session = await auth();
+    // @ts-ignore - idToken is added in auth.ts callbacks
+    const token = session?.idToken;
 
     // Set the authentication token
     if (token) {
       client.setAuth(token);
     } else {
-      console.warn('No Clerk token available - using unauthenticated client');
+      console.warn('No NextAuth token available - using unauthenticated client');
     }
   } catch (error) {
-    console.error('Failed to get Clerk token:', error);
+    console.error('Failed to get NextAuth token:', error);
     // Continue with unauthenticated client instead of throwing
-    // This allows the app to function even if Clerk auth fails
+    // This allows the app to function even if auth fails
   }
 
   return client;

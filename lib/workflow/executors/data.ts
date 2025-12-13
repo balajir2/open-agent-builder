@@ -7,18 +7,15 @@ import CodeInterpreter from '@e2b/code-interpreter';
  * SECURITY NOTE: Transform Node Script Execution
  *
  * E2B SANDBOX INTEGRATION (ENABLED):
- * - Uses E2B CodeInterpreter for secure sandboxed JavaScript/TypeScript execution
+ * - Uses E2B CodeInterpreter for secure sandboxed JavaScript execution
  * - Executes in isolated cloud environment with 5-minute timeout
  * - Safe for untrusted code execution
  * - Requires E2B_API_KEY environment variable
  *
- * FALLBACK: If E2B is not available (missing key or server-side only execution),
- * falls back to Function constructor with security patterns (NOT recommended for production)
- *
  * E2B Execution:
  * - Creates isolated sandbox per execution
- * - Supports JavaScript and TypeScript
- * - 5-minute timeout per execution
+ * - Supports JavaScript via Node.js subprocess in Python sandbox
+ * - 60-second timeout per execution
  * - Automatic cleanup after execution
  */
 export async function executeDataNode(
@@ -50,8 +47,7 @@ export async function executeDataNode(
 
     // Re-throw with more context
     throw new Error(
-      `Node ${node.id} execution failed: ${
-        error instanceof Error ? error.message : 'Unknown error'
+      `Node ${node.id} execution failed: ${error instanceof Error ? error.message : 'Unknown error'
       }`
     );
   }
@@ -85,7 +81,7 @@ async function executeTransform(data: any, state: WorkflowState): Promise<any> {
 
 /**
  * Execute transform using E2B CodeInterpreter (SECURE)
- * Now uses JavaScript/TypeScript execution
+ * Uses Python to run Node.js for JavaScript execution
  */
 async function executeTransformE2B(transformScript: string, state: WorkflowState): Promise<any> {
   console.log('🔒 Executing transform in E2B sandbox...');
@@ -102,34 +98,73 @@ async function executeTransformE2B(transformScript: string, state: WorkflowState
   });
 
   try {
-    // Prepare the code to execute using JavaScript
-    // We wrap the user's code in a function that provides the context
-    const codeToExecute = `
-const input = ${JSON.stringify(sandboxedInput)};
-const lastOutput = ${JSON.stringify(sandboxedInput)};
-const state = ${JSON.stringify(sandboxedState)};
+    // E2B CodeInterpreter runs Python by default
+    // To avoid JSON escaping issues, write data to files
+    await sandbox.files.write('/tmp/input.json', JSON.stringify(sandboxedInput));
+    await sandbox.files.write('/tmp/state.json', JSON.stringify(sandboxedState));
+    await sandbox.files.write('/tmp/transform.js', transformScript);
 
-// Execute user's transform code
-const transform = () => {
-${transformScript.split('\n').map((line: string) => '  ' + line).join('\n')}
-};
+    // Create Node.js wrapper script
+    const wrapperScript = `const fs = require('fs');
+const input = JSON.parse(fs.readFileSync('/tmp/input.json', 'utf8'));
+const lastOutput = input;
+const state = JSON.parse(fs.readFileSync('/tmp/state.json', 'utf8'));
+const transformCode = fs.readFileSync('/tmp/transform.js', 'utf8');
 
-const result = transform();
+let transform;
+try {
+  // Try to wrap as an expression first
+  transform = new Function('input', 'lastOutput', 'state', 'return (' + transformCode + ')');
+} catch (e) {
+  // If syntax error (likely because it's not an expression), try as a full script body
+  transform = new Function('input', 'lastOutput', 'state', transformCode);
+}
 
-// Output result as JSON
-console.log(JSON.stringify(result));
-`;
+try {
+  const result = transform(input, lastOutput, state);
+  console.log(JSON.stringify(result === undefined ? null : result));
+} catch (error) {
+  console.error('Transform error:', error.message);
+  process.exit(1);
+}`;
 
-    // Execute in the sandbox using JavaScript
-    const execution = await sandbox.runCode(codeToExecute);
+    await sandbox.files.write('/tmp/wrapper.js', wrapperScript);
+
+    console.log('🔍 E2B executing JavaScript transform...');
+
+    // Use Python to run Node.js
+    const pythonCode = `import subprocess
+import sys
+try:
+    result = subprocess.run(['node', '/tmp/wrapper.js'], capture_output=True, text=True, timeout=60)
+    if result.returncode != 0:
+        print(f"Error: {result.stderr}", file=sys.stderr)
+        sys.exit(1)
+    print(result.stdout)
+except subprocess.TimeoutExpired:
+    print("Error: Timeout after 60s", file=sys.stderr)
+    sys.exit(1)
+except Exception as e:
+    print(f"Error: {str(e)}", file=sys.stderr)
+    sys.exit(1)`;
+
+    const execution = await sandbox.runCode(pythonCode);
 
     // Check for errors
     if (execution.error) {
-      throw new Error(`E2B execution error: ${execution.error.name}: ${execution.error.value}`);
+      console.error('❌ E2B Execution Failed:', JSON.stringify(execution, null, 2));
+      const stderr = (execution.logs?.stderr || []).join('\n');
+      const errorMsg = execution.error.value || execution.error.name || JSON.stringify(execution.error);
+      throw new Error(`E2B execution error: ${errorMsg}\nStderr: ${stderr}`);
     }
 
     // Parse the result from stdout
-    const resultText = execution.logs.stdout.join('\n');
+    const resultText = (execution.logs?.stdout || []).join('\n').trim();
+
+    if (!resultText) {
+      throw new Error('Transform returned no output');
+    }
+
     let result;
     try {
       result = JSON.parse(resultText);
@@ -253,8 +288,7 @@ async function executeSetState(data: any, state: WorkflowState): Promise<any> {
   } catch (error) {
     // Provide context about what failed
     throw new Error(
-      `Failed to set state variable '${key}': ${
-        error instanceof Error ? error.message : 'Unknown error'
+      `Failed to set state variable '${key}': ${error instanceof Error ? error.message : 'Unknown error'
       }`
     );
   }

@@ -2,7 +2,7 @@
 
 export interface WorkflowNode {
   id: string;
-  type: 'agent' | 'mcp' | 'if-else' | 'while' | 'user-approval' | 'transform' | 'set-state' | 'end' | 'start' | 'guardrails' | 'arcade' | 'note';
+  type: 'agent' | 'mcp' | 'if-else' | 'while' | 'user-approval' | 'transform' | 'set-state' | 'end' | 'start' | 'guardrails' | 'arcade' | 'note' | 'extract' | 'http' | 'data-transform';
   position: { x: number; y: number };
   data: NodeData;
 }
@@ -23,6 +23,7 @@ export interface NodeData {
   jsonOutputSchema?: string;
   jsonSchema?: any;
   mcpTools?: any[];
+  mcpServerIds?: string[];
   selectedTools?: import('../../lib/tools/types').ToolConfig[]; // Standard tools configuration
   systemPrompt?: string;
   tokenLimit?: number;
@@ -178,4 +179,29 @@ export interface WorkflowPendingAuth {
   message?: string;
   threadId?: string;
   executionId?: string;
+}
+
+export interface AgentToolCall {
+  id?: string;
+  name: string;
+  arguments: any;
+  output: any;
+  server_name?: string;
+  type?: string;
+  tool_use_id?: string;
+}
+
+export interface AgentExecutionResult {
+  __agentValue: unknown;
+  __agentToolCalls: AgentToolCall[];
+  __chatHistoryUpdates: { role: string; content: string }[];
+  __variableUpdates: {
+    lastOutput: unknown;
+    [key: string]: any;
+  };
+  __usage?: {
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+  };
 }

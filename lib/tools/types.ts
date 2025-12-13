@@ -16,13 +16,14 @@ export interface ToolDefinition {
     name: string;
     label: string;
     description: string;
-    category: 'web-search' | 'scraping' | 'extraction' | 'other';
+    category: 'web-search' | 'scraping' | 'extraction' | 'ai-generation' | 'other';
     icon?: any; // Lucide icon component or string URL
     fields: ToolConfigField[];
     defaultConfig?: Record<string, any>;
 }
 
 export interface ToolConfig {
+    id?: string;
     toolId: string;
     enabled: boolean;
     config: Record<string, any>;

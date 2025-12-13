@@ -4,9 +4,10 @@ import { cn } from "@/utils/cn";
 /**
  * Unified Button Component
  *
- * Only two variants:
+ * Variants:
  * - primary: Orange/heat color for primary actions
  * - secondary: Grey for secondary actions
+ * - ghost: Transparent background for subtle actions
  *
  * @example
  * // Primary button (orange)
@@ -23,7 +24,7 @@ import { cn } from "@/utils/cn";
  */
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary";
+  variant?: "primary" | "secondary" | "ghost";
   size?: "default" | "large";
   isLoading?: boolean;
   loadingLabel?: string;
@@ -89,6 +90,17 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
               "active:scale-[0.99] active:bg-black-alpha-7",
             ],
             "disabled:bg-black-alpha-3 disabled:text-black-alpha-48 disabled:cursor-not-allowed",
+            "focus-visible:ring-black",
+          ],
+
+          // Ghost variant (transparent)
+          variant === "ghost" && [
+            "bg-transparent text-accent-black",
+            !isNonInteractive && [
+              "hover:bg-black-alpha-4",
+              "active:scale-[0.99] active:bg-black-alpha-6",
+            ],
+            "disabled:text-black-alpha-48 disabled:cursor-not-allowed",
             "focus-visible:ring-black",
           ],
 
