@@ -77,6 +77,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed tool type filtering for OpenAI/Groq models with proper type guards
   - Fixed data node executor function name mismatch (`executeDataNode`)
 - **CRITICAL:** Fixed agent executor syntax error causing all agent executions to fail (`lib/workflow/executors/agent.ts`)
+- **CRITICAL:** Fixed Azure AD authentication import error
+  - Changed from `next-auth/providers/microsoft-entra-id` to `next-auth/providers/azure-ad`
+  - Simplified AzureAD provider configuration to use tenantId parameter
+  - Installed next-auth package (was missing from dependencies)
 - **CRITICAL:** Fixed MCP authentication issues preventing Adarsh MCP and other MCP servers from executing
   - Fixed authentication token property inconsistency: MCP resolver provides `accessToken` but MCP utils expected `authToken`
   - Now supports both `authToken` and `accessToken` for backward compatibility
