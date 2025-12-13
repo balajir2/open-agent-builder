@@ -1,4 +1,4 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# See https://help.github.com/articles/ignoring-files/
 
 # dependencies
 /node_modules
@@ -7,6 +7,8 @@
 
 # testing
 /coverage
+playwright-report/
+/test-results/
 
 # next.js
 /.next/
@@ -20,7 +22,7 @@
 *.pem
 .geminiignore
 
-# debug
+# debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -31,29 +33,29 @@ tsc_output*.log
 
 # local env files
 .env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
 # vercel
-.vercel
+/.vercel
 
 # editors
-.vscode
+.vscode/
 
 # certificates
-certificates
+/certificates
 
-
-.env
-.env.*
+# Python script not to track
 post_migrator.py
 
-# Server
+# Server env
 firecrawl-responses-api/.env
 
-.clerk/"*.tsbuildinfo"
+# Clerk build info
+.clerk/*.tsbuildinfo
 
 # temporary files
 nul
