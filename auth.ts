@@ -28,6 +28,18 @@ export const authOptions: NextAuthOptions = {
             }
             return session;
         },
+        async redirect({ url, baseUrl }) {
+            // If the url is a relative path, prepend baseUrl
+            if (url.startsWith('/')) {
+                return `${baseUrl}${url}`;
+            }
+            // If the url is on the same origin as baseUrl, return it
+            else if (new URL(url).origin === baseUrl) {
+                return url;
+            }
+            // Otherwise, return baseUrl for security
+            return baseUrl;
+        },
     },
 }
 
