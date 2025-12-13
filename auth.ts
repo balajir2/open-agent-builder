@@ -1,14 +1,18 @@
-import NextAuth from "next-auth"
-import AzureAD from "next-auth/providers/azure-ad"
+import NextAuth, { NextAuthOptions } from "next-auth"
+import AzureADProvider from "next-auth/providers/azure-ad"
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
+export const authOptions: NextAuthOptions = {
     providers: [
-        AzureAD({
-            clientId: process.env.AUTH_MICROSOFT_ID,
-            clientSecret: process.env.AUTH_MICROSOFT_SECRET,
+        AzureADProvider({
+            clientId: process.env.AUTH_MICROSOFT_ID!,
+            clientSecret: process.env.AUTH_MICROSOFT_SECRET!,
             tenantId: process.env.AUTH_MICROSOFT_TENANT_ID,
         }),
     ],
+    pages: {
+        signIn: '/sign-in',
+        error: '/auth/error',
+    },
     callbacks: {
         async jwt({ token, account }) {
             if (account) {
@@ -25,4 +29,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return session;
         },
     },
-})
+}
+
+export default NextAuth(authOptions)

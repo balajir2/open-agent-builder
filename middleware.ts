@@ -1,37 +1,44 @@
-import { auth } from "@/auth";
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-export default auth((req) => {
-  const isLoggedIn = !!req.auth;
-  const { nextUrl } = req;
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
 
   // Define public routes that don't require authentication
   const isPublicRoute =
-    nextUrl.pathname === "/" ||
-    nextUrl.pathname.startsWith("/sign-in") ||
-    nextUrl.pathname.startsWith("/sign-up") ||
-    nextUrl.pathname.startsWith("/api/public") ||
-    nextUrl.pathname.startsWith("/api/config") ||
-    nextUrl.pathname.startsWith("/api/templates") ||
-    nextUrl.pathname.startsWith("/api/mcp") ||
-    nextUrl.pathname.startsWith("/api/test-mcp-connection") ||
-    nextUrl.pathname.startsWith("/api/auth");
+    pathname === "/" ||
+    pathname.startsWith("/sign-in") ||
+    pathname.startsWith("/sign-up") ||
+    pathname.startsWith("/api/public") ||
+    pathname.startsWith("/api/config") ||
+    pathname.startsWith("/api/templates") ||
+    pathname.startsWith("/api/mcp") ||
+    pathname.startsWith("/api/test-mcp-connection") ||
+    pathname.startsWith("/api/auth");
 
   // Define API routes that require API key authentication (bypass auth check here)
   const isApiKeyRoute =
-    nextUrl.pathname.match(/^\/api\/workflows\/[^/]+\/execute/) ||
-    nextUrl.pathname.match(/^\/api\/workflows\/[^/]+\/execute-stream/) ||
-    nextUrl.pathname.match(/^\/api\/workflows\/[^/]+\/resume/);
+    pathname.match(/^\/api\/workflows\/[^/]+\/execute/) ||
+    pathname.match(/^\/api\/workflows\/[^/]+\/execute-stream/) ||
+    pathname.match(/^\/api\/workflows\/[^/]+\/resume/);
 
-  // API key routes bypass auth (will be validated in the route handler)
-  if (isApiKeyRoute) {
-    return;
+  // Allow public routes and API key routes
+  if (isPublicRoute || isApiKeyRoute) {
+    return NextResponse.next();
   }
 
-  // Protect all routes except public ones
-  if (!isPublicRoute && !isLoggedIn) {
-    return Response.redirect(new URL("/sign-in", nextUrl));
+  // For protected routes, check for session cookie
+  const sessionToken = request.cookies.get('authjs.session-token') ||
+                      request.cookies.get('__Secure-authjs.session-token');
+
+  if (!sessionToken) {
+    const signInUrl = new URL('/sign-in', request.url);
+    signInUrl.searchParams.set('callbackUrl', pathname);
+    return NextResponse.redirect(signInUrl);
   }
-});
+
+  return NextResponse.next();
+}
 
 export const config = {
   matcher: [
