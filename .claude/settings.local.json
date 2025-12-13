@@ -56,7 +56,11 @@
       "Bash(curl:*)",
       "Bash(git show:*)",
       "Bash(git pull:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git rm:*)",
+      "Bash(GIT_SEQUENCE_EDITOR=\"sed -i ''1s/pick/edit/''\" git rebase -i HEAD~2)",
+      "Bash(git filter-branch:*)",
+      "Bash(git stash:*)"
     ],
     "deny": [],
     "ask": []
