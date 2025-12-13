@@ -1,8 +1,12 @@
 "use client";
 
 import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
-export default function SignInPage() {
+function SignInContent() {
+    const searchParams = useSearchParams();
+    const callbackUrl = searchParams.get("callbackUrl") || "/";
     return (
         <div className="flex min-h-screen w-full items-center justify-center bg-white">
             <div className="w-full max-w-md space-y-8 px-6">
@@ -20,7 +24,7 @@ export default function SignInPage() {
                 <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 space-y-6">
                     {/* Microsoft Sign In Button */}
                     <button
-                        onClick={() => signIn("azure-ad", { callbackUrl: "/" })}
+                        onClick={() => signIn("azure-ad", { callbackUrl })}
                         className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl font-medium transition-all duration-200 shadow-lg hover:shadow-xl active:scale-[0.98]"
                     >
                         {/* Microsoft Logo */}
@@ -72,5 +76,13 @@ export default function SignInPage() {
                 </p>
             </div>
         </div>
+    );
+}
+
+export default function SignInPage() {
+    return (
+        <Suspense fallback={<div className="flex min-h-screen w-full items-center justify-center">Loading...</div>}>
+            <SignInContent />
+        </Suspense>
     );
 }

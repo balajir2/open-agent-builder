@@ -9,11 +9,16 @@ export async function middleware(request: NextRequest) {
     pathname === "/" ||
     pathname.startsWith("/sign-in") ||
     pathname.startsWith("/sign-up") ||
+    pathname.startsWith("/ui-user-workflows") || // Allow UI for Workflows - uses client-side auth
+    pathname.startsWith("/ui-builder") || // Allow UI Builder - uses client-side auth
+    pathname.startsWith("/workflow-runner") || // Allow workflow runner - uses client-side auth
     pathname.startsWith("/api/public") ||
     pathname.startsWith("/api/config") ||
     pathname.startsWith("/api/templates") ||
     pathname.startsWith("/api/mcp") ||
     pathname.startsWith("/api/test-mcp-connection") ||
+    pathname.startsWith("/api/workflows") || // Allow workflows API - auth handled by getAuthenticatedConvexClient
+    pathname.startsWith("/api/team-workflows") || // Allow team workflows API
     pathname.startsWith("/api/auth");
 
   // Define API routes that require API key authentication (bypass auth check here)
@@ -32,6 +37,15 @@ export async function middleware(request: NextRequest) {
                       request.cookies.get('__Secure-authjs.session-token');
 
   if (!sessionToken) {
+    // For API routes, return 401 instead of redirecting
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { error: 'Unauthorized', message: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    // For page routes, redirect to sign-in
     const signInUrl = new URL('/sign-in', request.url);
     signInUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(signInUrl);

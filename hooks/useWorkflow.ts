@@ -209,30 +209,24 @@ export function useWorkflow(workflowId?: string) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updated, getCircularReplacer()),
+          credentials: 'include',
         });
         const data = await response.json();
 
-        // Store the Convex ID from the response
         if (data.success && data.workflowId) {
           setConvexId(data.workflowId);
+        } else {
+          console.error('Failed to save workflow:', data);
         }
-
-        // Don't reload workflows on every save - only when explicitly needed
-        // This prevents unnecessary re-fetches and duplicate saves
       } catch (error) {
-        console.error('Failed to save workflow to Convex:', error);
+        console.error('Failed to save workflow:', error);
       }
-    }, 1000); // 1000ms debounce to batch rapid saves
+    }, 1000);
   }, [workflow, loadWorkflows]);
 
   // Update nodes
   const updateNodes = useCallback((nodes: WorkflowNode[]) => {
-    if (!workflow) {
-      console.warn('⚠️ updateNodes called but no workflow exists');
-      return;
-    }
-
-    console.log('📝 updateNodes called with', nodes.length, 'nodes');
+    if (!workflow) return;
     saveWorkflow({ nodes });
   }, [workflow, saveWorkflow]);
 

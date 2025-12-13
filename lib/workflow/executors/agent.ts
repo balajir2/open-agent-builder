@@ -1256,6 +1256,8 @@ export async function executeAgentNode(
       },
     };
 
+    return result;
+
   } catch (error) {
     console.error('Agent execution error:', error);
 

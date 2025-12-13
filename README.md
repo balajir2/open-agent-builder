@@ -448,7 +448,7 @@ Add custom MCP servers in **Settings → MCP Registry**:
 
 3. **Set environment variables** in Vercel dashboard:
    - `NEXT_PUBLIC_CONVEX_URL` (from Convex)
-   - Clerk keys
+   - Azure AD authentication keys (from Azure Portal)
    - `FIRECRAWL_API_KEY` (Required)
    - Optional: Default LLM provider keys
 
@@ -457,17 +457,20 @@ Add custom MCP servers in **Settings → MCP Registry**:
    npx convex deploy
    ```
 
-5. **Update Clerk settings:**
-   - Add your Vercel domain to allowed origins
-   - Update redirect URLs
+5. **Update Azure AD settings:**
+   - Add your Vercel domain as a redirect URI in Azure Portal
+   - Update App Registration authentication settings
 
 ### Environment Variables Checklist
 
 **Required:**
 - `NEXT_PUBLIC_CONVEX_URL` - Convex database
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` - Clerk auth
-- `CLERK_SECRET_KEY` - Clerk auth
-- `CLERK_JWT_ISSUER_DOMAIN` - Clerk + Convex integration
+- `CONVEX_DEPLOYMENT` - Convex deployment ID
+- `NEXTAUTH_URL` - Your application URL
+- `AUTH_MICROSOFT_ID` - Azure AD Application (client) ID
+- `AUTH_MICROSOFT_SECRET` - Azure AD Client secret
+- `AUTH_MICROSOFT_TENANT_ID` - Azure AD Directory (tenant) ID
+- `AUTH_SECRET` - NextAuth session secret (32-byte random string)
 - `FIRECRAWL_API_KEY` - Web scraping
 - `ENCRYPTION_KEY` - AES-256 encryption for user API keys (32 bytes base64)
 - `E2B_API_KEY` - Secure sandboxed code execution (REQUIRED for transform nodes)
@@ -506,7 +509,7 @@ Open Agent Builder implements enterprise-grade security measures with comprehens
 
 **Authentication & Authorization:**
 - ✅ **Ownership Checks** - Users can only modify their own workflows/MCP servers
-- ✅ **JWT Authentication** - Clerk-based authentication for all protected routes
+- ✅ **JWT Authentication** - Azure AD authentication via NextAuth.js for all protected routes
 - ✅ **API Key Authentication** - Optional API key auth for programmatic access
 - ✅ **AES-256-GCM Encryption** - User API keys encrypted at rest
 
@@ -582,29 +585,45 @@ If you discover a security vulnerability, please report it via GitHub Security A
 | I want to... | Read this document |
 |--------------|-------------------|
 | **Get started quickly** | This README |
-| **Learn how to use the app** | [USER-MANUAL.md](./USER-MANUAL.md) |
-| **Understand the architecture** | [ARCHITECTURE.md](./ARCHITECTURE.md) ⭐ |
+| **Learn how to use the app** | [docs/USER-GUIDE.md](./docs/USER-GUIDE.md) 📖 |
+| **Understand the architecture** | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) ⭐ |
+| **Set up and administer the system** | [docs/ADMIN-GUIDE.md](./docs/ADMIN-GUIDE.md) 🔧 |
 | **Understand security features** | [SECURITY.md](./SECURITY.md) |
 | **Develop or contribute** | [CLAUDE.md](./CLAUDE.md) |
 | **Add new tools** | [ADDING-NEW-TOOLS.md](./ADDING-NEW-TOOLS.md) |
-| **Deploy to production** | [Deployment](#deployment) + [SECURITY.md](./SECURITY.md) |
-| **Troubleshoot issues** | [USER-MANUAL.md](./USER-MANUAL.md#troubleshooting) |
+| **Deploy to production** | [docs/ADMIN-GUIDE.md#deployment](./docs/ADMIN-GUIDE.md#deployment) |
+| **Troubleshoot issues** | [docs/USER-GUIDE.md#troubleshooting](./docs/USER-GUIDE.md#troubleshooting) |
 
 ### Core Documentation
 
-- **[USER-MANUAL.md](./USER-MANUAL.md)** - Complete user guide (2000+ lines)
-  - Getting started tutorial
-  - All 14 node types explained in detail
-  - Advanced features and best practices
-  - Troubleshooting guide with solutions
-  - 40+ FAQ questions
+- **[docs/USER-GUIDE.md](./docs/USER-GUIDE.md)** 📖 - End user documentation (500+ lines)
+  - Getting started with the application
+  - Complete guide to all 10 node types
+  - Creating and running workflows
+  - Using templates and sharing workflows
+  - Advanced features (variables, tools, token limits)
+  - Troubleshooting common issues
+  - Best practices and keyboard shortcuts
 
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** ⭐ - Complete system design (800+ lines)
-  - Tech stack and design patterns
-  - Project structure and organization
-  - Core systems (execution, rate limiting, security)
+- **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** ⭐ - System architecture (1200+ lines)
+  - Complete technology stack overview
+  - Architecture layers and component design
+  - Data flow and execution engine
+  - Authentication & authorization architecture
   - Database schema and API design
-  - Scalability and monitoring
+  - Security architecture and best practices
+  - Deployment architecture and scalability
+
+- **[docs/ADMIN-GUIDE.md](./docs/ADMIN-GUIDE.md)** 🔧 - System administration (900+ lines)
+  - Installation and initial setup
+  - Azure AD configuration
+  - Convex backend setup
+  - Environment configuration
+  - API key management (two-tier system)
+  - Production deployment guide
+  - Monitoring, logging, and maintenance
+  - Security best practices
+  - Troubleshooting guide
 
 - **[CLAUDE.md](./CLAUDE.md)** - Developer guide (500+ lines)
   - Development setup and commands
@@ -622,8 +641,6 @@ If you discover a security vulnerability, please report it via GitHub Security A
   - Step-by-step guide to add tools
   - Tool architecture explained
   - Best practices and examples
-
-- **[VERIFICATION-REPORT.md](./VERIFICATION-REPORT.md)** - Security verification
 
 ### Specialized Guides
 

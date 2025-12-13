@@ -55,9 +55,10 @@ export async function getAuthenticatedConvexClient(): Promise<ConvexHttpClient> 
 
   try {
     // Dynamically import auth only when not in a test environment
-    const { auth } = await import("@/auth");
+    const { getServerSession } = await import("next-auth");
+    const { authOptions } = await import("@/auth");
     // Get NextAuth session
-    const session = await auth();
+    const session = await getServerSession(authOptions);
     // @ts-ignore - idToken is added in auth.ts callbacks
     const token = session?.idToken;
 

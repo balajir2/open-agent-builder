@@ -45,7 +45,15 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
   useEffect(() => {
     const loadWorkflows = async () => {
       try {
-        const response = await fetch('/api/workflows');
+        const response = await fetch('/api/workflows', {
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          console.error('Failed to fetch workflows:', response.status);
+          return;
+        }
+
         const data = await response.json();
 
         if (data.workflows && Array.isArray(data.workflows)) {
@@ -64,7 +72,9 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
 
     const loadTeamWorkflows = async () => {
       try {
-        const response = await fetch('/api/team-workflows');
+        const response = await fetch('/api/team-workflows', {
+          credentials: 'include', // Include cookies in the request
+        });
         const data = await response.json();
 
         if (data.workflows && Array.isArray(data.workflows)) {

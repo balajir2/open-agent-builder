@@ -479,6 +479,7 @@ function minimalCleanEdges(edges: any[]) {
 ----------------------------------------- */
 
 export async function GET() {
+  console.log('📋 [GET /api/workflows] Request received');
   try {
     if (!isConvexConfigured()) {
       return NextResponse.json({
@@ -491,7 +492,9 @@ export async function GET() {
     }
 
     const convex = await getAuthenticatedConvexClient();
+    console.log('📋 [GET /api/workflows] Fetching from Convex...');
     const workflows = await convex.query(api.workflows.listWorkflows, {});
+    console.log(`📋 [GET /api/workflows] Found ${workflows.length} workflows`);
 
     return NextResponse.json({
       workflows: workflows.map((w: any) => ({
@@ -531,6 +534,7 @@ export async function GET() {
 ----------------------------------------- */
 
 export async function POST(request: NextRequest) {
+  console.log('💾 [POST /api/workflows] Request received');
   try {
     if (!isConvexConfigured()) {
       return NextResponse.json(

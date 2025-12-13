@@ -14,14 +14,14 @@ export const authOptions: NextAuthOptions = {
         error: '/auth/error',
     },
     callbacks: {
-        async jwt({ token, account }) {
+        async jwt({ token, account, user }) {
             if (account) {
                 token.idToken = account.id_token;
             }
             return token;
         },
         async session({ session, token }) {
-            // @ts-ignore // Extend type in real app
+            // @ts-ignore
             session.idToken = token.idToken;
             if (session.user && token.sub) {
                 session.user.id = token.sub;
@@ -29,15 +29,23 @@ export const authOptions: NextAuthOptions = {
             return session;
         },
         async redirect({ url, baseUrl }) {
-            // If the url is a relative path, prepend baseUrl
+            // If it's a relative URL, prepend the baseUrl
             if (url.startsWith('/')) {
                 return `${baseUrl}${url}`;
             }
-            // If the url is on the same origin as baseUrl, return it
-            else if (new URL(url).origin === baseUrl) {
-                return url;
+
+            // If it's an absolute URL on the same origin, allow it
+            try {
+                const urlObj = new URL(url);
+                const baseUrlObj = new URL(baseUrl);
+                if (urlObj.origin === baseUrlObj.origin) {
+                    return url;
+                }
+            } catch (e) {
+                // Invalid URL, fallback to baseUrl
             }
-            // Otherwise, return baseUrl for security
+
+            // For security, redirect to baseUrl for external URLs
             return baseUrl;
         },
     },

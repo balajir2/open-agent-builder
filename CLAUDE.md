@@ -109,7 +109,7 @@ npm run test:all:comprehensive
 - **TypeScript** - Type safety across the stack
 - **LangGraph** - Workflow orchestration engine with StateGraph
 - **Convex** - Real-time database with automatic reactivity
-- **Clerk** - Authentication with JWT integration
+- **Azure AD (Microsoft Entra ID)** - Enterprise authentication with NextAuth.js
 - **Firecrawl** - Web scraping API
 
 ### Project Structure
@@ -163,7 +163,7 @@ open-agent-builder/
 │   └── convex/                   # Convex client utilities
 ├── convex/                       # Convex backend
 │   ├── schema.ts                 # Database schema
-│   ├── auth.config.ts            # Clerk auth configuration
+│   ├── auth.config.ts            # NextAuth.js + Azure AD configuration
 │   ├── workflows.ts              # Workflow CRUD operations
 │   ├── executions.ts             # Execution tracking
 │   ├── userLLMKeys.ts            # User API key management
@@ -393,7 +393,7 @@ The Open Agent Builder implements comprehensive security measures to protect aga
 
 **4. Authorization & Access Control**
 - ✅ **Ownership Checks** - Users can only modify their own workflows/MCP servers
-- ✅ **JWT Authentication** - Clerk-based authentication for all protected routes
+- ✅ **JWT Authentication** - Azure AD authentication via NextAuth.js for all protected routes
 - ✅ **API Key Authentication** - Optional API key auth for programmatic access
 
 **5. CORS Configuration**
@@ -733,7 +733,7 @@ When writing tests:
 - Test workflow execution via API routes
 - Verify SSE streaming events
 - Check Convex database state after operations
-- Test authentication flows (Clerk + API keys)
+- Test authentication flows (Azure AD + API keys)
 
 When debugging tests:
 ```bash

@@ -26,7 +26,7 @@ export default function UIUserWorkflowsContent() {
             .then((res) => res.json())
             .then(setWorkflow)
             .catch(console.error);
-    }, []);
+    }, [searchParams]);
 
 
     return (
