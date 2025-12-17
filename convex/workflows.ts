@@ -42,7 +42,13 @@ export const list = query({
     return await ctx.db
       .query("workflows")
       .filter((q) =>
-        q.and(q.eq(q.field("userId"), identity.subject), q.neq(q.field("isTemplate"), true))
+        q.and(
+          q.neq(q.field("isTemplate"), true),
+          q.or(
+            q.eq(q.field("userId"), identity.subject),
+            q.eq(q.field("assignedTo"), identity.subject)
+          )
+        )
       )
       .order("desc")
       .collect();
@@ -55,7 +61,36 @@ export const listAll = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
-    return await ctx.db.query("workflows").filter((q) => q.neq(q.field("isTemplate"), true)).order("desc").collect();
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+      .first();
+
+    const isAdmin = user?.role === "admin";
+
+    // If admin, return all workflows
+    if (isAdmin) {
+      return await ctx.db.query("workflows")
+        .filter((q) => q.neq(q.field("isTemplate"), true))
+        .order("desc")
+        .collect();
+    }
+
+    // If regular user, return owned OR assigned workflows
+    return await ctx.db
+      .query("workflows")
+      .filter((q) =>
+        q.and(
+          q.neq(q.field("isTemplate"), true),
+          q.or(
+            q.eq(q.field("userId"), identity.subject),
+            q.eq(q.field("assignedTo"), identity.subject)
+          )
+        )
+      )
+      .order("desc")
+      .collect();
   },
 });
 
@@ -154,6 +189,7 @@ export const saveWorkflow = mutation({
 });
 
 // Delete workflow — SECURITY FIX: Added ownership check
+// Delete workflow — SECURITY FIX: Added ownership check
 export const deleteWorkflow = mutation({
   args: { id: v.id("workflows") },
   handler: async (ctx, { id }) => {
@@ -169,13 +205,41 @@ export const deleteWorkflow = mutation({
       throw new Error("Workflow not found");
     }
 
-    // Check ownership
-    if (workflow.userId !== identity.subject) {
+    const user = await ctx.db.query("users").withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject)).first();
+    const isAdmin = user?.role === "admin";
+
+    // Check ownership or admin status
+    if (workflow.userId !== identity.subject && !isAdmin) {
       throw new Error("Unauthorized: You can only delete your own workflows");
     }
 
     // Delete the workflow
     await ctx.db.delete(id);
+    return { success: true };
+  },
+});
+
+// Assign workflow to a user (Admin only)
+export const assignWorkflow = mutation({
+  args: {
+    workflowId: v.id("workflows"),
+    assignedTo: v.string(), // User ID (clerkId) to assign to
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+      .first();
+
+    if (user?.role !== "admin") throw new Error("Unauthorized: Admin access required");
+
+    await ctx.db.patch(args.workflowId, {
+      assignedTo: args.assignedTo,
+    });
+
     return { success: true };
   },
 });
@@ -348,11 +412,75 @@ export const getWorkflowDetails = query({
           });
         }
       });
-    } catch {}
+    } catch { }
 
     return {
       ...workflow,
       requiredInputs,
     };
+  },
+});
+
+// Get all workflows assigned to a specific user (Admin only)
+export const getWorkflowsForUser = query({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+      .first();
+
+    if (user?.role !== "admin") return [];
+
+    return await ctx.db
+      .query("workflows")
+      .filter((q) =>
+        q.or(
+          q.eq(q.field("assignedTo"), userId),
+          q.eq(q.field("userId"), userId)
+        )
+      )
+      .collect();
+  },
+});
+
+// Batch update workflow assignments for a user (Admin only)
+export const batchUpdateAssignments = mutation({
+  args: {
+    userId: v.string(),
+    workflowIds: v.array(v.id("workflows")),
+  },
+  handler: async (ctx, { userId, workflowIds }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+      .first();
+
+    if (user?.role !== "admin") throw new Error("Unauthorized: Admin access required");
+
+    // 1. Unassign all workflows currently assigned to this user that are NOT in the new list
+    const currentAssignments = await ctx.db
+      .query("workflows")
+      .filter((q) => q.eq(q.field("assignedTo"), userId))
+      .collect();
+
+    for (const workflow of currentAssignments) {
+      if (!workflowIds.includes(workflow._id)) {
+        await ctx.db.patch(workflow._id, { assignedTo: undefined });
+      }
+    }
+
+    // 2. Assign all workflows in the new list to this user
+    for (const workflowId of workflowIds) {
+      await ctx.db.patch(workflowId, { assignedTo: userId });
+    }
+
+    return { success: true };
   },
 });

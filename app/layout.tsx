@@ -35,6 +35,7 @@ export default function RootLayout({
         <ColorStyles />
       </head>
       <body
+        suppressHydrationWarning={true}
         className={`${GeistMono.variable} ${robotoMono.variable} font-sans text-accent-black bg-background-base overflow-x-clip`}
       >
         <BigIntProvider>

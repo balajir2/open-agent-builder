@@ -14,15 +14,18 @@ export default defineSchema({
     email: v.optional(v.string()),
     name: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
+    role: v.optional(v.string()), // "admin" | "user"
     createdAt: v.string(),
   })
     .index("by_clerkId", ["clerkId"])
-    .index("by_email", ["email"]),
+    .index("by_email", ["email"])
+    .index("by_role", ["role"]),
 
   // Workflows table - stores complete workflow definitions
   workflows: defineTable({
     // User ownership
     userId: v.optional(v.string()), // Clerk user ID - optional for backward compat
+    assignedTo: v.optional(v.string()), // Clerk user ID assigned to this workflow
 
     // Workflow identification
     customId: v.optional(v.string()), // Original workflow ID (like "workflow_123" or "amazon-product-research")
@@ -47,6 +50,7 @@ export default defineSchema({
     isPublic: v.optional(v.boolean()), // For shared templates
   })
     .index("by_userId", ["userId"])
+    .index("by_assignedTo", ["assignedTo"])
     .index("by_customId", ["customId"])
     .index("by_creation", ["createdAt"])
     .index("by_category", ["category"])

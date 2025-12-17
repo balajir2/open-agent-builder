@@ -141,6 +141,27 @@ export async function POST(
           id: workflowDoc.customId || workflowDoc._id, // Use customId if exists, otherwise Convex ID
         };
 
+        // Permission Check for Execution
+        if (!workflowData.isTemplate) {
+          // Get user information for permission check
+          const user = await convex.query(api.users.curretUser); // Using existing query (typo preserved)
+          const isAdmin = user?.role === "admin";
+          const currentUserId = authResult.userId;
+
+          const isOwner = workflowData.userId === currentUserId;
+          const isAssigned = workflowData.assignedTo === currentUserId;
+
+          if (!isOwner && !isAssigned && !isAdmin) {
+            sendEvent('error', {
+              error: 'Permission denied',
+              details: 'You do not have permission to execute this workflow.',
+              workflowId
+            });
+            closeStream();
+            return;
+          }
+        }
+
         if (!workflowData) {
           sendEvent('error', {
             error: `Workflow ${workflowId} not found`,

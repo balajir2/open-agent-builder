@@ -5,6 +5,8 @@ import { useState, useEffect } from "react";
 import { listTemplates } from "@/lib/workflow/templates";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 
 interface Step2PlaceholderProps {
   onReset: () => void;
@@ -23,7 +25,10 @@ interface Workflow {
 
 export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWorkflow, onLoadTemplate }: Step2PlaceholderProps) {
   const { data: session } = useSession();
-  const user = session?.user;
+  const user = session?.user as any;
+  const currentUser = useQuery(api.users.curretUser);
+  const isAdmin = currentUser !== undefined && currentUser !== null && currentUser.role === "admin";
+  const allUsers = useQuery(api.users.list) || [];
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [teamWorkflows, setTeamWorkflows] = useState<Workflow[]>([]);
   const [activeTab, setActiveTab] = useState<"workflows" | "templates" | "team">("templates");
@@ -134,45 +139,69 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
 
   const renderWorkflows = (items: Workflow[], isTeam: boolean = false) => {
     if (items.length > 0) {
-      return items.map((workflow, index) => (
-        <motion.div
-          key={workflow.id}
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{
-            duration: 0.5,
-            delay: (index + 1) * 0.1,
-            ease: "easeOut"
-          }}
-          className="relative cursor-pointer"
-          onClick={() => onLoadWorkflow?.(workflow.id)}
-        >
-          <div className="bg-accent-white rounded-12 p-24 border border-border-faint hover:border-heat-100 hover:shadow-sm transition-all h-full min-h-[160px] group relative">
-            <div className="absolute inset-0 rounded-12 bg-gradient-to-br from-heat-4 to-transparent opacity-0 group-hover:opacity-10 transition-opacity" />
-            <div className="relative">
-              <div className="flex justify-between items-start mb-8">
-                <h3 className="text-label-large text-accent-black font-medium pr-8">{workflow.title}</h3>
-                {/* Only show delete button if user is the owner */}
-                {user?.id === workflow.userId && (
-                  <button
-                    onClick={(e) => handleDelete(e, workflow.id, isTeam)}
-                    className="text-black-alpha-32 hover:text-red-500 transition-colors p-4 -mr-4 -mt-4 rounded-full hover:bg-red-50"
-                    title="Delete workflow"
-                  >
-                    <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
+      return items.map((workflow, index) => {
+        // Find owner name if it's a team workflow
+        let ownerName = "";
+        if (isTeam && workflow.userId) {
+          // Check if the owner is the current user (using clerkId)
+          if (currentUser && workflow.userId === currentUser.clerkId) {
+            ownerName = "Me";
+          } else {
+            const owner = allUsers.find((u: any) => u.clerkId === workflow.userId);
+            ownerName = owner?.name || "Unknown User";
+          }
+        }
+
+        return (
+          <motion.div
+            key={workflow.id}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{
+              duration: 0.5,
+              delay: (index + 1) * 0.1,
+              ease: "easeOut"
+            }}
+            className="relative cursor-pointer"
+            onClick={() => onLoadWorkflow?.(workflow.id)}
+          >
+            <div className="bg-accent-white rounded-12 p-24 border border-border-faint hover:border-heat-100 hover:shadow-sm transition-all h-full min-h-[160px] group relative">
+              <div className="absolute inset-0 rounded-12 bg-gradient-to-br from-heat-4 to-transparent opacity-0 group-hover:opacity-10 transition-opacity" />
+              <div className="relative">
+                <div className="flex justify-between items-start mb-8">
+                  <h3 className="text-label-large text-accent-black font-medium pr-8">{workflow.title}</h3>
+                  {/* Only show delete button if user is the owner */}
+                  {user?.id === workflow.userId && (
+                    <button
+                      onClick={(e) => handleDelete(e, workflow.id, isTeam)}
+                      className="text-black-alpha-32 hover:text-red-500 transition-colors p-4 -mr-4 -mt-4 rounded-full hover:bg-red-50"
+                      title="Delete workflow"
+                    >
+                      <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                {workflow.description && (
+                  <p className="text-body-small text-black-alpha-48 mb-12 line-clamp-2">{workflow.description}</p>
                 )}
+                <div className="flex justify-between items-center mt-auto">
+                  <p className="text-body-small text-black-alpha-32">Updated {workflow.createdAt}</p>
+                  {isTeam && ownerName && (
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${ownerName === "Me"
+                      ? "bg-indigo-50 text-indigo-600 border border-indigo-100"
+                      : "bg-gray-100 text-gray-500 border border-gray-200"
+                      }`}>
+                      {ownerName}
+                    </span>
+                  )}
+                </div>
               </div>
-              {workflow.description && (
-                <p className="text-body-small text-black-alpha-48 mb-12 line-clamp-2">{workflow.description}</p>
-              )}
-              <p className="text-body-small text-black-alpha-32">Updated {workflow.createdAt}</p>
             </div>
-          </div>
-        </motion.div>
-      ));
+          </motion.div>
+        );
+      });
     }
     return (
       <div className="col-span-1 lg:col-span-3 flex items-center justify-center min-h-[160px]">
@@ -207,15 +236,17 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
         >
           Your Workflows ({workflows.length})
         </button>
-        <button
-          onClick={() => setActiveTab("team")}
-          className={`px-20 py-10 rounded-8 text-body-medium transition-all ${activeTab === "team"
-            ? "bg-heat-100 text-white"
-            : "bg-background-base text-accent-black hover:bg-black-alpha-4 border border-border-faint"
-            }`}
-        >
-          Team Workflows ({teamWorkflows.length})
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setActiveTab("team")}
+            className={`px-20 py-10 rounded-8 text-body-medium transition-all ${activeTab === "team"
+              ? "bg-heat-100 text-white"
+              : "bg-background-base text-accent-black hover:bg-black-alpha-4 border border-border-faint"
+              }`}
+          >
+            Team Workflows ({teamWorkflows.length})
+          </button>
+        )}
         <button
           onClick={() => setActiveTab("templates")}
           className={`px-20 py-10 rounded-8 text-body-medium transition-all ${activeTab === "templates"

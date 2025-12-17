@@ -12,9 +12,22 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, LogOut, User } from "lucide-react";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { useEffect } from "react";
 
 export function UserMenu() {
     const { data: session } = useSession();
+    const storeUser = useMutation(api.users.store);
+
+    useEffect(() => {
+        if (session?.user) {
+            storeUser({
+                email: session.user.email || undefined,
+                name: session.user.name || undefined,
+            });
+        }
+    }, [session, storeUser]);
 
     if (!session?.user) return null;
 

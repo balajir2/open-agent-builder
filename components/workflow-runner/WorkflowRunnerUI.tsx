@@ -343,6 +343,9 @@ export default function WorkflowRunnerUI() {
 
   const [inputFields, setInputFields] = useState<Record<string, any>>({});
   const [workflowDetails, setWorkflowDetails] = useState<any>(null);
+  const [permissionDenied, setPermissionDenied] = useState(false);
+
+
   const [showDownloadSuccess, setShowDownloadSuccess] = useState(false);
   const [downloadLocation, setDownloadLocation] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
@@ -379,6 +382,8 @@ export default function WorkflowRunnerUI() {
   // UI config
   const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
   const ACCEPTED_MIME = "application/pdf";
+
+
 
   useEffect(() => {
     try {
@@ -427,11 +432,19 @@ export default function WorkflowRunnerUI() {
       setIsLoading(true);
       try {
         const res = await fetch(`/api/workflows/${selectedWorkflowId}/getWorkflowDetails`);
+
+        if (res.status === 403) {
+          setPermissionDenied(true);
+          setWorkflowDetails(null);
+          return;
+        }
+
         if (!res.ok) throw new Error(`Failed to fetch workflow details: ${res.status}`);
         const data = await res.json();
 
         if (data) {
           setWorkflowDetails(data);
+          setPermissionDenied(false);
 
           const inputs = Array.isArray(data.requiredInputs) ? data.requiredInputs : [];
           const initialInputs: Record<string, any> = {};
@@ -1402,6 +1415,20 @@ export default function WorkflowRunnerUI() {
     console.log('Current workflow details:', workflowDetails);
     console.log('Current input fields:', inputFields);
   }, [workflowDetails, inputFields]);
+
+  if (permissionDenied) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-8">
+        <div className="bg-red-50 p-6 rounded-2xl mb-4">
+          <AlertCircle className="w-12 h-12 text-red-500" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
+        <p className="text-gray-500 max-w-md">
+          You do not have permission to access this workflow.
+        </p>
+      </div>
+    );
+  }
 
   if (!selectedWorkflowId) {
     return (
