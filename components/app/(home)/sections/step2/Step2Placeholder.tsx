@@ -28,9 +28,9 @@ interface Workflow {
 export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWorkflow, onLoadTemplate }: Step2PlaceholderProps) {
   const { data: session } = useSession();
   const user = session?.user as any;
-  const currentUser = useQuery(api.users.curretUser);
+  const currentUser = useQuery(api.users.currentUser);
   const isAdmin = currentUser !== undefined && currentUser !== null && currentUser.role === "admin";
-  const allUsers = useQuery(api.users.list) || [];
+  const allUsers = useQuery(api.users.list, isAdmin ? {} : "skip") || [];
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [teamWorkflows, setTeamWorkflows] = useState<Workflow[]>([]);
   const [activeTab, setActiveTab] = useState<"workflows" | "templates" | "team">("templates");

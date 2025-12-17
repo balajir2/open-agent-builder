@@ -144,7 +144,7 @@ export async function POST(
         // Permission Check for Execution
         if (!workflowData.isTemplate) {
           // Get user information for permission check
-          const user = await convex.query(api.users.curretUser); // Using existing query (typo preserved)
+          const user = await convex.query(api.users.currentUser); // Using existing query (typo preserved)
           const isAdmin = user?.role === "admin";
           const currentUserId = authResult.userId;
 

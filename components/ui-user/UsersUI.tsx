@@ -152,7 +152,7 @@ function DroppableUserArea({
 // ------------------------------------------------------------------
 
 export default function UsersUI() {
-  const currentUser = useQuery(api.users.curretUser);
+  const currentUser = useQuery(api.users.currentUser);
 
   // Strict check: Must be loaded (not undefined), logged in (not null), and have admin role
   const isAdmin = currentUser !== undefined && currentUser !== null && currentUser.role === "admin";

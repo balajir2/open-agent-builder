@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "predev": "node scripts/check-dependencies.cjs",
-    "dev": "next dev",
+    "dev": "npx convex codegen && next dev",
     "dev:all": "concurrently \"npx convex dev\" \"npm run dev\"",
-    "build": "next build",
+    "build": "npx convex codegen && next build",
     "start": "next start",
     "lint": "eslint .",
     "migrate:dry-run": "node scripts/migrate-keys-to-convex.cjs --dry-run",

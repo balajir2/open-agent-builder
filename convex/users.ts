@@ -52,7 +52,7 @@ export const store = mutation({
 /**
  * Get the current logged in user's details (including role)
  */
-export const curretUser = query({
+export const currentUser = query({
     args: {},
     handler: async (ctx) => {
         const identity = await ctx.auth.getUserIdentity();

@@ -42,7 +42,7 @@ export async function GET(
     }
 
     // Get user role from DB to check for admin
-    const user = await convex.query(api.users.curretUser); // Using existing query (typo preserved for now)
+    const user = await convex.query(api.users.currentUser); // Using existing query (typo preserved for now)
     const isAdmin = user?.role === "admin";
 
     // 2. If Owner -> Allow
