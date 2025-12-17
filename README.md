@@ -1,4 +1,4 @@
-# Open Agent Builder
+# Open Agent Workflow Builder
 
 <p align="center">
   <img src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExcGNoY25xY2ptZTZtcDN6czBmdXJ2dnpkdWVjcXlqNXNhdjgyZXpkaiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/tWtopK29eXAbvaDpi5/giphy.gif" alt="Demo" width="100%" />
@@ -10,6 +10,7 @@
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
 [![Firecrawl](https://img.shields.io/badge/Powered%20by-Firecrawl-orange)](https://firecrawl.dev)
+[![Bounteous](https://img.shields.io/badge/Enhanced%20by-Bounteous-blue)](https://www.bounteous.com)
 
 [Documentation](#-documentation) • [Examples](#example-workflows)
 
@@ -27,6 +28,8 @@ Open Agent Builder is a visual workflow builder for creating AI agent pipelines 
 - Automated research and content generation
 - Data transformation and analysis
 - Web automation with human-in-the-loop approvals
+- Ability to add tools and MCP servers to Agents making the flow truely Agentic
+- Choose tool of your choice, LLM of your choice. Mix and Match
 
 > **Note:** This project is actively under development. Some features are still in progress and we welcome contributions and PRs!
 
