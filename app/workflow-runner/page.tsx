@@ -1,5 +1,7 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import WorkflowRunnerUI from "@/components/workflow-runner/WorkflowRunnerUI";
 import { SignedIn, SignedOut, SignInButton } from "@/components/shared/auth-helpers";
 import { UserMenu } from "@/components/shared/UserMenu";
@@ -12,6 +14,27 @@ import { Connector } from "@/components/shared/layout/curvy-rect";
 import { HeaderProvider } from "@/components/layout/header/HeaderContext";
 
 export default function WorkflowRunnerPage() {
+  const searchParams = useSearchParams();
+  const workflowId = searchParams.get('workflowid');
+  const [workflowName, setWorkflowName] = useState<string>('');
+
+  useEffect(() => {
+    async function fetchWorkflowName() {
+      if (!workflowId) return;
+
+      try {
+        const response = await fetch(`/api/workflows/${workflowId}/getWorkflowDetails`);
+        if (response.ok) {
+          const data = await response.json();
+          setWorkflowName(data.name || '');
+        }
+      } catch (error) {
+        console.error('Failed to fetch workflow name:', error);
+      }
+    }
+
+    fetchWorkflowName();
+  }, [workflowId]);
   return (
     <HeaderProvider>
       <div className="min-h-screen bg-background-base">
@@ -36,8 +59,16 @@ export default function WorkflowRunnerPage() {
             {/* The container below ensures perfect alignment with WorkflowRunnerUI panels */}
             <div className="px-16 sm:px-32 lg:px-64 mx-auto w-full flex justify-between items-center h-16">
               {/* LEFT SIDE — Brand */}
-              <div className="flex items-center">
+              <div className="flex items-center gap-12">
                 <HeaderBrandKit />
+                {workflowName && (
+                  <div className="flex items-center">
+                    <span className="text-border-faint mx-8">|</span>
+                    <span className="text-body-large font-semibold text-foreground-base">
+                      {workflowName}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* RIGHT SIDE — Buttons + Profile */}

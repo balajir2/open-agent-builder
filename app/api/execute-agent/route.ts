@@ -2,15 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerAPIKeys } from '@/lib/api/config';
 import { executeAgentNode } from '@/lib/workflow/executors/agent';
 import { WorkflowNode, WorkflowState } from '@/lib/workflow/types';
-import { auth } from '@clerk/nextjs/server';
+import { validateApiKey, createUnauthorizedResponse } from '@/lib/api/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Validate authentication
+    const auth = await validateApiKey(request);
+    if (!auth.authenticated || !auth.userId) {
+      return createUnauthorizedResponse(auth.error || 'Authentication required');
     }
 
     const body = await request.json();
