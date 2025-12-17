@@ -5,6 +5,8 @@ import { useState, useEffect } from "react";
 import { listTemplates } from "@/lib/workflow/templates";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
+import { FileDown } from "lucide-react";
+import { ImportMarkdownButton } from "../workflow-builder/ImportMarkdownButton";
 
 interface Step2PlaceholderProps {
   onReset: () => void;
@@ -96,6 +98,34 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
   }, []);
 
 
+  const handleExportMarkdown = async (e: React.MouseEvent, id: string, title: string) => {
+    e.stopPropagation();
+
+    try {
+      const response = await fetch(`/api/workflows/${id}/export-markdown`);
+
+      if (!response.ok) {
+        throw new Error('Export failed');
+      }
+
+      // Download the markdown file
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${title.replace(/\s+/g, '_')}.md`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success('Workflow exported as Markdown');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export workflow');
+    }
+  };
+
   const handleDelete = async (e: React.MouseEvent, id: string, isTeam: boolean) => {
     e.stopPropagation();
 
@@ -152,18 +182,28 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
             <div className="relative">
               <div className="flex justify-between items-start mb-8">
                 <h3 className="text-label-large text-accent-black font-medium pr-8">{workflow.title}</h3>
-                {/* Only show delete button if user is the owner */}
-                {user?.id === workflow.userId && (
+                <div className="flex items-center gap-2">
+                  {/* Export button */}
                   <button
-                    onClick={(e) => handleDelete(e, workflow.id, isTeam)}
-                    className="text-black-alpha-32 hover:text-red-500 transition-colors p-4 -mr-4 -mt-4 rounded-full hover:bg-red-50"
-                    title="Delete workflow"
+                    onClick={(e) => handleExportMarkdown(e, workflow.id, workflow.title)}
+                    className="text-black-alpha-48 hover:text-heat-100 transition-colors p-4 -mr-2 -mt-4 rounded-full hover:bg-heat-4"
+                    title="Export as Markdown"
                   >
-                    <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
+                    <FileDown className="w-16 h-16" />
                   </button>
-                )}
+                  {/* Only show delete button if user is the owner */}
+                  {user?.id === workflow.userId && (
+                    <button
+                      onClick={(e) => handleDelete(e, workflow.id, isTeam)}
+                      className="text-black-alpha-32 hover:text-red-500 transition-colors p-4 -mr-4 -mt-4 rounded-full hover:bg-red-50"
+                      title="Delete workflow"
+                    >
+                      <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
               </div>
               {workflow.description && (
                 <p className="text-body-small text-black-alpha-48 mb-12 line-clamp-2">{workflow.description}</p>
@@ -249,6 +289,32 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
                 </svg>
               </div>
               <h3 className="text-label-large text-accent-black font-medium">Create Workflow</h3>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Import Workflow Tile - Second */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{
+            duration: 0.5,
+            delay: 0.05,
+            ease: "easeOut"
+          }}
+          className="relative"
+        >
+          <div className="bg-accent-white rounded-12 p-24 border-2 border-dashed border-border-light hover:border-heat-100 transition-all h-full flex items-center justify-center min-h-[160px]">
+            <div className="text-center">
+              <div className="w-48 h-48 rounded-full bg-heat-4 flex items-center justify-center mx-auto mb-12">
+                <svg className="w-24 h-24 text-heat-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+              </div>
+              <ImportMarkdownButton onImportSuccess={(workflowId) => {
+                // Reload workflows and navigate to the imported workflow
+                onLoadWorkflow?.(workflowId);
+              }} />
             </div>
           </div>
         </motion.div>
