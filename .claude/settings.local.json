@@ -65,7 +65,8 @@
       "Bash(timeout:*)",
       "Bash(cmd.exe /c \"taskkill /F /PID 26308\")",
       "Bash(ping:*)",
-      "Bash(cmd.exe /c \"taskkill /F /IM node.exe\")"
+      "Bash(cmd.exe /c \"taskkill /F /IM node.exe\")",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

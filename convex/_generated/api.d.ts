@@ -33,6 +33,7 @@ import type * as userLLMKeysActions from "../userLLMKeysActions.js";
 import type * as userMCPs from "../userMCPs.js";
 import type * as userToolKeys from "../userToolKeys.js";
 import type * as userToolKeysActions from "../userToolKeysActions.js";
+import type * as users from "../users.js";
 import type * as workflows from "../workflows.js";
 
 import type {
@@ -75,6 +76,7 @@ declare const fullApi: ApiFromModules<{
   userMCPs: typeof userMCPs;
   userToolKeys: typeof userToolKeys;
   userToolKeysActions: typeof userToolKeysActions;
+  users: typeof users;
   workflows: typeof workflows;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
