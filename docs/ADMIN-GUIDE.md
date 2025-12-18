@@ -18,8 +18,9 @@
 10. [Backup & Recovery](#backup--recovery)
 11. [Security Best Practices](#security-best-practices)
 12. [Troubleshooting](#troubleshooting)
-13. [Maintenance Tasks](#maintenance-tasks)
-14. [Performance Tuning](#performance-tuning)
+13. [Migrating Workflows Between Environments](#migrating-workflows-between-environments)
+14. [Maintenance Tasks](#maintenance-tasks)
+15. [Performance Tuning](#performance-tuning)
 
 ---
 
@@ -963,6 +964,170 @@ Restart the development server to see detailed execution logs.
 **Community**:
 - GitHub Issues: https://github.com/your-org/open-agent-builder/issues
 - Internal chat/Slack channel
+
+---
+
+## Migrating Workflows Between Environments
+
+Moving workflows from development to production is a common administrative task. Open Agent Builder provides multiple methods to safely migrate workflows.
+
+### Method 1: Automated Migration Script (Recommended)
+
+The fastest way to migrate workflows is using the built-in migration script.
+
+**Step 1: Preview Migration (Dry Run)**
+```bash
+node scripts/migrate-workflows-to-prod.js --dry-run
+```
+
+This will show you:
+- ✅ Which workflows will be migrated
+- ⚠️ Which workflows already exist in production (will be skipped)
+- 📊 Total count and summary
+
+**Step 2: Run Migration**
+```bash
+# Migrate all workflows
+node scripts/migrate-workflows-to-prod.js
+
+# OR migrate a specific workflow
+node scripts/migrate-workflows-to-prod.js --workflow-id=your-workflow-id
+```
+
+**What the script does:**
+- Connects to both dev and prod Convex instances
+- Copies workflow definitions (nodes, edges, metadata)
+- Skips workflows that already exist in production
+- Preserves all configuration and settings
+- Shows detailed progress and summary
+
+### Method 2: Manual Export/Import via UI
+
+For individual workflows or when you need more control:
+
+**On Development Environment:**
+
+1. **Configure `.env.local` for development**:
+   ```bash
+   CONVEX_DEPLOYMENT=dev:disciplined-quail-9
+   NEXT_PUBLIC_CONVEX_URL=https://disciplined-quail-9.convex.cloud
+   NEXT_PUBLIC_CONVEX_UPLOAD_ACTION_URL=https://disciplined-quail-9.convex.site/http/uploadFile
+   ```
+
+2. **Restart server**: `npm run dev`
+
+3. **Export workflows**:
+   - Navigate to http://localhost:3000/?view=workflows
+   - Click on "Import from Markdown" button area
+   - Look for export option or download workflow as `.md` file
+   - Save the file (e.g., `my-workflow.md`)
+
+**On Production Environment:**
+
+1. **Configure `.env.local` for production**:
+   ```bash
+   CONVEX_DEPLOYMENT=prod:sensible-ermine-579
+   NEXT_PUBLIC_CONVEX_URL=https://sensible-ermine-579.convex.cloud
+   NEXT_PUBLIC_CONVEX_UPLOAD_ACTION_URL=https://sensible-ermine-579.convex.site/http/uploadFile
+   ```
+
+2. **Restart server**: `npm run dev`
+
+3. **Import workflow**:
+   - Navigate to http://localhost:3000/?view=workflows
+   - Click "Import from Markdown" button
+   - Upload the `.md` file you exported
+   - Workflow will be created in production
+
+### Method 3: API-Based Migration
+
+For automation or CI/CD pipelines:
+
+**Export from Development:**
+```bash
+# Make sure .env.local points to development
+curl http://localhost:3000/api/workflows/{workflowId}/export-markdown \
+  -o workflow.md
+```
+
+**Import to Production:**
+```bash
+# Switch .env.local to production and restart server
+curl -X POST http://localhost:3000/api/workflows/import-markdown \
+  -F "file=@workflow.md"
+```
+
+### Method 4: Direct Convex Database Operations
+
+For advanced users who need fine-grained control:
+
+```bash
+# Export from development
+npx convex export --table workflows --format json > workflows_dev.json
+
+# Review and edit workflows_dev.json if needed
+# Remove _id and _creationTime fields for new imports
+
+# Import to production
+npx convex import --prod workflows_dev.json
+```
+
+### Best Practices for Migration
+
+1. **Always test in development first**
+   - Create and test workflows in dev
+   - Verify all nodes execute correctly
+   - Check that all tools and API keys are available
+
+2. **Use dry-run before production migration**
+   - Preview what will change
+   - Verify workflow names and IDs
+   - Check for potential conflicts
+
+3. **Version control your workflows**
+   - Export workflows as `.md` files
+   - Commit to git repository
+   - Track changes over time
+
+4. **Verify after migration**
+   - Test workflows in production environment
+   - Confirm all nodes and connections are intact
+   - Run execution tests with sample data
+
+5. **Document custom workflows**
+   - Add descriptions to workflows
+   - Document input requirements
+   - Note any environment-specific configurations
+
+### Troubleshooting Migration Issues
+
+**Issue: "Workflow already exists"**
+- Solution: The workflow ID already exists in production. Either delete the existing workflow or use a different ID.
+
+**Issue: "Missing tools or MCP servers"**
+- Solution: Ensure all tools and MCP servers used in the workflow are configured in production environment.
+
+**Issue: "API keys not working"**
+- Solution: Verify that production environment has the necessary API keys set in Convex:
+  ```bash
+  npx convex env list --prod
+  npx convex env set TOOL_API_KEY "value" --prod
+  ```
+
+**Issue: "Migration script connection errors"**
+- Solution: Check your internet connection and verify Convex deployment URLs are correct in the script.
+
+### Rollback Procedures
+
+If you need to rollback a migration:
+
+1. **Identify the problematic workflow**
+2. **Delete from production**:
+   - Use Convex dashboard → workflows table → delete record
+   - Or use API to delete the workflow
+3. **Re-import previous version**:
+   - Use the backed-up `.md` file
+   - Import via UI or API
 
 ---
 

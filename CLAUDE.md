@@ -223,14 +223,23 @@ open-agent-builder/
 1. **Azure AD (Microsoft Entra ID)** handles user authentication via NextAuth.js
 2. **middleware.ts** protects routes and validates sessions
 3. **auth.ts** configures Microsoft provider with tenant-specific authentication
-4. **Convex** receives authenticated requests with `userId` from session
-5. **API Routes** can use API key authentication for programmatic access
+4. **Automatic Token Refresh** - Tokens refresh automatically before expiration
+5. **Convex** receives authenticated requests with `userId` from session
+6. **API Routes** can use API key authentication for programmatic access
+
+**Session Management:**
+- **Token Lifetime**: Azure AD tokens expire after 1 hour
+- **Auto-Refresh**: Tokens automatically refresh using refresh tokens
+- **Session Duration**: Sessions remain active for up to 24 hours
+- **Long-Running Workflows**: Token refresh prevents logout during execution
+- **Offline Access**: `offline_access` scope enables refresh token support
 
 **Important:**
 - User-facing routes require Azure AD authentication
 - `/api/workflows/{id}/execute*` routes support both session and API key auth
 - MCP server configurations are user-scoped
 - Sessions are encrypted using `AUTH_SECRET` environment variable
+- Users must sign out/in once after token refresh implementation to get refresh tokens
 
 ### UI Builder Architecture
 
@@ -338,6 +347,37 @@ return new Response(stream, {
 - `workflow_completed` - Workflow finishes
 - `error` - Fatal error
 
+### Document Upload and Processing
+
+The system supports uploading and extracting content from PDF, Word (DOCX), and Markdown files:
+
+**Upload Flow:**
+1. User uploads document via Start node's document input variable
+2. File stored in Convex storage, returns `storageId`
+3. During execution, `prefetchFileContents()` extracts text from document
+4. Extracted content injected into workflow state as `content` and `text` properties
+5. Variable substitution uses extracted content instead of metadata
+
+**Supported Formats:**
+- **PDF** - Text extraction via pdf-parse
+- **DOCX** - Text extraction via mammoth
+- **Markdown** - Direct text content
+
+**Usage in Workflows:**
+```typescript
+// In agent instructions, reference document input variables
+{{input.RFP_Document}}  // Correct - uses extracted content
+{{lastOutput}}          // Incorrect if lastOutput is just metadata
+
+// The system automatically extracts and injects content
+// File object: { storageId, originalFilename, content, text }
+```
+
+**Key Files:**
+- `lib/workflow/file-utils.ts` - Document extraction logic
+- `lib/workflow/variable-substitution.ts` - Content substitution
+- `convex/http/uploadFile.ts` - File upload endpoint
+
 ### Edge Validation and Auto-Save
 
 The system automatically validates and cleans up invalid workflow connections:
@@ -348,7 +388,7 @@ import { cleanupInvalidEdges } from '@/lib/workflow/edge-cleanup';
 const { edges: validEdges, removedCount } = cleanupInvalidEdges(nodes, edges);
 ```
 
-Workflows auto-save after 500ms debounce using `useWorkflow` hook.
+Workflows auto-save after 1 second debounce using `useWorkflow` hook.
 
 ### MCP (Model Context Protocol) Integration
 
@@ -374,9 +414,17 @@ The Gamma AI node enables generation of professional presentations, documents, a
 **Key Features:**
 - **Output Formats**: Presentations, documents, webpages
 - **Variable Integration**: Full support for `{{variableName}}` syntax
-- **Configurable Parameters**: Format, text mode, card count, text amount, image source, language
-- **Real-time Generation**: Automatic polling with 1-minute wait + 30-second intervals
-- **URL Output**: Shareable Gamma.app links stored in `lastOutput`
+- **Configurable Parameters**: Format, text mode, card count, text amount, image source, language, export format
+- **Export Options**: Web-only (Gamma.app link), PPTX (PowerPoint), or PDF download
+- **Automatic Export Waiting**: When PPTX/PDF export is requested, automatically waits up to 60 seconds for download URL
+- **Real-time Generation**: Automatic polling with 1-minute initial wait + 10-second intervals
+- **URL Output**: Shareable Gamma.app links or downloadable files stored in `lastOutput`
+
+**Important Notes:**
+- PPTX/PDF exports require a **paid Gamma plan** (Pro, Ultra, Team, or Business)
+- Export URLs may take 10-60 seconds to become ready after generation completes
+- Download URLs expire after a period of time - use them promptly if needed
+- Falls back to web URL if export URL isn't ready within 60 seconds
 
 **Configuration:**
 ```typescript
@@ -388,7 +436,8 @@ The Gamma AI node enables generation of professional presentations, documents, a
   numCards: 10,                    // Number of slides/sections
   textAmount: 'brief' | 'medium' | 'detailed',
   imageSource: 'aiGenerated' | 'search' | 'none',
-  language: 'en'                   // ISO 639-1 code
+  language: 'en',                  // ISO 639-1 code
+  exportAs: 'web' | 'pptx' | 'pdf' // Export format (default: 'web')
 }
 ```
 
@@ -406,13 +455,23 @@ npx convex env set GAMMA_API_KEY "sk-gamma_..."
 - **LangGraph Integration**: Case handler in `lib/workflow/langgraph.ts`
 
 **Output:**
-The Gamma node returns a `__variableUpdates` object that updates `lastOutput` with the generated URL. This enables downstream nodes to reference the presentation:
+The Gamma node returns a `__variableUpdates` object that updates `lastOutput` with the generated URL or download link. This enables downstream nodes to reference the presentation:
 ```typescript
+// For web-only (exportAs: 'web' or not specified)
 {
   success: true,
   generationId: 'abc123',
   url: 'https://gamma.app/docs/[id]',
   __variableUpdates: { lastOutput: 'https://gamma.app/docs/[id]' }
+}
+
+// For PPTX/PDF export (exportAs: 'pptx' or 'pdf')
+{
+  success: true,
+  generationId: 'abc123',
+  url: 'https://gamma.app/docs/[id]',          // Web preview
+  downloadUrl: 'https://gamma.app/download/[id]', // Download link
+  __variableUpdates: { lastOutput: 'https://gamma.app/download/[id]' }
 }
 ```
 

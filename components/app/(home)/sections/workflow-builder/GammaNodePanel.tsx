@@ -28,6 +28,7 @@ export default function GammaNodePanel({
     const [textAmount, setTextAmount] = useState(nodeData?.textAmount || 'medium');
     const [imageSource, setImageSource] = useState(nodeData?.imageSource || 'aiGenerated');
     const [language, setLanguage] = useState(nodeData?.language || 'en');
+    const [exportAs, setExportAs] = useState(nodeData?.exportAs || 'web');
     const [showAdvanced, setShowAdvanced] = useState(false);
     const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -36,6 +37,8 @@ export default function GammaNodePanel({
         if (updateTimeoutRef.current) {
             clearTimeout(updateTimeoutRef.current);
         }
+
+        if (!node) return;
 
         updateTimeoutRef.current = setTimeout(() => {
             onUpdate(node.id, {
@@ -46,6 +49,7 @@ export default function GammaNodePanel({
                 textAmount,
                 imageSource,
                 language,
+                exportAs,
                 nodeType: 'gamma-ai',
             });
         }, 300);
@@ -55,7 +59,7 @@ export default function GammaNodePanel({
                 clearTimeout(updateTimeoutRef.current);
             }
         };
-    }, [prompt, format, textMode, numCards, textAmount, imageSource, language, node.id, onUpdate]);
+    }, [prompt, format, textMode, numCards, textAmount, imageSource, language, exportAs, node?.id, onUpdate]);
 
     return (
         <AnimatePresence>
@@ -157,6 +161,25 @@ export default function GammaNodePanel({
                                 <option value="condense">Condense - Summarize input text</option>
                                 <option value="preserve">Preserve - Keep exact text</option>
                             </select>
+                        </div>
+
+                        {/* Export Format */}
+                        <div>
+                            <label className="block text-label-small text-black-alpha-48 mb-8">
+                                Export Format
+                            </label>
+                            <select
+                                value={exportAs}
+                                onChange={(e) => setExportAs(e.target.value)}
+                                className="w-full px-12 py-10 bg-background-base border border-border-faint rounded-8 text-body-medium text-accent-black focus:outline-none focus:border-heat-100 transition-colors"
+                            >
+                                <option value="web">Web Only (Gamma.app link)</option>
+                                <option value="pptx">Export as PPTX (PowerPoint)</option>
+                                <option value="pdf">Export as PDF</option>
+                            </select>
+                            <p className="text-body-small text-black-alpha-32 mt-6">
+                                Choose whether to generate a web presentation or export as PPTX/PDF file
+                            </p>
                         </div>
 
                         {/* Advanced Options Toggle */}

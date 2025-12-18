@@ -36,8 +36,12 @@ export async function executeGammaNode(
         if (data.language) {
             requestBody.textOptions = { ...requestBody.textOptions, language: data.language };
         }
+        // Add export format (pptx, pdf, or web)
+        if (data.exportAs && data.exportAs !== 'web') {
+            requestBody.exportAs = data.exportAs;
+        }
 
-        console.log('[GammaNode] Generating with format:', requestBody.format, 'cards:', requestBody.numCards || 10);
+        console.log('[GammaNode] Generating with format:', requestBody.format, 'cards:', requestBody.numCards || 10, requestBody.exportAs ? `exportAs: ${requestBody.exportAs}` : '');
 
         // Step 1: Create generation
         const createResponse = await fetch(
@@ -95,18 +99,66 @@ export async function executeGammaNode(
 
             const status = await statusResponse.json();
 
-            // Extract URL including gammaUrl
+            // Extract URLs including download URL for PPTX/PDF exports
             const url = status.gammaUrl || status.url || status.webUrl;
+            const downloadUrl = status.downloadUrl;
 
             if (status.state === 'completed' || status.status === 'completed') {
-                console.log('[GammaNode] Generation completed!');
+                console.log('[GammaNode] Generation completed!', downloadUrl ? `(download URL: ${downloadUrl})` : '');
+
+                // If exportAs is specified but downloadUrl is not yet available, wait for it
+                if (data.exportAs && data.exportAs !== 'web' && !downloadUrl) {
+                    console.log(`[GammaNode] Waiting for ${data.exportAs.toUpperCase()} export to be ready...`);
+
+                    // Wait up to 60 seconds for export URL (check every 5 seconds)
+                    const exportMaxWait = 60 * 1000;
+                    const exportPollInterval = 5 * 1000;
+                    const exportStartTime = Date.now();
+
+                    while (Date.now() - exportStartTime < exportMaxWait) {
+                        await new Promise(resolve => setTimeout(resolve, exportPollInterval));
+
+                        const exportCheckResponse = await fetch(
+                            `https://public-api.gamma.app/v0.2/generations/${generationId}`,
+                            {
+                                headers: {
+                                    'X-API-KEY': apiKey,
+                                },
+                            }
+                        );
+
+                        if (exportCheckResponse.ok) {
+                            const exportStatus = await exportCheckResponse.json();
+                            const exportDownloadUrl = exportStatus.downloadUrl;
+
+                            if (exportDownloadUrl) {
+                                console.log('[GammaNode] Export ready:', exportDownloadUrl);
+                                return {
+                                    success: true,
+                                    generationId,
+                                    url: url,
+                                    downloadUrl: exportDownloadUrl,
+                                    data: exportStatus,
+                                    __variableUpdates: { lastOutput: exportDownloadUrl },
+                                };
+                            }
+                        }
+                    }
+
+                    console.warn('[GammaNode] Export URL not ready after 60s, returning web URL');
+                }
+
+                // For PPTX/PDF exports, prioritize download URL
+                const outputUrl = downloadUrl || url;
+
                 return {
                     success: true,
                     generationId,
                     url: url,
+                    downloadUrl: downloadUrl,
                     data: status,
-                    // Update lastOutput variable
-                    __variableUpdates: { lastOutput: url },
+                    // Update lastOutput variable with download URL for exports, or web URL
+                    __variableUpdates: { lastOutput: outputUrl },
                 };
             }
 
@@ -132,24 +184,30 @@ export async function executeGammaNode(
         );
 
         let finalUrl = null;
+        let finalDownloadUrl = null;
         let finalState = 'processing';
         let finalData = {};
 
         if (finalStatusResponse.ok) {
             const finalStatus = await finalStatusResponse.json();
             finalUrl = finalStatus.gammaUrl || finalStatus.url || finalStatus.webUrl;
+            finalDownloadUrl = finalStatus.downloadUrl;
             finalState = finalStatus.state || finalStatus.status;
             finalData = finalStatus;
         }
+
+        // Prioritize download URL for exports
+        const outputUrl = finalDownloadUrl || finalUrl;
 
         return {
             success: true, // Return success so workflow continues
             generationId,
             url: finalUrl,
+            downloadUrl: finalDownloadUrl,
             state: finalState,
             data: finalData,
             message: 'Generation processing (timeout reached)',
-            __variableUpdates: { lastOutput: finalUrl },
+            __variableUpdates: { lastOutput: outputUrl },
         };
 
     } catch (error) {

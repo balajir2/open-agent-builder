@@ -18,10 +18,11 @@
 8. [Control Flow (Loops & Conditions)](#control-flow-loops--conditions)
 9. [Human Approval Workflows](#human-approval-workflows)
 10. [UI Builder](#ui-builder)
-11. [Templates & Examples](#templates--examples)
-12. [Best Practices](#best-practices)
-13. [Troubleshooting](#troubleshooting)
-14. [FAQ](#faq)
+11. [Sharing & Exporting Workflows](#sharing--exporting-workflows)
+12. [Templates & Examples](#templates--examples)
+13. [Best Practices](#best-practices)
+14. [Troubleshooting](#troubleshooting)
+15. [FAQ](#faq)
 
 ---
 
@@ -805,6 +806,126 @@ UI Builder lets you create a **polished form interface** for running workflows. 
 |  +------------------------------------+  |
 +------------------------------------------+
 ```
+
+---
+
+## Sharing & Exporting Workflows
+
+Share your workflows with teammates or move them between environments.
+
+### Exporting a Workflow
+
+Save any workflow as a markdown file for backup, sharing, or version control.
+
+**Steps to Export:**
+
+1. Open the workflow you want to export
+2. Click the **Export** button in the toolbar (or use the menu)
+3. The workflow is downloaded as a `.md` file
+4. The file contains:
+   - Workflow metadata (name, description)
+   - All node configurations
+   - Edge connections
+   - Variable definitions
+
+**What's Included:**
+- ✅ All nodes and their settings
+- ✅ Connection logic between nodes
+- ✅ Input/output variable mappings
+- ✅ Agent prompts and configurations
+- ✅ HTTP request settings
+- ✅ Conditional logic rules
+- ❌ Execution history (not included)
+- ❌ API keys (security - must be set separately)
+
+### Importing a Workflow
+
+Load a workflow from a markdown file shared by a teammate or exported previously.
+
+**Steps to Import:**
+
+1. Go to the **Workflows** page
+2. Click **Import Workflow** button
+3. Select the `.md` file from your computer
+4. The workflow appears in your workflows list
+5. Open it to review and test
+
+**After Importing:**
+- Check all node configurations
+- Set required API keys (if using custom keys)
+- Test the workflow with sample data
+- Publish when ready
+
+### Sharing with Your Team
+
+**Method 1: Export/Import (Recommended)**
+1. Export the workflow as `.md` file
+2. Share the file via email, Slack, or shared drive
+3. Teammate imports the file into their account
+4. Each person maintains their own copy
+
+**Method 2: Team Workflows Feature**
+- Some workflows may be marked as "Team Workflows"
+- These are visible to all authenticated users in your organization
+- Check with your admin about team workflow access
+
+### Version Control Best Practices
+
+Treat workflow files like code for better collaboration:
+
+**Recommended Workflow:**
+```
+1. Export workflow regularly (after major changes)
+2. Save files with version numbers
+   Example: "company-research-v1.md"
+            "company-research-v2.md"
+3. Store in version control (Git) if possible
+4. Document changes in commit messages
+5. Test before sharing with team
+```
+
+**File Naming Convention:**
+```
+[workflow-name]-[version]-[date].md
+
+Examples:
+- stock-analysis-v1-2024-12-18.md
+- rfp-processor-v2-2024-12-18.md
+- competitor-research-beta-2024-12-18.md
+```
+
+### Migrating Between Environments
+
+If your organization has separate development and production environments, you can move workflows between them.
+
+**For Regular Users:**
+1. Export workflow from development environment
+2. Sign in to production environment
+3. Import the workflow file
+4. Review and test before use
+
+**For Administrators:**
+Your system administrator has additional migration tools available. See the Admin Guide for automated migration scripts and bulk transfer options.
+
+### Troubleshooting Import Issues
+
+**Issue: "Invalid workflow format"**
+- Ensure the file is a valid `.md` export from Open Agent Builder
+- Don't manually edit the file structure
+- Re-export if the file was corrupted
+
+**Issue: "Missing required fields"**
+- The workflow may be from an older version
+- Contact support for migration assistance
+
+**Issue: "Node type not recognized"**
+- Your environment may not have all node types enabled
+- Contact your administrator about enabling missing features
+
+**Issue: Workflow imports but doesn't execute**
+- Check that all required API keys are set (Settings > API Keys)
+- Verify all nodes have valid configurations
+- Look for error messages in the execution panel
 
 ---
 

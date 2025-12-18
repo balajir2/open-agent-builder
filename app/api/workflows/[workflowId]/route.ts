@@ -28,7 +28,8 @@ export async function GET(
     });
 
     // If not found and looks like Convex ID, try direct lookup
-    if (!workflow && workflowId.startsWith('j')) {
+    // Convex IDs can start with various letters (j, k, etc.)
+    if (!workflow && /^[a-z][a-z0-9]+$/.test(workflowId)) {
       try {
         workflow = await convex.query(api.workflows.getWorkflow, {
           id: workflowId as any,

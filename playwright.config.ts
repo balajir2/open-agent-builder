@@ -15,12 +15,7 @@ export default defineConfig({
   use: {
     trace: 'on-first-retry',
   },
-  // Set environment variables for tests
-  env: {
-    NEXT_PUBLIC_CONVEX_URL: 'https://mock-convex-url.convex.cloud',
-    CONVEX_URL: 'https://mock-convex-url.convex.cloud',
-    ...process.env,
-  },
+  // Note: Environment variables should be set in .env.test or via process.env before running tests
   projects: [
     {
       name: 'chromium',

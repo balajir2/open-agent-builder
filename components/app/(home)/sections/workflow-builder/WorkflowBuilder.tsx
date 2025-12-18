@@ -479,6 +479,161 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
     setShowWorkflowMenu(false);
   }, [workflow, nodes, edges, saveWorkflow, setShowShareModal, setShowWorkflowMenu]);
 
+  const handleExportAsJSON = useCallback(() => {
+    if (!workflow) {
+      toast.error('No workflow to export');
+      return;
+    }
+
+    const workflowData = {
+      name: workflow.name,
+      description: workflow.description,
+      nodes: nodes,
+      edges: edges,
+      exportedAt: new Date().toISOString(),
+      version: '1.0',
+    };
+
+    const blob = new Blob([JSON.stringify(workflowData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${workflow.name || 'workflow'}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast.success('Workflow exported as JSON');
+    setShowWorkflowMenu(false);
+  }, [workflow, nodes, edges, setShowWorkflowMenu]);
+
+  const handleExportAsMarkdown = useCallback(() => {
+    if (!workflow) {
+      toast.error('No workflow to export');
+      return;
+    }
+
+    let markdown = `# ${workflow.name || 'Workflow'}\n\n`;
+
+    if (workflow.description) {
+      markdown += `${workflow.description}\n\n`;
+    }
+
+    markdown += `**Exported:** ${new Date().toLocaleString()}\n\n`;
+    markdown += `---\n\n`;
+    markdown += `## Workflow Structure\n\n`;
+    markdown += `- **Nodes:** ${nodes.length}\n`;
+    markdown += `- **Connections:** ${edges.length}\n\n`;
+
+    markdown += `### Nodes\n\n`;
+    nodes.forEach(node => {
+      const data = node.data as any;
+      markdown += `#### ${data.nodeName || data.nodeType || 'Node'} (${node.id})\n`;
+      markdown += `- **Type:** ${data.nodeType || 'unknown'}\n`;
+      markdown += `- **Position:** (${Math.round(node.position.x)}, ${Math.round(node.position.y)})\n`;
+      if (data.prompt) {
+        markdown += `- **Prompt:** ${data.prompt.substring(0, 100)}${data.prompt.length > 100 ? '...' : ''}\n`;
+      }
+      markdown += `\n`;
+    });
+
+    markdown += `### Connections\n\n`;
+    edges.forEach(edge => {
+      const sourceNode = nodes.find(n => n.id === edge.source);
+      const targetNode = nodes.find(n => n.id === edge.target);
+      const sourceName = (sourceNode?.data as any)?.nodeName || edge.source;
+      const targetName = (targetNode?.data as any)?.nodeName || edge.target;
+      markdown += `- ${sourceName} → ${targetName}`;
+      if (edge.label) {
+        markdown += ` (${edge.label})`;
+      }
+      markdown += `\n`;
+    });
+
+    markdown += `\n---\n\n`;
+    markdown += `## JSON Data\n\n`;
+    markdown += `\`\`\`json\n`;
+    markdown += JSON.stringify({ nodes, edges }, null, 2);
+    markdown += `\n\`\`\`\n`;
+
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${workflow.name || 'workflow'}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast.success('Workflow exported as Markdown');
+    setShowWorkflowMenu(false);
+  }, [workflow, nodes, edges, setShowWorkflowMenu]);
+
+  const handleImportJSON = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+
+    input.onchange = async (e: Event) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const importedData = JSON.parse(text);
+
+        // Validate the imported data
+        if (!importedData.nodes || !importedData.edges) {
+          toast.error('Invalid workflow file', {
+            description: 'The file must contain nodes and edges',
+          });
+          return;
+        }
+
+        // Confirm before importing
+        setConfirmDialog({
+          isOpen: true,
+          title: 'Import Workflow',
+          description: `This will replace the current workflow with "${importedData.name || 'Imported Workflow'}". This action cannot be undone.`,
+          variant: 'warning',
+          onConfirm: () => {
+            // Import the nodes and edges
+            setNodes(importedData.nodes);
+            setEdges(importedData.edges);
+
+            // Reset node ID counter based on imported nodes
+            resetNodeIdCounter(importedData.nodes);
+
+            // Update workflow name, description, nodes, and edges
+            // This single save prevents duplicate workflows
+            if (workflow) {
+              saveWorkflow({
+                name: importedData.name || workflow.name,
+                description: importedData.description || workflow.description,
+                nodes: importedData.nodes,
+                edges: importedData.edges,
+              });
+            }
+
+            toast.success('Workflow imported successfully', {
+              description: `Loaded ${importedData.nodes.length} nodes and ${importedData.edges.length} connections`,
+            });
+          },
+        });
+      } catch (error) {
+        console.error('Failed to import workflow:', error);
+        toast.error('Failed to import workflow', {
+          description: error instanceof Error ? error.message : 'Invalid JSON format',
+        });
+      }
+    };
+
+    input.click();
+    setShowWorkflowMenu(false);
+  }, [workflow, saveWorkflow, setNodes, setEdges, setShowWorkflowMenu]);
+
   const handleClearCanvas = useCallback(() => {
     setConfirmDialog({
       isOpen: true,
@@ -1471,9 +1626,27 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
                   setShowSaveAsTemplateModal(true);
                   setShowWorkflowMenu(false);
                 }}
-                className="w-full px-16 py-10 text-left text-body-small hover:bg-black-alpha-4 transition-colors border-b border-border-faint"
+                className="w-full px-16 py-10 text-left text-body-small hover:bg-black-alpha-4 transition-colors"
               >
                 Save as Template
+              </button>
+              <button
+                onClick={handleImportJSON}
+                className="w-full px-16 py-10 text-left text-body-small hover:bg-black-alpha-4 transition-colors"
+              >
+                Import JSON
+              </button>
+              <button
+                onClick={handleExportAsJSON}
+                className="w-full px-16 py-10 text-left text-body-small hover:bg-black-alpha-4 transition-colors"
+              >
+                Export as JSON
+              </button>
+              <button
+                onClick={handleExportAsMarkdown}
+                className="w-full px-16 py-10 text-left text-body-small hover:bg-black-alpha-4 transition-colors border-b border-border-faint"
+              >
+                Export as Markdown
               </button>
               <button
                 onClick={handleClearCanvas}

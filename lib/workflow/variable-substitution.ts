@@ -39,6 +39,8 @@ export function substituteVariables(text: string, state: WorkflowState): string 
           } else if (value.text) {
             return value.text;
           } else {
+            // File object without content - log warning and return metadata
+            console.warn(`[VarSub] ⚠️ File object "${cleanExpr}" (${value.originalFilename || 'unknown'}) has no extracted content. Returning metadata as JSON.`);
             return JSON.stringify(value);
           }
         }

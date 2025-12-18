@@ -41,9 +41,13 @@ export async function POST(request: NextRequest) {
     // Parse markdown to workflow
     const workflow = parseMarkdownToWorkflow(content, auth.userId);
 
+    // Generate a unique customId to prevent duplicate workflows on subsequent saves
+    const customId = `imported_${Date.now()}`;
+
     // Create workflow in database using authenticated Convex client
     const convex = await getAuthenticatedConvexClient();
     const workflowId = await convex.mutation(api.workflows.saveWorkflow, {
+      customId,
       name: workflow.name,
       description: workflow.description,
       nodes: workflow.nodes,
@@ -72,6 +76,74 @@ export async function POST(request: NextRequest) {
  * Note: This is a basic parser. Complex workflows may need manual adjustment.
  */
 function parseMarkdownToWorkflow(markdown: string, userId: string): any {
+  // First, try to extract JSON data from the markdown (new export format)
+  const jsonMatch = markdown.match(/```json\n([\s\S]+?)\n```/);
+
+  if (jsonMatch) {
+    try {
+      const jsonData = JSON.parse(jsonMatch[1]);
+
+      // Extract title and description from markdown
+      let name = 'Imported Workflow';
+      const titleMatch = markdown.match(/^#\s+(.+)$/m);
+      if (titleMatch) {
+        name = titleMatch[1].trim();
+      }
+
+      let description = '';
+      const descMatch = markdown.match(/^#\s+.+\n\n([\s\S]+?)\n\n\*\*Exported:/);
+      if (descMatch) {
+        description = descMatch[1].trim();
+      }
+
+      // Clean up nodes - remove React label objects and unnecessary fields
+      const cleanedNodes = (jsonData.nodes || []).map((node: any) => {
+        const cleanedNode = { ...node };
+
+        // Remove React-specific fields that can't be deserialized properly
+        if (cleanedNode.data) {
+          // Keep the simple string label if it exists, otherwise use nodeName
+          if (typeof cleanedNode.data.label === 'object') {
+            delete cleanedNode.data.label;
+          }
+
+          // Remove execution-specific fields
+          delete cleanedNode.data.executionStatus;
+          delete cleanedNode.data._executionUpdate;
+          delete cleanedNode.data.isRunning;
+
+          // Remove measured/selected fields
+          delete cleanedNode.measured;
+          delete cleanedNode.selected;
+        }
+
+        return cleanedNode;
+      });
+
+      // Clean up edges
+      const cleanedEdges = (jsonData.edges || []).map((edge: any) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        sourceHandle: edge.sourceHandle,
+        targetHandle: edge.targetHandle,
+        type: edge.type,
+        label: edge.label,
+      }));
+
+      return {
+        name,
+        description,
+        nodes: cleanedNodes,
+        edges: cleanedEdges,
+      };
+    } catch (e) {
+      console.error('Failed to parse JSON from markdown:', e);
+      // Fall through to legacy parser
+    }
+  }
+
+  // Legacy markdown parser (for old format)
   const lines = markdown.split('\n');
 
   // Extract title (first # heading)
@@ -99,12 +171,14 @@ function parseMarkdownToWorkflow(markdown: string, userId: string): any {
     position: { x: 250, y: 100 },
     data: {
       label: 'Start',
+      nodeName: 'Start',
+      nodeType: 'start',
       inputVariables: {},
     },
   });
 
-  // Parse nodes section
-  const nodesSection = markdown.match(/## Nodes\n\n([\s\S]+?)(?=\n## |---\n\n## Connections|$)/);
+  // Parse nodes section - handle both single and double newlines
+  const nodesSection = markdown.match(/## Nodes\n+?([\s\S]+?)(?=\n---\n|## Connections|$)/);
 
   if (nodesSection) {
     const nodeBlocks = nodesSection[1].split(/\n### \d+\. /);
@@ -119,6 +193,9 @@ function parseMarkdownToWorkflow(markdown: string, userId: string): any {
       const label = nodeMatch[1].trim();
       const type = nodeMatch[2].trim();
 
+      // Skip start and end nodes as we add them separately
+      if (type === 'start' || type === 'end') return;
+
       const nodeId = `node_${index + 1}`;
 
       // Create node based on type
@@ -128,21 +205,31 @@ function parseMarkdownToWorkflow(markdown: string, userId: string): any {
         position: { x: 250, y: 100 + (index + 1) * 150 },
         data: {
           label,
+          nodeName: label,
+          nodeType: type,
         },
       };
 
       // Extract type-specific data
       if (type === 'agent') {
         const modelMatch = block.match(/\*\*Model\*\*:\s*(.+)/);
-        const instructionsMatch = block.match(/\*\*Instructions\*\*:\s*(.+)/);
+        // Match multi-line instructions until next --- or next section
+        const instructionsMatch = block.match(/\*\*Instructions\*\*:\s*([\s\S]+?)(?=\n\n---|$)/);
         const toolsMatch = block.match(/\*\*Tools\*\*:\s*(.+)/);
 
         if (modelMatch) node.data.model = modelMatch[1].trim();
-        if (instructionsMatch) node.data.instructions = instructionsMatch[1].trim();
+        if (instructionsMatch) {
+          // Clean up the instructions text
+          const instructions = instructionsMatch[1]
+            .trim()
+            .replace(/\n+/g, '\n') // Normalize newlines
+            .replace(/\n---\n.*$/s, ''); // Remove trailing section markers
+          node.data.prompt = instructions;
+        }
         if (toolsMatch) node.data.tools = toolsMatch[1].split(',').map((t: string) => t.trim());
       } else if (type === 'extract') {
         const modelMatch = block.match(/\*\*Model\*\*:\s*(.+)/);
-        const promptMatch = block.match(/\*\*Prompt\*\*:\s*(.+)/);
+        const promptMatch = block.match(/\*\*Prompt\*\*:\s*([\s\S]+?)(?=\n\n---|$)/);
 
         if (modelMatch) node.data.model = modelMatch[1].trim();
         if (promptMatch) node.data.prompt = promptMatch[1].trim();
@@ -181,6 +268,8 @@ function parseMarkdownToWorkflow(markdown: string, userId: string): any {
     position: { x: 250, y: 100 + nodes.length * 150 },
     data: {
       label: 'End',
+      nodeName: 'End',
+      nodeType: 'end',
     },
   });
 
@@ -197,9 +286,17 @@ function parseMarkdownToWorkflow(markdown: string, userId: string): any {
         const toLabel = parts[1];
         const edgeLabel = parts[2] || '';
 
-        // Find node IDs by label
-        const fromNode = nodes.find(n => n.data.label === fromLabel);
-        const toNode = nodes.find(n => n.data.label === toLabel);
+        // Find node IDs by label or nodeName
+        const fromNode = nodes.find(n =>
+          n.data.label === fromLabel ||
+          n.data.nodeName === fromLabel ||
+          n.type === fromLabel.toLowerCase()
+        );
+        const toNode = nodes.find(n =>
+          n.data.label === toLabel ||
+          n.data.nodeName === toLabel ||
+          n.type === toLabel.toLowerCase()
+        );
 
         if (fromNode && toNode) {
           edges.push({

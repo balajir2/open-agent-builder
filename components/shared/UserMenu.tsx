@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, LogOut, User } from "lucide-react";
+import { ChevronDown, LogOut, User, Server } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useEffect } from "react";
@@ -38,6 +38,18 @@ export function UserMenu() {
         .join('')
         .toUpperCase()
         .slice(0, 2) || 'U';
+
+    // Determine environment based on Convex URL
+    const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL || '';
+    const isProduction = convexUrl.includes('sensible-ermine-579');
+    const isDevelopment = convexUrl.includes('disciplined-quail-9');
+
+    const environment = isProduction ? 'Production' : isDevelopment ? 'Development' : 'Unknown';
+    const environmentColor = isProduction
+        ? 'bg-red-100 text-red-700 border-red-200'
+        : isDevelopment
+        ? 'bg-blue-100 text-blue-700 border-blue-200'
+        : 'bg-gray-100 text-gray-700 border-gray-200';
 
     return (
         <DropdownMenu>
@@ -79,6 +91,10 @@ export function UserMenu() {
                             <p className="text-xs leading-none text-gray-500 truncate">
                                 {session.user.email}
                             </p>
+                            <div className={`inline-flex items-center gap-1.5 px-2 py-1 mt-2 rounded-md text-xs font-medium border ${environmentColor}`}>
+                                <Server className="h-3 w-3" />
+                                <span>{environment}</span>
+                            </div>
                         </div>
                     </div>
                 </DropdownMenuLabel>

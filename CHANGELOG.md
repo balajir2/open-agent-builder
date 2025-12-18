@@ -7,6 +7,106 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Gamma AI PPTX/PDF Export** - Gamma node now supports exporting presentations as PPTX or PDF files
+  - Added `exportAs` parameter with options: 'web' (default), 'pptx', 'pdf'
+  - Export URLs automatically stored in `lastOutput` variable for downstream nodes
+  - Updated UI panel with export format selector
+  - Download URLs returned in node output for PPTX/PDF exports
+
+- **Automatic Token Refresh** - Azure AD tokens now refresh automatically before expiration
+  - Implemented `refreshAccessToken()` function for seamless token renewal
+  - Extended session duration from 1 hour to 24 hours
+  - Added `offline_access` scope to Azure AD provider configuration
+  - Prevents auto-logout during long-running workflow executions
+  - Users remain authenticated throughout multi-hour sessions
+
+### Fixed
+- **Auto-Logout During Workflow Execution** ([auth.ts](auth.ts:7-48))
+  - **Problem**: Users were automatically logged out after 1 hour during long-running workflows
+  - **Root Cause**: Azure AD tokens expired after 1 hour without automatic refresh
+  - **Solution**: Implemented automatic token refresh using refresh tokens before expiration
+  - JWT callback now checks token expiration and refreshes proactively
+  - Session callback passes refresh errors to client for graceful handling
+  - **Fix Applied**: Added missing `scope` parameter to refresh token request (fixes AADSTS9002313 error)
+
+- **Workflow Name Reset Issue** ([WorkflowNameEditor.tsx](components/app/(home)/sections/workflow-builder/WorkflowNameEditor.tsx:21))
+  - **Problem**: Newly created workflow names were being overwritten back to "New Workflow"
+  - **Root Cause**: `useEffect` dependency `[workflow]` triggered on ANY workflow property change
+  - **Solution**: Changed dependency to `[workflow?.name]` to only trigger on name changes
+  - Prevents name reset when nodes, edges, or other properties update
+
+- **Duplicate Workflows on Markdown Import** ([import-markdown/route.ts](app/api/workflows/import-markdown/route.ts:45))
+  - **Problem**: Importing markdown files created duplicate workflows
+  - **Root Cause**: Imported workflows lacked `customId`, causing auto-save to create new workflow
+  - **Solution**: Generate unique `customId` during import: `imported_${Date.now()}`
+  - Prevents duplicate creation on subsequent saves
+
+- **Document Content Not Available to Agents** ([variable-substitution.ts](lib/workflow/variable-substitution.ts:36-44))
+  - **Problem**: Agents received file metadata instead of extracted document text
+  - **Root Cause**: Variable references pointed to wrong state variables (e.g., `lastOutput` instead of `input.RFP_Document`)
+  - **Solution**: Enhanced logging and documentation for proper variable reference patterns
+  - Variable substitution now prioritizes `content` and `text` properties over metadata
+
+### Changed
+- **Session Management Configuration** ([auth.ts](auth.ts:67-70))
+  - Session strategy set to `jwt` with 24-hour max age
+  - Access tokens, refresh tokens, and expiration times now tracked in JWT
+  - Session errors propagated to client for better user experience
+
+- **TypeScript Type Definitions** ([types/next-auth.d.ts](types/next-auth.d.ts:16-23))
+  - Extended `JWT` interface with `accessToken`, `refreshToken`, `accessTokenExpires`, `error`
+  - Extended `Session` interface with `accessToken`, `error`
+  - Ensures type safety for new authentication fields
+
+- **Workflow Auto-Save Timing** ([CLAUDE.md](CLAUDE.md:391))
+  - Updated documentation: Auto-save debounce changed from 500ms to 1000ms
+  - Reduces unnecessary saves during rapid workflow editing
+
+- **Documentation Updates** ([CLAUDE.md](CLAUDE.md:221-242))
+  - Added comprehensive "Authentication Flow" section with session management details
+  - Added "Document Upload and Processing" section explaining file extraction
+  - Documented token refresh behavior and offline access requirements
+  - Added variable reference best practices for document inputs
+
+### Technical Details
+
+**Authentication Architecture Changes:**
+```typescript
+// Before: No token refresh
+callbacks: {
+  async jwt({ token, account }) {
+    if (account) token.idToken = account.id_token;
+    return token;
+  }
+}
+
+// After: Automatic refresh
+callbacks: {
+  async jwt({ token, account, user }) {
+    if (account && user) {
+      return { ...token, accessToken, refreshToken, accessTokenExpires };
+    }
+    if (Date.now() < token.accessTokenExpires) return token;
+    return refreshAccessToken(token);  // Auto-refresh!
+  }
+}
+```
+
+**Files Modified:**
+- `auth.ts` - Token refresh implementation (48 lines added)
+- `types/next-auth.d.ts` - Type definitions extended (6 lines added)
+- `lib/workflow/variable-substitution.ts` - File content logging optimized (9 lines changed)
+- `components/app/(home)/sections/workflow-builder/WorkflowNameEditor.tsx` - Dependency fix (1 line changed)
+- `app/api/workflows/import-markdown/route.ts` - CustomId generation (3 lines added)
+- `CLAUDE.md` - Documentation updates (60 lines added)
+- `CHANGELOG.md` - This changelog entry
+
+**Migration Notes:**
+- No breaking changes
+- Existing users will need to sign out and sign back in once to receive refresh tokens
+- After re-login, sessions will automatically refresh for up to 24 hours
+
 ### Changed
 - **BREAKING:** Migrated authentication from Clerk to Azure AD (Microsoft Entra ID)
   - Replaced Clerk authentication with NextAuth.js Microsoft provider

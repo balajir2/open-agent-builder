@@ -32,8 +32,6 @@ const mockWorkflow: Workflow = {
     ],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    userId: "debug-user",
-    isPublished: false
 };
 
 async function testWorkflowExecution() {

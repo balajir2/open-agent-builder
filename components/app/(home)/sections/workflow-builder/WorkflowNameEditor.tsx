@@ -18,7 +18,7 @@ export default function WorkflowNameEditor({ workflow, onUpdate, renameTrigger =
     if (workflow) {
       setName(workflow.name);
     }
-  }, [workflow]);
+  }, [workflow?.name]);
 
   useEffect(() => {
     if (renameTrigger > 0) {
