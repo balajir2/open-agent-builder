@@ -252,7 +252,7 @@ callbacks: {
 - Clerk authentication with JWT integration
 - Convex real-time database
 - Firecrawl integration for web scraping
-- MCP (Model Context Protocol) support for Anthropic Claude
+- MCP (Model Context Protocol) support for all LLM providers
 - User API key management with AES-256-GCM encryption
 - E2B sandboxed code execution for Transform nodes
 - SSRF protection for HTTP nodes

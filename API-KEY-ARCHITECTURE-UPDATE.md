@@ -143,11 +143,13 @@ const apiKeys = {
 
 ### Integrated Services (9 Total)
 
-**LLM Providers (4)**:
+**LLM Providers (4)** - All support Tools + MCP:
 1. Anthropic Claude (Haiku 4.5, Sonnet 4.5, Opus 4.5)
 2. OpenAI (GPT-4o, GPT-4o-mini)
 3. Google Gemini (2.0 Flash Experimental, 2.0 Flash, 2.0 Flash-Lite)
 4. Groq (Llama 3.3 70B, Llama 3.1 8B Instant, GPT OSS 120B/20B)
+
+**Note**: All LLM providers have universal tool support. While Claude is often recommended because Anthropic developed the MCP protocol, the implementation in Open Agent Builder works seamlessly with all four providers.
 
 **Tool Providers (5)**:
 1. Firecrawl - Web scraping

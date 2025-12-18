@@ -139,17 +139,20 @@ Get your E2B key at [e2b.dev](https://e2b.dev)
 While users can add LLM API keys through the UI, you can set a default:
 
 \`\`\`bash
-# Anthropic Claude (Recommended - Native MCP support)
+# All providers support Tools + MCP
+# Choose based on your preference for model quality, speed, and cost
+
+# Anthropic Claude
 ANTHROPIC_API_KEY=sk-ant-...
 
 # OpenAI GPT-4o
 OPENAI_API_KEY=sk-...
 
-# Groq
-GROQ_API_KEY=gsk_...
-
 # Google Gemini
 GOOGLE_API_KEY=AIza...
+
+# Groq
+GROQ_API_KEY=gsk_...
 \`\`\`
 
 ## Running the Application

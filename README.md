@@ -74,10 +74,11 @@
 - **Universal Tool Support** - All LLM providers (Claude, GPT-4, Gemini, Groq) support all tools
 
 ### 🧠 Multi-LLM Support
-- **Anthropic Claude** - Haiku 4.5, Sonnet 4.5, Opus 4.5 (recommended for MCP)
+- **Anthropic Claude** - Haiku 4.5, Sonnet 4.5, Opus 4.5
 - **OpenAI** - GPT-4o, GPT-4o-mini
 - **Google Gemini** - 2.0 Flash Experimental, 2.0 Flash, 2.0 Flash-Lite
 - **Groq** - Llama 3.3 70B, Llama 3.1 8B Instant, GPT OSS 120B/20B
+- **All Providers Support Tools + MCP** - Universal tool support across all LLM providers
 - **Mix and Match** - Use different models for different nodes in the same workflow
 
 ### 🚀 End-User Workflow Execution
@@ -398,12 +399,14 @@ Provides a more customizable execution interface with embedded workflow visualiz
 
 ### Supported LLM Providers
 
-| Provider | Models | MCP Support | Standard Tools | Notes |
-|----------|--------|-------------|----------------|-------|
-| **Anthropic Claude** | 3.5 Haiku, Sonnet 3.5 | ✅ Native | ✅ Yes | Recommended for MCP |
-| **OpenAI** | GPT-4o, GPT-4o Mini | 🔄 In Dev | ✅ Yes | Function calling |
-| **Google Gemini** | 1.5 Pro, 1.5 Flash | 🔄 In Dev | ✅ Yes | Function calling |
-| **Groq** | GPT-OSS-120B | 🔄 In Dev | ✅ Yes | Fast inference |
+| Provider | Models | Tool Support | Notes |
+|----------|--------|-------------|-------|
+| **Anthropic Claude** | Haiku 4.5, Sonnet 4.5, Opus 4.5 | ✅ Tools + MCP | All tools supported |
+| **OpenAI** | GPT-4o, GPT-4o-mini | ✅ Tools + MCP | All tools supported |
+| **Google Gemini** | 2.0 Flash Experimental, 2.0 Flash, 2.0 Flash-Lite | ✅ Tools + MCP | All tools supported |
+| **Groq** | Llama 3.3 70B, Llama 3.1 8B Instant, GPT OSS 120B/20B | ✅ Tools + MCP | All tools supported |
+
+**Universal Tool Support**: All LLM providers support both standard tools and MCP protocol. The tool integration is handled at the LangGraph orchestration layer, making it provider-agnostic.
 
 ### Tool Integration with Agents
 
@@ -493,7 +496,7 @@ Output: "Firecrawl is a web scraping API that converts websites into LLM-ready m
 
 Users can add their own API keys via **Settings → API Keys**:
 
-- **LLM Providers:** Anthropic (Recommended for MCP), OpenAI, Google Gemini, Groq (Required - add at least one)
+- **LLM Providers:** Anthropic, OpenAI, Google Gemini, Groq (all support Tools + MCP)
 - **Firecrawl:** Personal API key (Optional - falls back to environment variable)
 - **Custom MCP Servers:** Authentication tokens
 
@@ -563,10 +566,10 @@ Add custom MCP servers in **Settings → MCP Registry**:
 - `E2B_API_KEY` - Secure sandboxed code execution (REQUIRED for transform nodes)
 
 **Optional (can be added in UI instead):**
-- `ANTHROPIC_API_KEY` - Default Claude provider (Recommended for MCP)
-- `OPENAI_API_KEY` - Default GPT-4o provider (MCP in development)
-- `GOOGLE_API_KEY` - Default Gemini provider (MCP in development)
-- `GROQ_API_KEY` - Default Groq provider (MCP in development)
+- `ANTHROPIC_API_KEY` - Claude provider (all models support Tools + MCP)
+- `OPENAI_API_KEY` - GPT-4o provider (all models support Tools + MCP)
+- `GOOGLE_API_KEY` - Gemini provider (all models support Tools + MCP)
+- `GROQ_API_KEY` - Groq provider (all models support Tools + MCP)
 - `ALLOWED_HTTP_DOMAINS` - Whitelist for HTTP node requests (security)
 
 ---
@@ -789,8 +792,10 @@ flowchart TD
 - **Custom Node Types** - Plugin system for community nodes
 
 ### Coming Soon
-- Full MCP support for all LLM providers
 - OAuth authentication for MCP servers
+- Parallel tool execution for agents
+- Workflow versioning and rollback
+- Custom plugin system for community nodes
 
 We welcome contributions and PRs to help build these features!
 

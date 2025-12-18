@@ -14,12 +14,13 @@ import { Workflow } from '../../types';
  * - FIRECRAWL_API_KEY environment variable
  * - AI provider with MCP/function calling support
  *
- * MCP TOOL SUPPORT BY PROVIDER:
- * - Anthropic (Claude): ✅ Native MCP support via beta API
- * - OpenAI (GPT-4o): ✅ Function calling support (converted from MCP)
- * - Groq (gpt-oss-20b/120b): ✅ Native MCP via Responses API
+ * MCP & TOOL SUPPORT:
+ * - Anthropic (Claude): ✅ Tools + MCP
+ * - OpenAI (GPT-4o): ✅ Tools + MCP
+ * - Google Gemini: ✅ Tools + MCP
+ * - Groq: ✅ Tools + MCP
  *
- * All three providers support MCP tools! Choose based on speed, cost, and model preference.
+ * All LLM providers support both standard tools and MCP protocol! Choose based on speed, cost, and model preference.
  */
 export const agentWithFirecrawl: Workflow = {
   id: 'example-02-agent-with-firecrawl',
