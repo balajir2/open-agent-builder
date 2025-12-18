@@ -99,16 +99,29 @@ Click on your profile (top-right) to:
 
 ### Setting Up Your API Keys (Optional)
 
-Your team admin may have already configured system-wide keys. To use your own:
+✅ **No API keys required!** Your administrator has configured system-wide keys that work for all users automatically.
+
+🔧 **Want to use your own keys?** You can optionally add your own API keys:
 
 1. Click **Settings** in the top navigation
 2. Go to the **API Keys** section
 3. Add keys for the services you want to use:
    - **Anthropic** - For Claude AI models
    - **OpenAI** - For GPT-4 models
+   - **Google Gemini** - For Gemini models
+   - **Groq** - For fast inference
    - **Firecrawl** - For web scraping
+   - **E2B** - For code execution
+   - **Tavily** - For web search
+   - **Arcade** - For browser automation
+   - **Gamma AI** - For presentation generation
 
-> **Note:** Personal keys take priority over system keys, letting you use your own quotas.
+**Benefits of adding your own keys:**
+- Use your own API quotas instead of shared system quotas
+- Track your individual API usage
+- Use specific accounts or organizations
+
+> **Note:** Personal keys take priority over system keys when provided. You can remove your keys anytime to fall back to system keys.
 
 ---
 
@@ -1035,7 +1048,7 @@ End (output: structured report)
 - Common causes:
   - Invalid URL format
   - Missing required variables
-  - API key not configured
+  - System or personal API key not configured (rare - contact admin if this occurs)
   - Timeout exceeded
 
 #### Variables Not Working
@@ -1045,10 +1058,10 @@ End (output: structured report)
 - Check node order (can't use future results)
 
 #### Agent Returns Empty Response
-- Verify API key is configured
-- Check instructions are clear
+- Check instructions are clear and specific
 - Ensure tools are enabled if needed
 - Try increasing max tokens
+- If issue persists, contact admin to verify system API keys are configured
 
 #### Loop Never Ends
 - Check condition logic
@@ -1074,7 +1087,7 @@ End (output: structured report)
 A: No! Everything is visual drag-and-drop. Transform nodes use JavaScript, but you can skip them or use templates.
 
 **Q: How much does it cost to run workflows?**
-A: Costs depend on AI model and complexity. Haiku is cheapest (~$0.001 per run), Opus is most expensive (~$0.05+ per run). Your admin may provide shared API keys.
+A: Costs depend on AI model and complexity. Haiku is cheapest (~$0.001 per run), Opus is most expensive (~$0.05+ per run). Your admin provides shared system API keys, so costs are typically covered centrally. If you add your own API keys, you'll be billed directly by the provider.
 
 **Q: Can I share workflows with my team?**
 A: Yes, through templates or by granting access to specific workflows.

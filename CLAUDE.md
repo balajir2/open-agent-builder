@@ -37,7 +37,18 @@ const apiKey = systemKeys.anthropic;
 
 ## Overview
 
-Open Agent Builder is a visual workflow builder for creating AI agent pipelines powered by Firecrawl. It uses Next.js 16, React 19, LangGraph for workflow orchestration, Convex for real-time database, and Azure AD (Microsoft Entra ID) for authentication. The project includes both a visual workflow builder and a UI Builder for creating custom interfaces.
+**Open Agent Builder** is an enterprise-grade visual workflow platform for building, deploying, and managing sophisticated AI agent workflows. Originally inspired by Firecrawl's workflow concepts, this project has evolved into a comprehensive agent orchestration platform featuring:
+
+- **Multi-Tool Integration**: 6 integrated tools (Firecrawl, Tavily, Serper, E2B, Arcade, Gamma AI)
+- **Multi-LLM Support**: Claude, GPT-4, Gemini, and Groq (all models support tools + MCP)
+- **Enterprise Features**: Azure AD SSO, automatic token refresh, encrypted API keys, OWASP Top 10 compliance
+- **Production Infrastructure**: Next.js 16, React 19, LangGraph orchestration, Convex real-time database
+- **Visual Builder**: 15 node types, drag-and-drop interface, real-time SSE execution streaming
+- **Extensible Architecture**: MCP protocol support, two-tier API key system, custom tool integration
+
+This project is actively maintained and production-ready, with comprehensive documentation, security features, and enterprise-grade scalability.
+
+**Attribution**: Originally inspired by **[Firecrawl](https://firecrawl.dev)** | Developed & maintained by **[Bounteous](https://www.bounteous.com)**
 
 ## Essential Commands
 
@@ -477,6 +488,458 @@ The Gamma node returns a `__variableUpdates` object that updates `lastOutput` wi
 
 For detailed implementation docs, see [docs/GAMMA-NODE-IMPLEMENTATION.md](docs/GAMMA-NODE-IMPLEMENTATION.md).
 
+## Agent Tools Integration
+
+The Open Agent Builder includes built-in integrations for powerful external tools that agents can use during workflow execution. These tools are automatically available to agent nodes and can be configured via the two-tier API key system.
+
+### Available Tools
+
+#### 1. Firecrawl - Web Scraping & Crawling
+
+**Purpose**: Extract structured data from websites, crawl pages, scrape content, and convert web pages to clean markdown.
+
+**Capabilities**:
+- **Scrape URL** - Extract clean markdown content from a single URL
+- **Crawl Website** - Recursively crawl a website following links
+- **Map Website** - Get sitemap of all accessible URLs
+- **Extract Structured Data** - Use AI to extract specific data fields from web pages
+
+**API Key Setup**:
+```bash
+# System-level key (fallback for all users)
+npx convex env set FIRECRAWL_API_KEY "fc-..."
+
+# Users can add their own keys via Settings > API Keys
+```
+
+**Usage in Agents**:
+Agents can reference Firecrawl tools automatically when configured with tool access. The tools are available via the MCP protocol and can be invoked by LLMs during reasoning.
+
+**Example Workflow**:
+```
+Start Node → Agent (with Firecrawl tools) → Extract Node → End
+```
+
+The agent can scrape URLs provided in workflow input and extract specific information based on instructions.
+
+**Key Files**:
+- `lib/workflow/executors/mcp.ts` - MCP tool execution handler
+- `convex/mcpServers.ts` - Firecrawl MCP server registry
+
+**Available Firecrawl Tools**:
+- `firecrawl_scrape` - Scrape single URL
+- `firecrawl_crawl` - Crawl entire website
+- `firecrawl_map` - Generate sitemap
+- `firecrawl_extract` - AI-powered extraction
+
+---
+
+#### 2. Tavily - AI-Powered Web Search
+
+**Purpose**: Perform intelligent web searches optimized for AI agents with real-time results and source citations.
+
+**Capabilities**:
+- Real-time web search with AI optimization
+- Source citation and credibility scoring
+- Content extraction from search results
+- Domain filtering and advanced search parameters
+
+**API Key Setup**:
+```bash
+# System-level key (fallback for all users)
+npx convex env set TAVILY_API_KEY "tvly-..."
+
+# Users can add their own keys via Settings > API Keys
+```
+
+**Usage in Agents**:
+Agents can use Tavily for research tasks, fact-checking, and gathering current information from the web.
+
+**Example Workflow**:
+```
+Start Node → Agent (research query) → Tavily Search → Agent (analyze results) → End
+```
+
+**Key Features**:
+- Optimized for LLM consumption (clean, structured results)
+- Real-time web data (not limited by training cutoff)
+- Source URLs included for verification
+- Supports search depth control (basic, advanced)
+
+**Integration**:
+- Available as tool in agent nodes via MCP protocol
+- Results automatically formatted for LLM processing
+- Supports variable substitution in search queries
+
+---
+
+#### 3. Serper - Google Search API
+
+**Purpose**: Access Google Search results programmatically with support for web, news, images, and places.
+
+**Capabilities**:
+- Google web search results
+- News search
+- Image search
+- Google Places search
+- Shopping results
+- Domain-specific search
+
+**API Key Setup**:
+```bash
+# System-level key (fallback for all users)
+npx convex env set SERPER_API_KEY "..."
+
+# Users can add their own keys via Settings > API Keys
+```
+
+**Usage in Agents**:
+Provides Google-quality search results to agents for information retrieval tasks.
+
+**Example Workflow**:
+```
+Start Node → Agent (search query) → Serper Search → Agent (summarize) → End
+```
+
+**Key Features**:
+- Google Search quality with API access
+- Rich result types (organic, knowledge graph, featured snippets)
+- Location-based search support
+- Rate limits: Based on your Serper plan
+
+**Integration**:
+- Available as HTTP tool to agents
+- Returns structured JSON results
+- Supports pagination and result count limits
+
+---
+
+#### 4. E2B Code Interpreter - Sandboxed Code Execution
+
+**Purpose**: Execute Python and JavaScript code in secure, isolated cloud sandboxes.
+
+**Capabilities**:
+- Run Python/JavaScript code safely
+- Install packages dynamically (pip, npm)
+- File system access within sandbox
+- Network access for API calls
+- Stateful execution environments
+
+**API Key Setup**:
+```bash
+# System-level key (fallback for all users)
+npx convex env set E2B_API_KEY "e2b_..."
+
+# Users can add their own keys via Settings > API Keys
+```
+
+**Usage in Workflows**:
+E2B powers the **Transform Node** for data manipulation and custom processing logic.
+
+**Transform Node**:
+```typescript
+// Transform node executes JavaScript in E2B sandbox
+{
+  type: 'transform',
+  data: {
+    code: `
+      // Access workflow variables
+      const data = variables.lastOutput;
+
+      // Transform data
+      const processed = data.map(item => ({
+        name: item.title,
+        value: item.price * 1.1
+      }));
+
+      return processed;
+    `
+  }
+}
+```
+
+**Security**:
+- Isolated execution environment per sandbox
+- No access to host system
+- Resource limits (CPU, memory, timeout)
+- Safe for user-provided code
+
+**Key Files**:
+- `lib/workflow/executors/data.ts` - Transform node executor using E2B
+- `lib/workflow/executors/tool-factory.ts` - E2B tool integration
+
+**Important Notes**:
+- Each execution creates a new sandbox instance
+- Sandboxes auto-terminate after 5 minutes of inactivity
+- Supports common libraries (pandas, requests, etc.)
+
+---
+
+#### 5. Arcade - Browser Automation
+
+**Purpose**: Automate browser interactions, fill forms, click buttons, and extract data from dynamic web applications.
+
+**Capabilities**:
+- Browser automation (clicks, typing, navigation)
+- Form filling and submission
+- Screenshot capture
+- JavaScript execution in browser context
+- Handle dynamic content and SPAs
+
+**API Key Setup**:
+```bash
+# System-level key (fallback for all users)
+npx convex env set ARCADE_API_KEY "arcade_..."
+
+# Users can add their own keys via Settings > API Keys
+```
+
+**Usage in Workflows**:
+Arcade powers the **Arcade Node** for browser-based automation tasks.
+
+**Arcade Node Configuration**:
+```typescript
+{
+  type: 'arcade',
+  data: {
+    toolId: 'tool_abc123',  // Arcade tool ID
+    parameters: {
+      url: '{{input.targetUrl}}',
+      action: 'fill-form',
+      fields: {
+        email: '{{input.email}}',
+        password: '{{input.password}}'
+      }
+    }
+  }
+}
+```
+
+**Use Cases**:
+- Automate login flows
+- Fill and submit forms programmatically
+- Extract data from JavaScript-heavy sites
+- Interact with web applications that require user actions
+
+**Key Files**:
+- `lib/workflow/executors/arcade.ts` - Arcade node executor
+- `components/app/(home)/sections/workflow-builder/ArcadeNodePanel.tsx` - UI panel
+
+**Integration**:
+- Available as dedicated node type
+- Supports Arcade API tool definitions
+- Results passed to downstream nodes via `lastOutput`
+
+---
+
+#### 6. Gamma AI - Presentation Generation
+
+**Purpose**: Generate professional presentations, documents, and webpages using AI.
+
+**Capabilities**:
+- AI-powered presentation generation
+- Document creation (reports, proposals)
+- Webpage generation
+- PPTX/PDF export (requires paid plan)
+- Customizable themes and layouts
+
+**API Key Setup**:
+```bash
+# System-level key (fallback for all users)
+npx convex env set GAMMA_API_KEY "sk-gamma_..."
+
+# Users can add their own keys via Settings > API Keys
+```
+
+**Usage in Workflows**:
+Gamma AI powers the **Gamma AI Node** for automated content generation.
+
+**Configuration Options**:
+- **Format**: Presentation, Document, Webpage
+- **Text Mode**: Generate (AI-written) or Paste (use provided content)
+- **Card Count**: Number of slides/sections (1-25)
+- **Text Amount**: Brief, Medium, Detailed
+- **Image Source**: AI Generated, Search, None
+- **Language**: Any ISO 639-1 language code
+- **Export Format**: Web (Gamma.app link), PPTX, PDF
+
+**Example Workflow**:
+```
+Start Node → Agent (gather data) → Gamma AI (generate presentation) → End
+```
+
+The Gamma node receives data from previous nodes and generates a presentation, returning a shareable URL or download link in `lastOutput`.
+
+**Key Files**:
+- `lib/workflow/executors/gamma.ts` - Gamma node executor
+- `components/app/(home)/sections/workflow-builder/GammaNodePanel.tsx` - UI panel
+
+**Output**:
+- Web URL: Shareable Gamma.app link
+- Download URL: PPTX/PDF file (when export format specified)
+- Both URLs accessible via `url` and `downloadUrl` properties
+- `lastOutput` variable contains the primary output URL
+
+See [Gamma AI Integration](#gamma-ai-integration) section above for detailed documentation.
+
+---
+
+### How Agents Access Tools
+
+**Automatic Tool Access**:
+When you add tools to an agent node, the agent automatically receives:
+1. **Tool Definitions** - Function signatures with parameter descriptions
+2. **Invocation Rights** - Permission to call tools during execution
+3. **Result Handling** - Tool outputs integrated into agent context
+
+**Tool Selection in Agent Node**:
+```typescript
+// In Agent Node configuration
+{
+  type: 'agent',
+  data: {
+    provider: 'anthropic',
+    model: 'claude-sonnet-4',
+    instructions: 'Research the company and summarize key facts',
+    tools: ['firecrawl', 'tavily', 'serper'],  // Select tools
+    mcpTools: ['firecrawl_scrape', 'firecrawl_map']  // MCP-specific tools
+  }
+}
+```
+
+**Execution Flow**:
+1. Agent receives instructions and tool definitions
+2. LLM decides which tools to use based on task
+3. Tools execute with provided parameters
+4. Results returned to agent for processing
+5. Agent continues reasoning with tool outputs
+
+**Tool Results in State**:
+Tool outputs are automatically added to workflow state and accessible via:
+- `{{lastOutput}}` - Most recent node output
+- `{{toolResults.toolName}}` - Specific tool result
+- Agent context - Results available for LLM reasoning
+
+---
+
+### API Key Management
+
+**Two-Tier System**:
+All tools support the two-tier API key architecture:
+
+1. **System Keys** (Convex Environment)
+   - Fallback for all users
+   - Set via `npx convex env set TOOL_API_KEY "..."`
+   - Available immediately without user configuration
+
+2. **User Keys** (Convex Database)
+   - User-specific keys override system keys
+   - Set via Settings > API Keys UI
+   - Encrypted with AES-256-GCM
+
+**Key Retrieval in Code**:
+```typescript
+// From app/api/workflows/[workflowId]/execute-stream/route.ts
+const apiKeys = {
+  firecrawl: (await getLLMApiKey('firecrawl', userId)) ?? systemKeys.firecrawl,
+  tavily: (await getLLMApiKey('tavily', userId)) ?? systemKeys.tavily,
+  serper: (await getLLMApiKey('serper', userId)) ?? systemKeys.serper,
+  e2b: (await getLLMApiKey('e2b', userId)) ?? systemKeys.e2b,
+  arcade: (await getLLMApiKey('arcade', userId)) ?? systemKeys.arcade,
+  gamma: (await getLLMApiKey('gamma', userId)) ?? systemKeys.gamma,
+};
+```
+
+**User Settings UI**:
+Users can manage their API keys at `/settings`:
+- Add new keys
+- Update existing keys
+- Delete keys to fall back to system defaults
+- Keys encrypted before storage
+
+---
+
+### Tool Debugging and Logging
+
+**Execution Logs**:
+All tool invocations are logged for debugging:
+
+```typescript
+console.log('[MCPNode] Executing tool:', toolName);
+console.log('[MCPNode] Tool parameters:', parameters);
+console.log('[MCPNode] Tool result:', result);
+```
+
+**Error Handling**:
+Tools include comprehensive error handling:
+- API errors logged with status codes
+- Timeout errors caught and reported
+- Invalid parameters validated before execution
+- Results normalized to consistent format
+
+**Monitoring**:
+Enable LangSmith tracing to monitor tool usage:
+```bash
+npx convex env set LANGCHAIN_TRACING_V2 "true"
+npx convex env set LANGCHAIN_API_KEY "lsv2_pt_..."
+```
+
+View tool calls, parameters, and results in LangSmith dashboard.
+
+---
+
+### Adding New Tools
+
+To add a new tool integration:
+
+1. **Add API Key Support**:
+   - Add key name to `convex/systemApiKeys.ts`
+   - Add to Settings UI for user-level keys
+
+2. **Create Tool Executor**:
+   - Add executor in `lib/workflow/executors/your-tool.ts`
+   - Implement error handling and result normalization
+
+3. **Register Tool**:
+   - Add to `lib/tools/registry.ts` (if using tool factory)
+   - Add to MCP registry in `convex/mcpServers.ts` (if MCP-compatible)
+
+4. **Create UI Panel**:
+   - Add configuration panel in `components/app/(home)/sections/workflow-builder/`
+   - Add tool selection option in agent node
+
+5. **Update Documentation**:
+   - Add tool to this section
+   - Document API key setup and usage examples
+
+For complete details, see [Adding New Tools](#adding-new-tools) section.
+
+---
+
+### Tool Limitations and Best Practices
+
+**Rate Limits**:
+- Firecrawl: 500 requests/month (free), unlimited (paid)
+- Tavily: 1000 searches/month (free)
+- Serper: Based on your plan
+- E2B: 100 sandbox hours/month (free)
+- Arcade: Based on your plan
+- Gamma: API calls vary by plan
+
+**Best Practices**:
+1. **Cache Results** - Avoid redundant tool calls by storing results in state
+2. **Error Handling** - Always handle tool failures gracefully
+3. **Rate Limiting** - Implement retry logic with exponential backoff
+4. **Cost Awareness** - Monitor API usage to control costs
+5. **Security** - Never expose API keys in client-side code
+6. **Testing** - Test tool integrations with various inputs before production
+
+**Performance Tips**:
+- Use parallel tool calls when possible (not implemented yet - future enhancement)
+- Limit tool outputs to necessary data only
+- Implement timeouts for long-running tools
+- Use streaming for large data transfers
+
 ## Security
 
 ### Security Architecture
@@ -560,17 +1023,24 @@ cat docs/SECURITY-FIXES-REPORT.md
 
 This project uses a **two-tier API key system** that provides both convenience and flexibility:
 
-**Tier 1: System-Level Keys (Convex Environment)**
+**Tier 1: System-Level Keys (Convex Environment) - Administrator Setup**
 - Stored in Convex environment variables
-- Available to ALL users as fallback
-- Set via: `npx convex env set KEY_NAME value`
-- Used when user hasn't provided their own key
+- **Available to ALL users automatically** - no individual setup required
+- Set once by administrator via: `npx convex env set KEY_NAME value`
+- Works across all deployment environments (dev, staging, production)
+- Users can start using workflows immediately after login
 
-**Tier 2: User-Specific Keys (Convex Database)**
+**Tier 2: User-Specific Keys (Convex Database) - Optional Override**
 - Stored encrypted in Convex database
-- User-provided keys via Settings UI
-- Takes precedence over system keys
-- Optional - users can rely on system keys
+- User-provided keys via Settings → API Keys UI
+- Takes precedence over system keys when provided
+- **Completely optional** - users can rely on system keys indefinitely
+- Useful for power users who want to use their own quotas or specific accounts
+
+**User Experience:**
+- ✅ **End Users**: No API keys required - application works out-of-the-box
+- 🔧 **Power Users**: Can optionally add their own keys to override system defaults
+- 👨‍💼 **Administrators**: Configure system keys once, all users benefit
 
 ### Environment Variables
 

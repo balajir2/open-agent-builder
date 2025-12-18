@@ -340,28 +340,33 @@ For Vercel deployment, set environment variables in the Vercel dashboard:
 
 ### Two-Tier API Key System
 
-Open Agent Builder uses a two-tier API key system:
+Open Agent Builder uses a two-tier API key system that provides convenience for end users while offering flexibility for power users:
 
-1. **System Keys** (Convex environment) - Fallback for all users
-2. **User Keys** (Convex database) - User-specific, optional
+1. **Tier 1: System Keys** (Convex environment) - Administrator configures once, available to ALL users automatically
+2. **Tier 2: User Keys** (Convex database) - Optional user-provided keys that override system defaults
 
-### 1. System-Level API Keys
+**Key Benefit**: End users can start using the application immediately without procuring any API keys. The administrator configures system-level keys once, and all users benefit.
 
-Store in Convex environment (recommended approach):
+### 1. System-Level API Keys (Required Administrator Setup)
+
+**These keys enable ALL users to use the application without individual setup.**
+
+Store in Convex environment:
 
 **Development**:
 ```bash
-# LLM Providers (optional but recommended)
+# LLM Providers (REQUIRED - at least one)
 npx convex env set ANTHROPIC_API_KEY "sk-ant-api03-xxx"
 npx convex env set OPENAI_API_KEY "sk-xxx"
 npx convex env set GROQ_API_KEY "gsk_xxx"
 npx convex env set GOOGLE_API_KEY "AIzaSyxxx"
 
-# Tools & Services (optional but recommended)
-npx convex env set FIRECRAWL_API_KEY "fc-xxx"
-npx convex env set E2B_API_KEY "e2b_xxx"
-npx convex env set TAVILY_API_KEY "tvly-xxx"
-npx convex env set ARCADE_API_KEY "arcade_xxx"
+# Tools & Services (REQUIRED for corresponding workflows)
+npx convex env set FIRECRAWL_API_KEY "fc-xxx"      # Web scraping
+npx convex env set E2B_API_KEY "e2b_xxx"           # Code execution (Transform nodes)
+npx convex env set TAVILY_API_KEY "tvly-xxx"       # Web search
+npx convex env set ARCADE_API_KEY "arcade_xxx"     # Browser automation
+npx convex env set GAMMA_API_KEY "sk-gamma_xxx"    # Presentation generation
 ```
 
 **Production**:
@@ -390,15 +395,26 @@ npx convex env unset KEY_NAME
 npx convex env unset --prod KEY_NAME
 ```
 
-### 2. User-Specific API Keys
+### 2. User-Specific API Keys (Optional User Override)
 
-Users can add their own API keys via the Settings page in the application. These are:
-- Stored encrypted in Convex database (`userLLMKeys` table)
-- AES-256-GCM encryption
-- Take precedence over system keys
+**Important**: User keys are **completely optional**. Users can use the application indefinitely with system keys alone.
+
+**When users might add their own keys:**
+- Want to use their own API quotas instead of shared system quotas
+- Need to use a specific account or organization
+- Want to track their individual API usage
+- Testing or development purposes
+
+**How it works:**
+- Users navigate to Settings → API Keys in the application
+- Add their own keys for specific providers
+- These keys are stored encrypted in Convex database (`userLLMKeys` table) with AES-256-GCM encryption
+- User keys take precedence over system keys when provided
 - User-scoped (only accessible to the owner)
 
 **As an admin, you cannot directly access user keys** (they're encrypted). Users manage their own keys through the UI.
+
+**User Experience**: The Settings page clearly indicates that adding keys is optional, and the system keys are available as fallback.
 
 ### 3. API Key Security Best Practices
 

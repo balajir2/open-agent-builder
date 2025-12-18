@@ -279,11 +279,38 @@ AUTH_SECRET=...
 | `app/api/workflows/import-markdown/route.ts` | +1 | CustomId generation |
 | `components/.../GammaNodePanel.tsx` | +19 | PPTX/PDF export UI |
 | `lib/workflow/executors/gamma.ts` | +58 | Export parameter + auto-wait logic |
-| `CLAUDE.md` | +90 | Documentation updates |
+| `CLAUDE.md` | +540 | Documentation updates (Gamma + Agent Tools) |
 | `CHANGELOG.md` | +99 | Changelog entries |
 | `SESSION-FIXES-SUMMARY.md` | +60 | This summary document |
 
-**Total**: 10 files, ~391 lines changed
+**Total**: 10 files, ~841 lines changed
+
+### Documentation Additions
+
+**Agent Tools Integration Section** (+450 lines):
+Comprehensive documentation for all integrated tools:
+1. **Firecrawl** - Web scraping & crawling (scrape, crawl, map, extract)
+2. **Tavily** - AI-powered web search with source citations
+3. **Serper** - Google Search API integration
+4. **E2B Code Interpreter** - Sandboxed Python/JavaScript execution
+5. **Arcade** - Browser automation and form filling
+6. **Gamma AI** - Presentation/document generation
+
+Each tool includes:
+- Purpose and capabilities
+- API key setup (system + user-level)
+- Usage examples in workflows
+- Configuration options
+- Key files and implementation details
+- Rate limits and best practices
+
+Additional documentation:
+- How agents access tools (automatic tool definitions)
+- Tool selection in agent nodes
+- API key management (two-tier system)
+- Tool debugging and logging
+- Adding new tools (5-step process)
+- Tool limitations and best practices
 
 ## Production Readiness
 

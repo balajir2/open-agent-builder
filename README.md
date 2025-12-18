@@ -1,4 +1,4 @@
-# Open Agent Workflow Builder
+# Open Agent Builder
 
 <p align="center">
   <img src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExcGNoY25xY2ptZTZtcDN6czBmdXJ2dnpkdWVjcXlqNXNhdjgyZXpkaiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/tWtopK29eXAbvaDpi5/giphy.gif" alt="Demo" width="100%" />
@@ -6,13 +6,13 @@
 
 <div align="center">
 
-**Build, test, and deploy AI agent workflows with a visual no-code interface**
+**Enterprise-Grade Visual AI Agent Platform with Multi-Tool Integration**
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
-[![Firecrawl](https://img.shields.io/badge/Powered%20by-Firecrawl-orange)](https://firecrawl.dev)
-[![Bounteous](https://img.shields.io/badge/Enhanced%20by-Bounteous-blue)](https://www.bounteous.com)
+[![Built with Next.js](https://img.shields.io/badge/Built%20with-Next.js%2016-black)](https://nextjs.org/)
+[![Powered by LangGraph](https://img.shields.io/badge/Powered%20by-LangGraph-blue)](https://github.com/langchain-ai/langgraph)
 
-[Documentation](#-documentation) • [Examples](#example-workflows)
+[Documentation](#-documentation) • [Examples](#example-workflows) • [Architecture](#architecture)
 
 </div>
 
@@ -20,81 +20,164 @@
 
 ## What is Open Agent Builder?
 
-Open Agent Builder is a visual workflow builder for creating AI agent pipelines powered by [Firecrawl](https://firecrawl.dev). Design complex agent workflows with a drag-and-drop interface, then execute them with real-time streaming updates.
+**Open Agent Builder** is an enterprise-grade, visual workflow platform for building, deploying, and managing sophisticated AI agent workflows. Originally inspired by Firecrawl's workflow concepts, this project has evolved into a comprehensive agent orchestration platform with extensive tool integrations, multi-LLM support, and production-ready security features.
+
+### Built for Enterprise & Scale
+
+- **Visual No-Code Interface** - Drag-and-drop workflow builder with 15 node types
+- **Multi-Tool Integration** - 6+ integrated tools (Firecrawl, Tavily, Serper, E2B, Arcade, Gamma AI)
+- **Multi-LLM Support** - Choose from Claude, GPT-4, Gemini, or Groq (all models support tools)
+- **Real-Time Execution** - Server-Sent Events (SSE) streaming with live progress updates
+- **Enterprise Authentication** - Azure AD integration with automatic token refresh
+- **Production Security** - OWASP Top 10 compliance, sandboxed code execution, input validation
 
 **Perfect for:**
-- Web scraping and data extraction workflows
-- Multi-step AI agent pipelines
-- Automated research and content generation
-- Data transformation and analysis
-- Web automation with human-in-the-loop approvals
-- Ability to add tools and MCP servers to Agents making the flow truely Agentic
-- Choose tool of your choice, LLM of your choice. Mix and Match
+- **Enterprise Web Automation** - Complex multi-step scraping and data extraction pipelines
+- **AI Research Assistants** - Multi-tool agent workflows with web search, scraping, and analysis
+- **Content Generation** - Automated document, presentation, and report creation (Gamma AI integration)
+- **Data Processing Pipelines** - Transform, validate, and analyze data with sandboxed code execution
+- **Browser Automation** - Form filling, login flows, and JavaScript-heavy site interactions (Arcade)
+- **Human-in-the-Loop Workflows** - Approval gates for sensitive operations
+- **Custom Tool Integration** - Extensible MCP protocol support for any external service
 
-> **Note:** This project is actively under development. Some features are still in progress and we welcome contributions and PRs!
+### Key Differentiators
+
+✨ **Multi-Tool Agent Orchestration** - First visual workflow builder with native support for Firecrawl, Tavily, Serper, E2B, Arcade, and Gamma AI
+
+🔐 **Enterprise Security** - Production-ready with Azure AD SSO, encrypted API keys, SSRF protection, and sandboxed code execution
+
+🎯 **True No-Code** - Build sophisticated agent workflows without writing any code, then deploy instantly
+
+📊 **Real-Time Execution** - Watch your workflows execute in real-time with SSE streaming and detailed logging
+
+🔧 **Developer Friendly** - Full API access, TypeScript SDK, comprehensive documentation, and extensible architecture
+
+> **Development Status:** This is an actively maintained production-ready platform. We welcome contributions, feedback, and feature requests!
 
 ---
 
 ## Key Features
 
-### Visual Workflow Builder
-- **Drag-and-drop interface** for building agent workflows
-- **Real-time execution** with streaming updates
-- **10 core node types**: Start, Agent, MCP Tools, Transform, Extract, HTTP, If/Else, While Loop, User Approval, End
-- **Template library** with pre-built workflows
-- **MCP protocol support** for extensible tool integration
-- **Custom tool integration** - Attach standard and MCP tools to AI agents
-- **Multi-LLM support** - Choose from Claude, GPT-4o, Gemini, or Groq
+### 🎨 Visual Workflow Builder
+- **Drag-and-drop interface** with 15 node types for complex workflows
+- **Real-time execution** with Server-Sent Events (SSE) streaming
+- **15 node types**: Start, Agent, MCP, Extract, HTTP, Transform, If/Else, While, Approval, End, Set-State, Guardrails, Arcade, Gamma AI, Note
+- **Template library** with pre-built workflows (web scraping, research, price monitoring, etc.)
+- **Variable system** with `{{variableName}}` syntax for dynamic data flow
+- **Auto-save** with 1-second debounce and automatic edge validation
 
-### End-User Workflow Execution
-- **Workflow Runner UI** - Clean, simple interface for executing published workflows
-- **User Workflow Interface** - Allow end users to run workflows without seeing builder complexity
-- **Embedded execution** - Share workflows via direct links
-- **Real-time progress** - Watch workflow execution with live updates
+### 🤖 Multi-Tool Agent Integration
+- **6 Integrated Tools**: Firecrawl (web scraping), Tavily (AI search), Serper (Google API), E2B (code execution), Arcade (browser automation), Gamma AI (presentations)
+- **MCP Protocol Support** - Extensible Model Context Protocol for custom tool integration
+- **Tool Auto-Discovery** - Agents automatically receive tool definitions and invocation rights
+- **Two-Tier API Keys** - System-level fallback keys + user-level encrypted keys
+- **Universal Tool Support** - All LLM providers (Claude, GPT-4, Gemini, Groq) support all tools
 
-### Powered by Firecrawl
-- **Native Firecrawl integration** for web scraping and searching
+### 🧠 Multi-LLM Support
+- **Anthropic Claude** - Haiku 4.5, Sonnet 4.5, Opus 4.5 (recommended for MCP)
+- **OpenAI** - GPT-4o, GPT-4o-mini
+- **Google Gemini** - 2.0 Flash Experimental, 2.0 Flash, 2.0 Flash-Lite
+- **Groq** - Llama 3.3 70B, Llama 3.1 8B Instant, GPT OSS 120B/20B
+- **Mix and Match** - Use different models for different nodes in the same workflow
 
-### Enterprise Features
-- **LangGraph execution engine** for reliable state management
-- **Azure AD authentication** via Microsoft Entra ID for secure enterprise access
-- **Convex database** for persistent storage with real-time sync
-- **API endpoints** for programmatic execution
-- **Human-in-the-loop** approvals for sensitive operations
+### 🚀 End-User Workflow Execution
+- **Workflow Runner UI** - Clean interface for executing published workflows
+- **Direct Links** - Share workflows via URL with embedded execution
+- **Real-time Progress** - Live updates with node-by-node execution tracking
+- **API Access** - Programmatic execution with streaming SSE responses
+- **Human-in-the-Loop** - Approval gates for sensitive operations
+
+### 🔐 Enterprise Security & Authentication
+- **Azure AD Integration** - Microsoft Entra ID with automatic token refresh (24-hour sessions)
+- **OWASP Top 10 Compliance** - Comprehensive protection against web vulnerabilities
+- **Sandboxed Code Execution** - E2B Code Interpreter for secure transform nodes
+- **Input Validation** - Zod schemas with SSRF protection for HTTP nodes
+- **AES-256-GCM Encryption** - User API keys encrypted at rest
+- **Rate Limiting** - Distributed rate limits (10 executions/min per user)
+
+### 📊 Production-Ready Infrastructure
+- **LangGraph Orchestration** - State management, conditional routing, loops, interrupts
+- **Convex Real-Time Database** - Persistent storage with automatic reactivity
+- **Next.js 16 + React 19** - Modern full-stack framework with App Router
+- **TypeScript** - Type-safe development across the entire stack
+- **Vercel Deployment** - One-click deployment with edge functions
 
 ---
 
 ## Tech Stack
 
+### Core Infrastructure
 | Technology | Purpose |
 |-----------|---------|
-| **[Firecrawl](https://firecrawl.dev)** | Web scraping API for converting websites into LLM-ready data |
-| **[Next.js 16 (canary)](https://nextjs.org/)** | React framework with App Router for frontend and API routes |
-| **[TypeScript](https://www.typescriptlang.org/)** | Type-safe development across the stack |
-| **[LangGraph](https://github.com/langchain-ai/langgraph)** | Workflow orchestration engine with state management, conditional routing, and human-in-the-loop support |
-| **[Convex](https://convex.dev)** | Real-time database with automatic reactivity for workflows, executions, and user data |
-| **[Azure AD](https://azure.microsoft.com/en-us/services/active-directory/)** | Enterprise authentication via Microsoft Entra ID with NextAuth.js |
-| **[Tailwind CSS](https://tailwindcss.com/)** | Utility-first CSS framework for responsive UI |
-| **[React Flow](https://reactflow.dev/)** | Visual workflow builder canvas with drag-and-drop nodes |
-| **[Anthropic](https://www.anthropic.com/)** | Claude 3.5 Haiku, Sonnet 3.5, Sonnet 4.5 - All tools & MCP supported |
-| **[OpenAI](https://platform.openai.com/)** | GPT-4o, GPT-4o-mini - All tools & MCP supported |
-| **[Google AI](https://ai.google.dev/)** | Gemini 2.0 Flash Experimental, 2.0 Flash Lite - All tools & MCP supported |
-| **[Groq](https://groq.com/)** | Llama 3.3 70B, Llama 3.1 8B Instant, GPT OSS 120B/20B - All tools & MCP supported |
-| **[E2B](https://e2b.dev)** | Sandboxed code execution for secure transform nodes |
-| **[Vercel](https://vercel.com)** | Deployment platform with edge functions |
+| **[Next.js 16](https://nextjs.org/)** | Full-stack React framework with App Router, API routes, and SSE streaming |
+| **[TypeScript](https://www.typescriptlang.org/)** | Type-safe development across the entire stack |
+| **[LangGraph](https://github.com/langchain-ai/langgraph)** | Workflow orchestration engine with StateGraph, conditional routing, and interrupts |
+| **[Convex](https://convex.dev)** | Real-time database with automatic reactivity and server-side functions |
+| **[Azure AD / Entra ID](https://azure.microsoft.com/en-us/services/active-directory/)** | Enterprise authentication with automatic token refresh via NextAuth.js |
+| **[Vercel](https://vercel.com)** | Production deployment with edge functions and automatic scaling |
+
+### Frontend & UI
+| Technology | Purpose |
+|-----------|---------|
+| **[React 19](https://react.dev/)** | Modern component-based UI with server components |
+| **[Tailwind CSS](https://tailwindcss.com/)** | Utility-first CSS framework for responsive design |
+| **[React Flow](https://reactflow.dev/)** | Visual workflow canvas with drag-and-drop node editing |
+| **[Framer Motion](https://www.framer.com/motion/)** | Animation library for smooth UI transitions |
+
+### LLM Providers (Choose Any)
+| Provider | Models | Tool Support |
+|----------|--------|-------------|
+| **[Anthropic Claude](https://www.anthropic.com/)** | Haiku 4.5, Sonnet 4.5, Opus 4.5 | ✅ Tools + MCP |
+| **[OpenAI](https://platform.openai.com/)** | GPT-4o, GPT-4o-mini | ✅ Tools + MCP |
+| **[Google Gemini](https://ai.google.dev/)** | 2.0 Flash Experimental, 2.0 Flash, 2.0 Flash-Lite | ✅ Tools + MCP |
+| **[Groq](https://groq.com/)** | Llama 3.3 70B, Llama 3.1 8B Instant | ✅ Tools + MCP |
+
+### Integrated Tools
+| Tool | Purpose | Integration |
+|------|---------|-------------|
+| **[Firecrawl](https://firecrawl.dev)** 🔥 | Web scraping and crawling (scrape, crawl, map, extract) | MCP Protocol |
+| **[Tavily](https://tavily.com)** | AI-powered web search with source citations | REST API |
+| **[Serper](https://serper.dev)** | Google Search API (web, news, images, places) | REST API |
+| **[E2B](https://e2b.dev)** | Sandboxed code execution (Python, JavaScript) | SDK |
+| **[Arcade](https://arcade.ai)** | Browser automation and form filling | REST API |
+| **[Gamma AI](https://gamma.app)** | AI-powered presentation and document generation | REST API |
+
+### Origins & Attribution
+
+**Open Agent Builder** was originally inspired by **[Firecrawl](https://firecrawl.dev)**'s workflow concepts and has evolved into a comprehensive enterprise platform through extensive development by the Bounteous team.
+
+**What started as:** A Firecrawl-powered workflow builder
+**Evolved into:** A multi-tool agent orchestration platform with:
+- 6 integrated tools (including Firecrawl as one of many)
+- 4 LLM providers with universal tool support
+- Enterprise authentication and security
+- Production-ready infrastructure
+- Extensible architecture for custom tools
+
+**Credit to Firecrawl:** The initial workflow concept and web scraping integration
+**Built by Bounteous:** All additional features, security, tools, infrastructure, and production hardening
+
+We remain grateful to the Firecrawl team for the original inspiration, and Firecrawl continues to be a powerful tool within our platform.
 
 ---
 
 ## Prerequisites
 
-Before you begin, you'll need:
+**For Administrators (Initial Setup):**
 
 1. **Node.js 18+** installed on your machine
-2. **Firecrawl API key** (Required for web scraping) - [Get one here](https://firecrawl.dev)
-3. **Convex account** - [Sign up free](https://convex.dev)
-4. **Azure AD tenant** - Microsoft 365 or Azure subscription with admin access
+2. **Convex account** - [Sign up free](https://convex.dev)
+3. **Azure AD tenant** - Microsoft 365 or Azure subscription with admin access
+4. **System-Level API Keys** (configured once, works for all users):
+   - Firecrawl API key - [Get one here](https://firecrawl.dev)
+   - At least one LLM provider key (Anthropic Claude, OpenAI, Google Gemini, or Groq)
+   - E2B API key for secure code execution - [Get one here](https://e2b.dev)
 
-> **Note:** LLM API keys can be added directly in the UI via Settings → API Keys after setup. For MCP tool support, Anthropic Claude (3.5 Haiku or Sonnet 3.5) is currently recommended as the default option.
+**For End Users:**
+
+✅ **No API keys required!** The application works out-of-the-box with administrator-configured system keys.
+
+🔧 **Optional:** Users can add their own API keys in Settings → API Keys to override system defaults and use their own quotas.
 
 ---
 
@@ -148,19 +231,43 @@ AUTH_SECRET=$(openssl rand -base64 32)  # Generate a secure secret
 npx convex env set AUTH_MICROSOFT_ID "your-application-client-id"
 ```
 
-### 4. Set Up Firecrawl (Required)
+### 4. Configure System-Level API Keys (Administrator Setup)
 
-**Firecrawl is the core web scraping engine** that powers most workflows.
+**Two-Tier API Key Architecture:**
+- **Tier 1:** System keys (Convex environment) - configured by admin, available to all users
+- **Tier 2:** User keys (optional) - users can add their own keys in Settings UI to override system defaults
 
-1. Get your API key at [firecrawl.dev](https://firecrawl.dev)
-2. Add to `.env.local`:
+**Set up system-level keys in Convex** (these work for all users):
 
 ```bash
-# Firecrawl API (REQUIRED)
-FIRECRAWL_API_KEY=fc-...
+# Required: Web scraping engine
+npx convex env set FIRECRAWL_API_KEY "fc-..."
+
+# Required: At least one LLM provider (choose one or more)
+npx convex env set ANTHROPIC_API_KEY "sk-ant-..."
+npx convex env set OPENAI_API_KEY "sk-..."
+npx convex env set GOOGLE_API_KEY "AIza..."
+npx convex env set GROQ_API_KEY "gsk_..."
+
+# Required: Secure code execution for Transform nodes
+npx convex env set E2B_API_KEY "e2b_..."
+
+# Optional: Additional tool providers
+npx convex env set TAVILY_API_KEY "tvly-..."
+npx convex env set SERPER_API_KEY "..."
+npx convex env set ARCADE_API_KEY "arcade_..."
+npx convex env set GAMMA_API_KEY "sk-gamma_..."
 ```
 
-> **Note:** Users can also add their own Firecrawl keys in Settings → API Keys, but having a default key in `.env.local` enables the template workflows.
+**Get your API keys:**
+- [Firecrawl](https://firecrawl.dev) - Web scraping
+- [Anthropic](https://console.anthropic.com) - Claude models
+- [OpenAI](https://platform.openai.com) - GPT models
+- [Google AI Studio](https://aistudio.google.com) - Gemini models
+- [Groq](https://console.groq.com) - Fast inference
+- [E2B](https://e2b.dev) - Code sandboxing
+
+> **Why Convex?** Storing keys in Convex environment (not `.env.local`) ensures they work across all deployment environments and are available to all users without individual setup.
 
 ### 5. Set Up Security (Required for Production)
 
@@ -170,16 +277,14 @@ FIRECRAWL_API_KEY=fc-...
 # Generate encryption key (32 bytes for AES-256-GCM)
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
-# Add to .env.local
-ENCRYPTION_KEY=<generated-key>
+# Set in Convex environment
+npx convex env set ENCRYPTION_KEY "<generated-key>"
 
-# E2B Sandbox (REQUIRED for Transform nodes)
-E2B_API_KEY=e2b_...
+# Also add to .env.local for local development
+ENCRYPTION_KEY=<generated-key>
 ```
 
-Get your E2B key at [e2b.dev](https://e2b.dev)
-
-> **Security Note:** Transform nodes execute user-provided code and **require** E2B sandbox for security. Without `E2B_API_KEY`, transform nodes will fail with an error message.
+> **Security Note:** The encryption key is used to encrypt user-provided API keys in the database. Users can optionally store their own keys securely via Settings → API Keys.
 
 **Verify security setup:**
 ```bash
@@ -187,28 +292,6 @@ node scripts/verify-security-setup.js
 ```
 
 For complete security documentation, see [SECURITY.md](./SECURITY.md)
-
-### 7. Optional: Configure Default LLM Provider
-
-While users can add their own LLM API keys through the UI (Settings → API Keys), you can optionally set a default provider in `.env.local`:
-
-```bash
-# Optional: Choose one as default
-
-# Anthropic Claude - 3.5 Haiku, Sonnet 3.5, Sonnet 4.5
-ANTHROPIC_API_KEY=sk-ant-...
-
-# OpenAI - GPT-4o, GPT-4o-mini
-OPENAI_API_KEY=sk-...
-
-# Google Gemini - 2.0 Flash Experimental, 2.0 Flash Lite
-GOOGLE_API_KEY=AIza...
-
-# Groq - Llama 3.3 70B, Llama 3.1 8B Instant, GPT OSS 120B/20B
-GROQ_API_KEY=gsk_...
-```
-
-> **Note:** All LLM providers support both standard tools (Firecrawl, Tavily, Serper, E2B) and MCP (Model Context Protocol) for extensible tool integration. Choose any provider based on your preference for model quality, speed, and cost.
 
 ### 8. Optional: HTTP Domain Whitelist
 
@@ -257,20 +340,21 @@ npm start
 ### Your First Workflow
 
 1. **Sign Up/Login** at `http://localhost:3000`
-2. **Add your LLM API key** in Settings → API Keys
-   - For MCP tool support: Use Anthropic Claude (3.5 Haiku or Sonnet 3.5)
-   - For basic workflows: OpenAI, Google Gemini, or Groq also work
-3. **Click "New Workflow"** or select a template
-4. **Try the "Simple Web Scraper" template:**
+2. **Click "New Workflow"** or select a template
+3. **Try the "Simple Web Scraper" template:**
    - Pre-configured to scrape any website
    - Uses Firecrawl for extraction
    - AI agent summarizes the content
-5. **Attach tools to agents** (optional):
+4. **Attach tools to agents** (optional):
    - Select an Agent node
    - Click "Add Tools" in the node panel
    - Choose from Firecrawl MCP tools or standard tools
-6. **Click "Run"** and enter a URL
-7. **Watch real-time execution** with streaming updates
+5. **Click "Run"** and enter a URL
+6. **Watch real-time execution** with streaming updates
+
+> ✅ **No API keys needed!** The application works immediately with administrator-configured system keys.
+>
+> 🔧 **Optional:** Power users can add their own API keys in Settings → API Keys to use their own quotas and override system defaults.
 
 ### End-User Workflow Execution
 
@@ -583,81 +667,53 @@ If you discover a security vulnerability, please report it via GitHub Security A
 
 ## 📚 Documentation
 
-### Quick Navigation
+> **📑 Full Documentation Index**: See **[DOCUMENTATION-INDEX.md](./DOCUMENTATION-INDEX.md)** for complete documentation catalog
+
+### Quick Start
 
 | I want to... | Read this document |
 |--------------|-------------------|
-| **Get started quickly** | This README |
+| **Get started quickly** | This README (you are here) |
 | **Learn how to use the app** | [docs/USER-GUIDE.md](./docs/USER-GUIDE.md) 📖 |
+| **Install and configure** | [docs/ADMIN-GUIDE.md](./docs/ADMIN-GUIDE.md) 🔧 |
 | **Understand the architecture** | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) ⭐ |
-| **Set up and administer the system** | [docs/ADMIN-GUIDE.md](./docs/ADMIN-GUIDE.md) 🔧 |
-| **Understand security features** | [SECURITY.md](./SECURITY.md) |
-| **Develop or contribute** | [CLAUDE.md](./CLAUDE.md) |
-| **Add new tools** | [ADDING-NEW-TOOLS.md](./ADDING-NEW-TOOLS.md) |
-| **Deploy to production** | [docs/ADMIN-GUIDE.md#deployment](./docs/ADMIN-GUIDE.md#deployment) |
-| **Troubleshoot issues** | [docs/USER-GUIDE.md#troubleshooting](./docs/USER-GUIDE.md#troubleshooting) |
+| **Develop or contribute** | [CLAUDE.md](./CLAUDE.md) 💻 |
+| **Deploy to production** | [DEPLOYMENT.md](./DEPLOYMENT.md) 🚀 |
+| **Add new tools** | [ADDING-NEW-TOOLS.md](./ADDING-NEW-TOOLS.md) 🔧 |
+| **Understand security** | [SECURITY.md](./SECURITY.md) 🔐 |
 
 ### Core Documentation
 
-- **[docs/USER-GUIDE.md](./docs/USER-GUIDE.md)** 📖 - End user documentation (500+ lines)
-  - Getting started with the application
-  - Complete guide to all 10 node types
-  - Creating and running workflows
-  - Using templates and sharing workflows
-  - Advanced features (variables, tools, token limits)
-  - Troubleshooting common issues
-  - Best practices and keyboard shortcuts
+**For Users:**
+- **[User Guide](./docs/USER-GUIDE.md)** 📖 - Complete user documentation (500+ lines)
+- **[Workflow Runner](./docs/guides/WORKFLOW-RUNNER-README.md)** - End-user execution interface
 
-- **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** ⭐ - System architecture (1200+ lines)
-  - Complete technology stack overview
-  - Architecture layers and component design
-  - Data flow and execution engine
-  - Authentication & authorization architecture
-  - Database schema and API design
-  - Security architecture and best practices
-  - Deployment architecture and scalability
+**For Administrators:**
+- **[Admin Guide](./docs/ADMIN-GUIDE.md)** 🔧 - Installation, configuration, deployment (900+ lines)
+- **[Deployment Guide](./DEPLOYMENT.md)** 🚀 - Production deployment instructions
+- **[Environment Switching](./ENVIRONMENT-SWITCHING.md)** 🔄 - Switch between dev/prod
 
-- **[docs/ADMIN-GUIDE.md](./docs/ADMIN-GUIDE.md)** 🔧 - System administration (900+ lines)
-  - Installation and initial setup
-  - Azure AD configuration
-  - Convex backend setup
-  - Environment configuration
-  - API key management (two-tier system)
-  - Production deployment guide
-  - Monitoring, logging, and maintenance
-  - Security best practices
-  - Troubleshooting guide
+**For Developers:**
+- **[Developer Guide (CLAUDE.md)](./CLAUDE.md)** 💻 - Development setup and patterns (500+ lines)
+- **[Architecture Guide](./docs/ARCHITECTURE.md)** ⭐ - System architecture deep dive (1200+ lines)
+- **[Adding New Tools](./ADDING-NEW-TOOLS.md)** 🔧 - Tool integration guide
+- **[Contributing Guide](./CONTRIBUTING.md)** 🤝 - How to contribute
 
-- **[CLAUDE.md](./CLAUDE.md)** - Developer guide (500+ lines)
-  - Development setup and commands
-  - Project structure and configuration
-  - Adding new node types
-  - Common development tasks
-
-- **[SECURITY.md](./SECURITY.md)** - Security guide (500+ lines)
-  - All 8 security features explained
-  - Production deployment checklist
-  - Monitoring and incident response
-  - OWASP Top 10 coverage
-
-- **[ADDING-NEW-TOOLS.md](./ADDING-NEW-TOOLS.md)** - Tool development
-  - Step-by-step guide to add tools
-  - Tool architecture explained
-  - Best practices and examples
+**Security & Operations:**
+- **[Security Guide](./SECURITY.md)** 🔐 - Security features and best practices
+- **[Security Audit Report](./docs/SECURITY-FIXES-REPORT.md)** 🛡️ - December 2025 audit results
 
 ### Specialized Guides
 
-Additional guides are available in [docs/guides/](./docs/guides/):
-- **[UI Builder documentation](./docs/guides/)** (4 guides) - Build custom UIs for workflows
-- **[Workflow Runner guide](./docs/guides/WORKFLOW-RUNNER-README.md)** - End-user workflow execution interface
-- **[Vercel deployment guide](./docs/guides/VERCEL_DEPLOYMENT_GUIDE.md)** - Production deployment
+**UI Builder** (4 guides in `docs/guides/`):
+- Complete UI Builder documentation
+- 5-minute quickstart tutorial
+- Architecture diagrams and examples
 
-### Architecture Documentation
-
-Comprehensive architecture docs in [docs/architecture/](./docs/architecture/):
-- **[System Architecture](./docs/architecture/README.md)** - Complete technical overview
-- **[Database Schema](./docs/architecture/database-schema.md)** - Convex schema documentation
-- **[Execution Engine](./docs/architecture/execution-engine.md)** - LangGraph workflow orchestration
+**Additional Resources:**
+- [Vercel Deployment Guide](./docs/guides/VERCEL_DEPLOYMENT_GUIDE.md)
+- [Architecture Documentation](./docs/architecture/) - Database schema, execution engine
+- [Historical Documentation](./docs/archive/) - Archived summaries and logs
 
 ---
 
@@ -740,12 +796,41 @@ We welcome contributions and PRs to help build these features!
 
 ## License
 
-This project is licensed under the MIT License 
+This project is licensed under the MIT License.
+
+---
 
 <div align="center">
 
-**[Star us on GitHub](https://github.com/firecrawl/open-agent-builder)** | **[Try Firecrawl](https://firecrawl.dev)** 
+## 🙏 Acknowledgments
 
-Made with love by the Firecrawl team
+**Originally Inspired by** [Firecrawl](https://firecrawl.dev) 🔥
+**Developed & Maintained by** [Bounteous](https://www.bounteous.com) 💙
+
+---
+
+### Built With
+
+❤️ **Open Source** | 🚀 **Production-Ready** | 🔐 **Enterprise-Grade**
+
+---
+
+**[⭐ Star us on GitHub](#)** | **[📖 Read the Docs](#-documentation)** | **[🚀 Try Firecrawl](https://firecrawl.dev)**
+
+### Contributing
+
+We welcome contributions! This project has grown from a simple workflow builder into a comprehensive agent platform. Whether you're fixing bugs, adding features, or improving documentation, we'd love your help.
+
+**Ways to contribute:**
+- 🐛 Report bugs and issues
+- 💡 Suggest new features or tools
+- 📝 Improve documentation
+- 🔧 Submit pull requests
+- ⭐ Star the repository
+
+---
+
+Built with ❤️ by the **Bounteous** team
+Original workflow concept inspired by **Firecrawl**
 
 </div>
