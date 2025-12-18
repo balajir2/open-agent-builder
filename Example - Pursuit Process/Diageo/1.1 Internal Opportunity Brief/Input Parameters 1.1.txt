@@ -1,0 +1,141 @@
+
+---
+
+## **1. Client Name**
+
+**Diageo**
+
+---
+
+## **2. Engagement Type**
+
+Prospective client — Smart Shelf Phase 1 MVP
+(GenAI-driven Product Description Enrichment App)
+
+---
+
+## **3. Short Description of Ask**
+
+Diageo is seeking a scalable MVP version of “Smart Shelf,” a GenAI application to enrich product descriptions, optimize search rank, reduce non-compliance, and drive productivity across ecommerce retailers (Walmart, Kroger, Amazon, Instacart).
+
+
+
+## **5. Functional Requirements (From RFI)**
+
+### **Product & UX**
+
+* Stand-alone Azure-based app; simple task-based UI.
+* No prompt engineering required.
+* Seasonal/trend supplemental instructions.
+
+### **Data & Integration**
+
+* Full integration with **Stibo MDM** (source of truth).
+* Pull product data → enrich in Smart Shelf → push back to Stibo.
+* Stibo workflows remain unchanged.
+
+### **AI & Content**
+
+* LLM-enriched descriptions optimized for retailer rules (Walmart, Kroger, Amazon).
+* Bulk + individual SKU workflows.
+* Built inside Diageo’s Azure OpenAI Sandbox.
+* Retailer compliance + keyword-enrichment built in.
+
+### **Testing**
+
+* Required in-market test across a limited number of retailers.
+* Must deliver statistically relevant results. 
+
+---
+
+## **6. Assumptions & Constraints (From RFI)**
+
+* MVP scope may change due to budget constraints.
+* Keyword generation limited to modifying approved keywords.
+* Stibo API access assumed.
+* All data must live inside Diageo’s Azure environment.
+* Diageo to procure keyword search-volume tool license (e.g., Keyword Planner). 
+
+---
+
+## **7. Stakeholder List (Synthetic for Step 1 Use)**
+
+1. **Emma Gallagher** — Director, Ecommerce Acceleration (H)
+2. **Michael O’Brien** — Sr Manager, Digital Shelf Optimization (M)
+3. **Priya Nandakumar** — Marketing Operations Lead (M)
+4. **Daniel Rodriguez** — Technical Product Owner, Stibo MDM (M)
+5. **Sarah McLeod** — Legal & Regulatory Manager (L/M)
+6. **Jason Miller** — Retail Media Partner Manager (L)
+
+---
+
+## **8. Meeting Notes (Sales Discovery Style — Synthetic)**
+
+### **Key Themes**
+
+* **Search rank is the #1 KPI** to prove value. (Emma)
+* “We spend too much time reworking product descriptions rejected by retailers.” — *Michael*
+* “Marketers need a tool that simplifies everything. No prompt engineering.” — *Priya*
+* “Integration with Stibo must be clean. No disruptions.” — *Daniel*
+* “AI must not introduce risky claims or break compliance rules.” — *Sarah*
+* “Retailers change requirements frequently; system must adapt.” — *Jason*
+
+### **Decision Dynamics**
+
+* Emma = final decision maker.
+* Michael + Priya = primary users & influencers.
+* Daniel = technical gatekeeper.
+* Sarah = compliance check.
+* Jason = retailer alignment advisor.
+
+### **Buying Signals**
+
+* Positive impression from POC results.
+* Clear mandate to scale if MVP proves impact.
+* Budget concerns may limit scope.
+
+### **Risks Raised**
+
+* Inconclusive POC sales lift → need stronger evidence.
+* Stibo dependency → must avoid workflow breakage.
+* High sensitivity around compliance and brand voice.
+
+---
+
+## **9. Known Competitors**
+
+*Not mentioned in RFI — treat as assumption.*
+Potential competitive categories:
+
+* Content enrichment platforms (Salsify, Akeneo).
+* AI product content startups.
+* Martech agencies with AI capabilities.
+  Mark as **[Assumption]**.
+
+---
+
+## **10. Existing Relationships (From RFI)**
+
+* Diageo partnered with Bounteous for the Smart Shelf POC (FY2024).
+* Credibility established; strong advantage in continuity. 
+
+---
+
+## **11. Off-Deck Ideas (Proactive)**
+
+* Demo multi-SKU enrichment flow.
+* Show retailer compliance rule “diff engine.”
+* Provide draft dashboard for test-measure-learn.
+* Show seasonal/trend-based instruction templates.
+* Offer risk-controlled “compliance guardrail” demo.
+
+---
+
+## **12. Additional Context**
+
+* Entire solution must run in Diageo Azure environment.
+* Strong emphasis on cost reduction + speed + compliance.
+* Big focus on avoiding retailer fines + rework.
+* MVP is a gating step for a larger multi-phase rollout.
+
+---
