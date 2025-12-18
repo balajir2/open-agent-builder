@@ -19,6 +19,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/api/test-mcp-connection") ||
     pathname.startsWith("/api/workflows") || // Allow workflows API - auth handled by getAuthenticatedConvexClient
     pathname.startsWith("/api/team-workflows") || // Allow team workflows API
+    pathname.startsWith("/api/upload") || // Allow file uploads for workflow runner
     pathname.startsWith("/api/auth");
 
   // Define API routes that require API key authentication (bypass auth check here)
@@ -34,7 +35,7 @@ export async function middleware(request: NextRequest) {
 
   // For protected routes, check for session cookie
   const sessionToken = request.cookies.get('authjs.session-token') ||
-                      request.cookies.get('__Secure-authjs.session-token');
+    request.cookies.get('__Secure-authjs.session-token');
 
   if (!sessionToken) {
     // For API routes, return 401 instead of redirecting

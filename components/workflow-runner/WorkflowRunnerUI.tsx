@@ -10,6 +10,7 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 import html2canvas from "html2canvas";
 import DOMPurify from 'dompurify'; // SECURITY FIX: XSS protection
+import { marked } from "marked";
 import {
   Search, X, Save, Check, Download, ChevronDown,
   FileText, FileDown, Loader, CheckCircle,
@@ -18,7 +19,8 @@ import {
 import { getDocumentSaveLocation } from '@/utils/document-export';
 import { FileLocationModal } from '@/components/ui/FileLocationModal';
 import { useRouter, useSearchParams } from "next/navigation";
-import htmlDocx from 'html-docx-js/dist/html-docx';
+import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, BorderStyle, HeadingLevel, AlignmentType } from "docx";
+import { saveAs } from 'file-saver';
 
 // Type definitions for input requirements and validation
 interface InputRequirement {
@@ -350,6 +352,7 @@ export default function WorkflowRunnerUI() {
   const [downloadLocation, setDownloadLocation] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [downloadFileType, setDownloadFileType] = useState("PDF document");
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [inputValidation, setInputValidation] = useState<Record<string, InputValidation>>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -381,7 +384,8 @@ export default function WorkflowRunnerUI() {
 
   // UI config
   const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
-  const ACCEPTED_MIME = "application/pdf";
+  // Allow PDF and DOCX
+  const ACCEPTED_MIME_TYPES = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/markdown", "text/x-markdown"];
 
 
 
@@ -673,9 +677,13 @@ export default function WorkflowRunnerUI() {
     if (!file) return;
 
     // Client-side validation
-    if (ACCEPTED_MIME && file.type !== ACCEPTED_MIME) {
-      setUploadErrors(prev => ({ ...prev, [variableName]: "Only PDF files are accepted" }));
-      return;
+    if (ACCEPTED_MIME_TYPES && !ACCEPTED_MIME_TYPES.includes(file.type)) {
+      // For .md, file.type might be empty or plain text depending on OS/Browser
+      const isMd = file.name.toLowerCase().endsWith('.md');
+      if (!isMd) {
+        setUploadErrors(prev => ({ ...prev, [variableName]: "Only PDF, Word or Markdown documents are accepted" }));
+        return;
+      }
     }
     if (MAX_FILE_SIZE_BYTES && file.size > MAX_FILE_SIZE_BYTES) {
       setUploadErrors(prev => ({ ...prev, [variableName]: `File is too large (max ${formatBytes(MAX_FILE_SIZE_BYTES)})` }));
@@ -987,11 +995,10 @@ export default function WorkflowRunnerUI() {
           .replace(/[\u2022\u2023\u25E6\u2043]/g, '*') // Replace bullets with *
           .replace(/[\u2013\u2014]/g, '-')       // Replace em/en dashes
           .replace(/[\u2026]/g, '...')           // Replace ellipsis
-          .replace(/[^\x00-\x7F]/g, '')          // Remove any non-ASCII characters
-          .replace(/\s+/g, ' ')                  // Normalize whitespace
-          .replace(/\s+\*\s+/g, '\n* ')          // Add line break before each bullet point
-          .replace(/(\*\s+[^:]+:)\s+(\d+\.)/g, '$1\n$2') // Add line break after section headers before numbered lists
-          .replace(/(\d+\.\s+[^:]+:)/g, '\n$1') // Add line break before numbered list items with colons
+          .replace(/[^\x00-\x7F]/g, (char) => {
+            // Keep common symbols if possible, or replace with space to avoid mangling
+            return ' ';
+          })
           .trim();
       };
 
@@ -1151,46 +1158,34 @@ export default function WorkflowRunnerUI() {
 
       // Helper to process text nodes with inline formatting
       const processTextWithFormatting = (el: Element, fontSize = 10) => {
-        const text = cleanText(el.textContent || '');
+        // Use innerText to preserve some formatting like line breaks from <br>
+        const text = cleanText((el as HTMLElement).innerText || el.textContent || '');
         if (!text) return;
 
-        // Set font BEFORE splitTextToSize for accurate measurement
         pdf.setFontSize(fontSize);
         pdf.setFont('helvetica', 'normal');
 
-        // Split by newlines first to handle manual line breaks
         const paragraphs = text.split('\n');
         const lineHeight = fontSize * 0.6;
 
-        console.log(`Processing text (${paragraphs.length} paragraphs):`, text.substring(0, 50));
+        paragraphs.forEach((paragraph) => {
+          if (!paragraph.trim()) {
+            yPosition += 2; // small gap for empty lines
+            return;
+          }
 
-        paragraphs.forEach((paragraph, pIdx) => {
-          if (!paragraph.trim()) return;
-
-          // Use splitTextToSize to ensure proper wrapping within contentWidth
           const lines = pdf.splitTextToSize(paragraph, contentWidth);
 
-          lines.forEach((line: string, idx: number) => {
+          lines.forEach((line: string) => {
             checkPageBreak(lineHeight + 2);
-            // Ensure font is set before rendering (in case checkPageBreak added a page)
             pdf.setFontSize(fontSize);
             pdf.setFont('helvetica', 'normal');
-
-            const textWidth = pdf.getTextWidth(line);
-            console.log(`  Para ${pIdx} Line ${idx}: width=${textWidth.toFixed(2)}mm, contentWidth=${contentWidth}mm`);
-
-            // Render the pre-wrapped line (don't use maxWidth as we already split)
             pdf.text(line, margin, yPosition);
             yPosition += lineHeight;
           });
-
-          // Add extra spacing between paragraphs (after numbered items)
-          if (paragraph.match(/^\d+\./)) {
-            yPosition += 2;
-          }
         });
 
-        yPosition += 4; // Paragraph spacing
+        yPosition += 2; // Small spacing after processed text block
       };
 
       // Process each child element
@@ -1254,13 +1249,18 @@ export default function WorkflowRunnerUI() {
 
           case 'UL':
           case 'OL':
-            const listItems = el.querySelectorAll('li');
+            // Use only direct LI children to prevent double processing in recursive calls
+            const listItems = Array.from(el.children).filter(child => child.tagName === 'LI');
             listItems.forEach((li, index) => {
               pdf.setFontSize(10);
               pdf.setFont('helvetica', 'normal');
               const bullet = tagName === 'UL' ? '•' : `${index + 1}.`;
-              const itemText = cleanText(li.textContent || '');
+
+              // Process LI content - if it has nested paragraphs or lists, we might need more complexity
+              // but for now, innerText handles basic nested formatting better than textContent
+              const itemText = cleanText((li as HTMLElement).innerText || li.textContent || '');
               const lines = pdf.splitTextToSize(`${bullet} ${itemText}`, contentWidth - 5);
+
               lines.forEach((line: string, i: number) => {
                 checkPageBreak(6);
                 pdf.setFontSize(10);
@@ -1274,6 +1274,7 @@ export default function WorkflowRunnerUI() {
 
           case 'P':
           case 'SPAN':
+          case 'BLOCKQUOTE':
             checkPageBreak(10);
             processTextWithFormatting(el, 10);
             break;
@@ -1285,7 +1286,6 @@ export default function WorkflowRunnerUI() {
             pdf.setFont('courier', 'normal');
             const codeLines = text.split('\n');
             codeLines.forEach(line => {
-              // Use splitTextToSize for code lines too
               const wrappedLines = pdf.splitTextToSize(line || ' ', contentWidth - 4);
               wrappedLines.forEach((wrappedLine: string) => {
                 checkPageBreak(6);
@@ -1315,11 +1315,11 @@ export default function WorkflowRunnerUI() {
             break;
 
           default:
-            // For unknown elements, try to process children
+            // For unknown elements, try to process children if they exist, 
+            // otherwise treat as a text block
             if (el.children.length > 0) {
               Array.from(el.children).forEach(child => processElement(child, depth + 1));
             } else if (text) {
-              // Render text content with proper wrapping
               checkPageBreak(10);
               processTextWithFormatting(el, 10);
             }
@@ -1360,29 +1360,247 @@ export default function WorkflowRunnerUI() {
     try {
       setIsDownloading(true);
       const element = resultRef.current;
-      const htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif;font-size:11pt;line-height:1.5}h1{font-size:18pt;font-weight:bold;margin-top:12pt;margin-bottom:6pt}h2{font-size:14pt;font-weight:bold;margin-top:10pt;margin-bottom:5pt}h3{font-size:12pt;font-weight:bold;margin-top:8pt;margin-bottom:4pt}p{margin-top:0;margin-bottom:8pt}table{border-collapse:collapse;width:100%;margin:10pt 0}th,td{border:1px solid #000;padding:4pt 8pt;text-align:left}th{background-color:#f0f0f0;font-weight:bold}ul,ol{margin:8pt 0;padding-left:20pt}li{margin-bottom:4pt}strong,b{font-weight:bold}em,i{font-style:italic}pre,code{font-family:'Courier New',monospace;background-color:#f5f5f5;padding:4pt}</style></head><body>${element.innerHTML}</body></html>`;
-      const converted = htmlDocx.asBlob(htmlContent);
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(converted);
+
+      const { workflowName } = getWorkflowData();
       const timestamp = new Date().getTime();
-      link.download = filename.replace('.docx', `-${timestamp}.docx`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(link.href);
+      const finalFilename = filename.replace('.docx', `-${timestamp}.docx`);
+
+      // We'll build a standard DOCX using the 'docx' library
+      // This is much more compatible with mammoth and other parsers than html-docx-js
+
+      const children: any[] = [];
+
+      // Title
+      children.push(new Paragraph({
+        text: workflowName || "Workflow Result",
+        heading: HeadingLevel.HEADING_1,
+        spacing: { after: 400 },
+      }));
+
+      // Recursive function to process DOM elements into docx components
+      const processNode = (node: Node, depth = 0) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const text = node.textContent; // Don't trim here to preserve spaces
+          if (text && text.replace(/\s/g, '').length > 0) {
+            return [new TextRun(text)];
+          }
+          return [];
+        }
+
+        if (node.nodeType !== Node.ELEMENT_NODE) return [];
+        const el = node as HTMLElement;
+        const tagName = el.tagName.toUpperCase();
+
+        // BLOCK ELEMENTS
+        if (tagName === 'P' || tagName === 'DIV' || tagName === 'SECTION' || tagName === 'ARTICLE') {
+          const paragraphChildren: any[] = [];
+          Array.from(el.childNodes).forEach(child => {
+            paragraphChildren.push(...processNode(child, depth + 1));
+          });
+          if (paragraphChildren.length > 0) {
+            children.push(new Paragraph({ children: paragraphChildren, spacing: { after: 200 } }));
+          }
+          return [];
+        }
+
+        if (tagName === 'H1' || tagName === 'H2' || tagName === 'H3' || tagName === 'H4' || tagName === 'H5' || tagName === 'H6') {
+          const level = tagName === 'H1' ? HeadingLevel.HEADING_1 :
+            tagName === 'H2' ? HeadingLevel.HEADING_2 :
+              tagName === 'H3' ? HeadingLevel.HEADING_3 :
+                tagName === 'H4' ? HeadingLevel.HEADING_4 :
+                  tagName === 'H5' ? HeadingLevel.HEADING_5 :
+                    HeadingLevel.HEADING_6;
+
+          children.push(new Paragraph({
+            text: el.innerText,
+            heading: level,
+            spacing: { before: 400, after: 200 },
+          }));
+          return [];
+        }
+
+        if (tagName === 'BLOCKQUOTE') {
+          const quoteChildren: any[] = [];
+          Array.from(el.childNodes).forEach(child => {
+            quoteChildren.push(...processNode(child, depth + 1));
+          });
+          if (quoteChildren.length > 0) {
+            children.push(new Paragraph({
+              children: quoteChildren,
+              indent: { left: 720 }, // roughly 0.5 inch
+              spacing: { before: 200, after: 200 }
+            }));
+          }
+          return [];
+        }
+
+        if (tagName === 'UL' || tagName === 'OL') {
+          const isOrdered = tagName === 'OL';
+          const listItems = Array.from(el.children).filter(child => child.tagName === 'LI');
+
+          listItems.forEach((li, index) => {
+            const liChildren: any[] = [];
+            Array.from(li.childNodes).forEach(child => {
+              liChildren.push(...processNode(child, depth + 1));
+            });
+
+            if (liChildren.length > 0) {
+              children.push(new Paragraph({
+                children: liChildren,
+                bullet: isOrdered ? undefined : { level: 0 },
+                numbering: isOrdered ? { reference: "default-numbering", level: 0 } : undefined,
+                spacing: { after: 120 }
+              }));
+            }
+          });
+          return [];
+        }
+
+        if (tagName === 'PRE' || tagName === 'CODE') {
+          const codeText = el.innerText || el.textContent || "";
+          if (codeText) {
+            children.push(new Paragraph({
+              children: [new TextRun({ text: codeText, font: "Courier New" })],
+              spacing: { before: 200, after: 200 },
+              // Standard docx doesn't easily support shading in a simple Paragraph call here without more setup
+            }));
+          }
+          return [];
+        }
+
+        if (tagName === 'TABLE') {
+          const rows = Array.from(el.querySelectorAll('tr')).map(tr => {
+            return new TableRow({
+              children: Array.from(tr.querySelectorAll('td, th')).map(cell => {
+                return new TableCell({
+                  children: [new Paragraph((cell as HTMLElement).innerText)],
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  }
+                });
+              })
+            });
+          });
+
+          if (rows.length > 0) {
+            children.push(new Table({
+              rows,
+              width: { size: 100, type: "pct" as any },
+            }));
+            children.push(new Paragraph({ text: "", spacing: { after: 200 } }));
+          }
+          return [];
+        }
+
+        if (tagName === 'HR') {
+          children.push(new Paragraph({
+            border: {
+              bottom: { color: "auto", space: 1, style: BorderStyle.SINGLE, size: 6 }
+            },
+            spacing: { before: 200, after: 200 }
+          }));
+          return [];
+        }
+
+        if (tagName === 'BR') {
+          return [new TextRun({ break: 1 })];
+        }
+
+        // INLINE ELEMENTS
+        const runs: any[] = [];
+        const isBold = tagName === 'STRONG' || tagName === 'B' || tagName === 'TH';
+        const isItalic = tagName === 'EM' || tagName === 'I';
+        const isUnderline = tagName === 'U';
+
+        Array.from(el.childNodes).forEach(child => {
+          const subRuns = processNode(child, depth + 1);
+          subRuns.forEach((run: any) => {
+            if (run instanceof TextRun) {
+              if (isBold) (run as any).bold = true;
+              if (isItalic) (run as any).italics = true;
+              if (isUnderline) (run as any).underline = { type: "single" };
+            }
+            runs.push(run);
+          });
+        });
+        return runs;
+      };
+
+      // Process the result element
+      Array.from(element.childNodes).forEach(node => processNode(node));
+
+      const doc = new Document({
+        numbering: {
+          config: [
+            {
+              reference: "default-numbering",
+              levels: [
+                {
+                  level: 0,
+                  format: "decimal",
+                  text: "%1.",
+                  alignment: AlignmentType.LEFT,
+                },
+              ],
+            },
+          ],
+        },
+        sections: [{
+          properties: {},
+          children: children,
+        }],
+      });
+
+      const blob = await Packer.toBlob(doc);
+      saveAs(blob, finalFilename);
+
+    } catch (error) {
+      console.error("Error generating DOCX:", error);
+      throw error;
+    } finally {
+      setIsDownloading(false);
+    }
+  }
+
+  async function downloadResultAsMarkdown(filename = "workflow-output.md") {
+    if (workflowResponses.length === 0) {
+      alert("Nothing to download");
+      return;
+    }
+    try {
+      setIsDownloading(true);
+
+      // Use the raw final output and displayAsText helper to get high-fidelity markdown
+      const rawOutput = getRawFinalOutput(workflowResponses, workflowDetails);
+      const textContent = displayAsText(rawOutput);
+
+      if (!textContent) {
+        alert("No visible result to download");
+        return;
+      }
+
+      const { workflowName } = getWorkflowData();
+      const timestamp = new Date().getTime();
+      const finalFilename = filename.replace('.md', `-${timestamp}.md`);
+
+      const blob = new Blob([textContent], { type: 'text/markdown;charset=utf-8' });
+      saveAs(blob, finalFilename);
+
       setDownloadLocation(getDocumentSaveLocation());
       setShowDownloadSuccess(true);
       setTimeout(() => setShowDownloadSuccess(false), 5000);
     } catch (error) {
-      console.error("Error generating DOCX:", error);
-      alert(`Failed to generate DOCX: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error("Error generating Markdown:", error);
+      throw error;
     } finally {
       setIsDownloading(false);
-      setShowLocationModal(true);
     }
   }
 
-  const handleDownloadResults = async (format: 'pdf' | 'docx' = 'pdf') => {
+  const handleDownloadResults = async (format: 'pdf' | 'docx' | 'markdown' = 'pdf') => {
     if (workflowResponses.length === 0) return;
 
     setIsDownloading(true);
@@ -1395,8 +1613,13 @@ export default function WorkflowRunnerUI() {
 
     try {
       if (format === 'docx') {
+        setDownloadFileType("Word document");
         await downloadResultAsDOCX(`workflow-results-${safeName}.docx`);
+      } else if (format === 'markdown') {
+        setDownloadFileType("Markdown document");
+        await downloadResultAsMarkdown(`workflow-results-${safeName}.md`);
       } else {
+        setDownloadFileType("PDF document");
         await downloadResultAsPDF(`workflow-results-${safeName}.pdf`);
       }
       setDownloadLocation(getDocumentSaveLocation());
@@ -1587,22 +1810,22 @@ export default function WorkflowRunnerUI() {
                                   <div className="flex items-center justify-between">
                                     <div>
                                       <div className="flex items-center gap-3">
-                                        <svg className="w-8 h-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        {/* <svg className="w-15 h-15 text-indigo-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 2h6l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" />
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 2v6h6" />
-                                        </svg>
+                                        </svg> */}
                                         <div>
-                                          <div className="text-sm font-medium">{input.description || (input as any).documentName || "Upload PDF"}</div>
-                                          <div className="text-xs text-gray-500">Drag & drop a PDF here, or click to select. Max: {formatBytes(MAX_FILE_SIZE_BYTES)}</div>
+                                          <div className="text-sm font-medium">{input.description || (input as any).documentName || "Upload Document"}</div>
+                                          <div className="text-xs text-gray-500">Drag & drop a PDF, Word or Markdown doc here, or click to select. Max: {formatBytes(MAX_FILE_SIZE_BYTES)}</div>
                                         </div>
                                       </div>
                                     </div>
 
                                     <div>
-                                      <label className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded shadow cursor-pointer hover:brightness-110">
+                                      <label className="inline-flex items-center px-6 py-2 bg-indigo-600 text-white text-xs font-medium rounded shadow cursor-pointer hover:brightness-110">
                                         <input
                                           type="file"
-                                          accept="application/pdf"
+                                          accept={ACCEPTED_MIME_TYPES.join(",") + ",.md,.docx,.pdf"}
                                           className="hidden"
                                           onChange={(e) => {
                                             const f = e.target.files?.[0] ?? null;
@@ -1620,12 +1843,12 @@ export default function WorkflowRunnerUI() {
                                     {inputFields[input.name] && (inputFields[input.name] as FileMeta).originalFilename ? (
                                       <div className="flex items-center justify-between gap-4 p-3 bg-gray-50 rounded">
                                         <div className="flex items-center gap-3">
-                                          <div className="w-12 h-12 flex items-center justify-center bg-white rounded border">
-                                            <svg className="w-6 h-6 text-indigo-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                          {/* <div className="w-12 h-12 flex items-center justify-center bg-white rounded border">
+                                            <svg className="w-12 h-12 text-indigo-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 2h6l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" />
                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 2v6h6" />
                                             </svg>
-                                          </div>
+                                          </div> */}
                                           <div>
                                             <div className="text-sm font-medium">{(inputFields[input.name] as FileMeta).originalFilename}</div>
                                             <div className="text-xs text-gray-500">{formatBytes((inputFields[input.name] as FileMeta).size)}</div>
@@ -1760,14 +1983,14 @@ export default function WorkflowRunnerUI() {
                   >
                     {isDownloading ? (
                       <>
-                        <Loader className="w-4 h-4 animate-spin" />
+                        <Loader className="w-15 h-15 animate-spin" />
                         <span>Downloading...</span>
                       </>
                     ) : (
                       <>
-                        <FileDown className="w-4 h-4" />
+                        <FileDown className="w-15 h-15" />
                         <span>Download</span>
-                        <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showDownloadMenu ? 'rotate-180' : ''}`} />
+                        <ChevronDown className={`w-15 h-15 transition-transform duration-200 ${showDownloadMenu ? 'rotate-180' : ''}`} />
                       </>
                     )}
                   </button>
@@ -1823,6 +2046,21 @@ export default function WorkflowRunnerUI() {
                             <div>
                               <div className="font-medium text-gray-900 text-sm whitespace-nowrap">Word Document</div>
                               <div className="text-xs text-gray-500">Editable format</div>
+                            </div>
+                          </button>
+                          <button
+                            onClick={() => {
+                              handleDownloadResults('markdown');
+                              setShowDownloadMenu(false);
+                            }}
+                            className="w-full text-left px-3 py-3 hover:bg-slate-50 transition-colors duration-150 flex items-center gap-3 group rounded-lg"
+                          >
+                            <div className="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center transition-colors group-hover:bg-orange-100 flex-shrink-0">
+                              <FileText className="w-5 h-5 text-orange-600" />
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900 text-sm whitespace-nowrap">Markdown Document</div>
+                              <div className="text-xs text-gray-500">Fast, plain-text format</div>
                             </div>
                           </button>
                         </div>
@@ -1883,7 +2121,7 @@ export default function WorkflowRunnerUI() {
       <FileLocationModal
         isOpen={showLocationModal}
         onClose={() => setShowLocationModal(false)}
-        fileType={"PDF document"}
+        fileType={downloadFileType}
         location={downloadLocation}
       />
     </div>
@@ -1894,6 +2132,87 @@ export default function WorkflowRunnerUI() {
    Helpers: rendering results
    (kept from your original)
    =========================== */
+
+const getRawFinalOutput = (responses: any[], workflowDetails: any): any => {
+  const errorEvent = responses.find(r => r.event === "error" || r.event === "node_failed");
+  if (errorEvent) return null;
+
+  // 1. Check for explicit "End" node output
+  if (workflowDetails && workflowDetails.nodes) {
+    const endNode = workflowDetails.nodes.find((n: any) => n.type === 'end');
+    if (endNode) {
+      const endNodeEvent = responses.find(
+        r => r.event === 'node_completed' && r.data.nodeId === endNode.id
+      );
+      if (endNodeEvent && endNodeEvent.data.result?.output) {
+        return endNodeEvent.data.result.output;
+      }
+    }
+  }
+
+  // 2. Prioritize the last completed node that has output
+  const nodeCompletedEvents = responses.filter(r => r.event === "node_completed");
+  for (let i = nodeCompletedEvents.length - 1; i >= 0; i--) {
+    const node = nodeCompletedEvents[i];
+    if (node.data.result?.output) {
+      return node.data.result.output;
+    }
+  }
+
+  // Fallback: Check for workflow_completed variables
+  const completedEvent = responses.find(r => r.event === "workflow_completed");
+  if (completedEvent && completedEvent.data.variables) {
+    const variables = completedEvent.data.variables;
+    const outputVarName = Object.keys(variables).find(name =>
+      name.toLowerCase().includes('output') ||
+      name.toLowerCase().includes('result') ||
+      name.toLowerCase().includes('final')
+    );
+    if (outputVarName && variables[outputVarName]) {
+      return variables[outputVarName];
+    }
+    return variables;
+  }
+
+  return null;
+};
+
+const displayAsText = (content: any): string => {
+  if (content === null || content === undefined) return "";
+
+  if (typeof content === 'string') {
+    try {
+      if (content.trim().startsWith('{') && content.trim().endsWith('}')) {
+        const parsed = JSON.parse(content);
+        if (parsed.finalOutput) return displayAsText(parsed.finalOutput);
+        if (parsed.message && parsed.finalOutput) return parsed.finalOutput;
+      }
+    } catch (e) { }
+    return content;
+  }
+
+  if (typeof content === 'object') {
+    if (content.finalOutput) return displayAsText(content.finalOutput);
+    if (content.__agentValue) return displayAsText(content.__agentValue);
+    if (content.text) return String(content.text);
+    if (content.output) return displayAsText(content.output);
+    if (content.result) return displayAsText(content.result);
+    if (content.content) return displayAsText(content.content);
+    if (content.message) return displayAsText(content.message);
+
+    if (Array.isArray(content)) {
+      return content.map(item => displayAsText(item)).join('\n\n');
+    }
+
+    try {
+      return JSON.stringify(content, null, 2);
+    } catch (e) {
+      console.warn("[Display] Failed to stringify object:", e);
+      return `[Object: ${Object.keys(content).join(', ')}]`;
+    }
+  }
+  return String(content);
+};
 
 const getFinalWorkflowResult = (responses: any[], workflowDetails: any) => {
   const errorEvent = responses.find(r => r.event === "error" || r.event === "node_failed");
@@ -1914,60 +2233,40 @@ const getFinalWorkflowResult = (responses: any[], workflowDetails: any) => {
     );
   }
 
-  // 1. Check for explicit "End" node output
-  if (workflowDetails && workflowDetails.nodes) {
-    const endNode = workflowDetails.nodes.find((n: any) => n.type === 'end');
-    if (endNode) {
-      const endNodeEvent = responses.find(
-        r => r.event === 'node_completed' && r.data.nodeId === endNode.id
+  const rawOutput = getRawFinalOutput(responses, workflowDetails);
+
+  if (rawOutput !== null) {
+    // Check if it was just variables object (fallback case in getRawFinalOutput)
+    const completedEvent = responses.find(r => r.event === "workflow_completed");
+    if (completedEvent && rawOutput === completedEvent.data.variables) {
+      // Check if there was NO explicit output var found
+      const variables = completedEvent.data.variables;
+      const outputVarName = Object.keys(variables).find(name =>
+        name.toLowerCase().includes('output') ||
+        name.toLowerCase().includes('result') ||
+        name.toLowerCase().includes('final')
       );
-      if (endNodeEvent && endNodeEvent.data.result?.output) {
-        return formatOutput(endNodeEvent.data.result.output);
-      }
-    }
-  }
-
-  // 2. Prioritize the last completed node that has output
-  const nodeCompletedEvents = responses.filter(r => r.event === "node_completed");
-  for (let i = nodeCompletedEvents.length - 1; i >= 0; i--) {
-    const node = nodeCompletedEvents[i];
-    if (node.data.result?.output) {
-      return formatOutput(node.data.result.output);
-    }
-  }
-
-  // Fallback: Check for workflow_completed variables
-  const completedEvent = responses.find(r => r.event === "workflow_completed");
-  if (completedEvent && completedEvent.data.variables) {
-    const variables = completedEvent.data.variables;
-    // If there's an explicit "output" or "result" variable, use it
-    const outputVarName = Object.keys(variables).find(name =>
-      name.toLowerCase().includes('output') ||
-      name.toLowerCase().includes('result') ||
-      name.toLowerCase().includes('final')
-    );
-
-    if (outputVarName && variables[outputVarName]) {
-      return formatOutput(variables[outputVarName]);
-    }
-
-    // Otherwise show all variables
-    return (
-      <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 to-slate-100 p-6 flex flex-col gap-6">
-        <div className="flex items-start gap-3">
-          <CheckCircle className="w-6 h-6 text-blue-500 mt-1" />
-          <div className="flex-1">
-            <h3 className="text-lg font-medium text-blue-800 mb-2">Workflow Complete</h3>
-            <div className="bg-white rounded-md p-4 border border-blue-100 overflow-auto">
-              <pre className="text-sm">{JSON.stringify(variables, null, 2)}</pre>
+      if (!outputVarName) {
+        return (
+          <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 to-slate-100 p-6 flex flex-col gap-6">
+            <div className="flex items-start gap-3">
+              <CheckCircle className="w-6 h-6 text-blue-500 mt-1" />
+              <div className="flex-1">
+                <h3 className="text-lg font-medium text-blue-800 mb-2">Workflow Complete</h3>
+                <div className="bg-white rounded-md p-4 border border-blue-100 overflow-auto">
+                  <pre className="text-sm">{JSON.stringify(variables, null, 2)}</pre>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-    );
+        );
+      }
+    }
+    return formatOutput(rawOutput);
   }
 
   // If workflow is completed but no output found
+  const completedEvent = responses.find(r => r.event === "workflow_completed");
   if (completedEvent) {
     return (
       <div className="p-6 border border-green-200 rounded-lg bg-green-50">
@@ -2001,40 +2300,6 @@ const getFinalWorkflowResult = (responses: any[], workflowDetails: any) => {
 };
 
 const formatOutput = (output: any) => {
-  const displayAsText = (content: any): string => {
-    if (typeof content === 'string') {
-      try {
-        // Try to parse JSON strings to check for finalOutput
-        if (content.trim().startsWith('{') && content.trim().endsWith('}')) {
-          const parsed = JSON.parse(content);
-          if (parsed.finalOutput) return displayAsText(parsed.finalOutput);
-          // If it's the specific format user mentioned: { message: "...", finalOutput: "..." }
-          if (parsed.message && parsed.finalOutput) return parsed.finalOutput;
-        }
-      } catch (e) {
-        // Not JSON, continue
-      }
-      return content;
-    }
-    if (typeof content === 'object') {
-      if (content.finalOutput) return displayAsText(content.finalOutput);
-      if (content.text) return content.text;
-      if (content.output) return displayAsText(content.output);
-      if (content.result) return displayAsText(content.result);
-      if (content.content) return displayAsText(content.content);
-      if (content.message) return displayAsText(content.message);
-      if (Array.isArray(content)) {
-        return content.map(item => displayAsText(item)).join('\n\n');
-      }
-      try {
-        return JSON.stringify(content, null, 2);
-      } catch (e) {
-        return String(content);
-      }
-    }
-    return String(content);
-  };
-
   if (output === null || output === undefined) {
     return (
       <div className="p-6 border border-gray-200 rounded-lg bg-gray-50 text-center">
@@ -2072,79 +2337,18 @@ const formatOutput = (output: any) => {
   function formatTextToHTML(text: string): string {
     if (!text) return "";
 
-    let html = text.trim();
-
-    // Escape HTML in content that's not whitelisted tags
-    html = html.replace(
-      /<(?!\/?(?:b|strong|i|em|u|p|br|h1|h2|h3|h4|h5|h6|ul|ol|li|table|thead|tbody|tr|th|td|pre|code|hr)\b)[^>]*>/gi,
-      (match) => match.replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    );
-
-    // Convert markdown-style tables to HTML
-    html = html.replace(
-      /((?:\|.+\|\n)+)/g,
-      (tableBlock) => {
-        const lines = tableBlock
-          .trim()
-          .split("\n")
-          .filter((l) => l.trim().startsWith("|") && l.includes("|"));
-
-        if (lines.length < 2) return tableBlock;
-
-        const headerCells = lines[0]
-          .split("|")
-          .slice(1, -1)
-          .map((cell) => `<th>${DOMPurify.sanitize(cell.trim())}</th>`)
-          .join("");
-
-        const rows = lines
-          .slice(2)
-          .map((line) => {
-            const cells = line
-              .split("|")
-              .slice(1, -1)
-              .map((cell) => `<td>${DOMPurify.sanitize(cell.trim())}</td>`)
-              .join("");
-            return `<tr>${cells}</tr>`;
-          })
-          .join("");
-
-        return `<table><thead><tr>${headerCells}</tr></thead><tbody>${rows}</tbody></table>`;
-      }
-    );
-
-    // Convert markdown headings
-    html = html.replace(/^#### (.*)$/gm, "<h4>$1</h4>");
-    html = html.replace(/^### (.*)$/gm, "<h3>$1</h3>");
-    html = html.replace(/^## (.*)$/gm, "<h2>$1</h2>");
-    html = html.replace(/^# (.*)$/gm, "<h1>$1</h1>");
-
-    // Convert markdown bold and italic
-    html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-    html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
-
-    // Convert line breaks
-    html = html.replace(/\n{2,}/g, "</p><p>");
-    html = html.replace(/\n/g, "<br/>");
-
-    // Wrap in paragraph if not already a block element
-    if (!/^<\s*(h\d|table|ul|ol|pre|p|code|blockquote)/i.test(html.trim())) {
-      html = `<p>${html}</p>`;
-    }
-
-    // Remove empty paragraphs
-    html = html.replace(/<p><\/p>/g, "");
+    // Convert markdown to HTML using marked
+    const html = marked.parse(text);
 
     // SECURITY FIX: Sanitize the final HTML with DOMPurify
-    // This removes any potentially malicious scripts, event handlers, or dangerous content
-    return DOMPurify.sanitize(html, {
+    return DOMPurify.sanitize(html as string, {
       ALLOWED_TAGS: [
         'b', 'strong', 'i', 'em', 'u', 'p', 'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
         'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
         'pre', 'code', 'hr', 'blockquote', 'span', 'div'
       ],
-      ALLOWED_ATTR: ['class', 'style'], // Only allow safe attributes
-      KEEP_CONTENT: true, // Keep text content even if tags are removed
+      ALLOWED_ATTR: ['class', 'style'],
+      KEEP_CONTENT: true,
     });
   }
 

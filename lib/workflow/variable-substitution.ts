@@ -35,21 +35,23 @@ export function substituteVariables(text: string, state: WorkflowState): string 
         // Special handling for file objects - use content/text instead of JSON
         if (value.storageId) {
           if (value.content) {
-            console.log(`[VarSub] Substituting file content for ${cleanExpr}, content length: ${value.content.length}`);
             return value.content;
           } else if (value.text) {
-            console.log(`[VarSub] Substituting file text for ${cleanExpr}, text length: ${value.text.length}`);
             return value.text;
           } else {
-            console.warn(`[VarSub] File object ${cleanExpr} has no content or text property, returning JSON`);
             return JSON.stringify(value);
           }
         }
         // For non-file objects, return JSON
-        return JSON.stringify(value);
+        const json = JSON.stringify(value, null, 2);
+        return json;
       }
 
-      return String(value);
+      const strValue = String(value);
+      if (strValue === '[object Object]') {
+        console.error(`[VarSub] ⚠️ CRITICAL: Value became [object Object] for ${cleanExpr}. Original value:`, value);
+      }
+      return strValue;
     } catch (e) {
       console.warn(`Failed to substitute variable: ${expression}`, e);
       return match; // Keep original on error

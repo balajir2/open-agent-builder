@@ -3,6 +3,7 @@ import { extractVariableReferences, evaluateExpression } from './variable-substi
 import { getConvexClient } from '../convex/client';
 import { api } from '../convex/client';
 import { handler } from './pdf-utils';
+import { handler as docxHandler } from './docx-utils';
 
 /**
  * Check if a file is a PDF based on MIME type or filename
@@ -17,9 +18,36 @@ function isPdfFile(contentType: string | null, filename: string | null): boolean
     return false;
 }
 
+function isDocxFile(contentType: string | null, filename: string | null): boolean {
+    if (contentType && (
+        contentType.includes('wordprocessingml') ||
+        contentType.includes('msword') ||
+        contentType.includes('officedocument')
+    )) {
+        return true;
+    }
+    if (filename && filename.toLowerCase().endsWith('.docx')) {
+        return true;
+    }
+    return false;
+}
+
+function isMarkdownFile(contentType: string | null, filename: string | null): boolean {
+    if (contentType && (contentType.includes('markdown') || contentType.includes('text/plain'))) {
+        // text/plain is broad, so check extension too if it's text/plain
+        if (contentType.includes('text/plain') && filename && filename.toLowerCase().endsWith('.md')) {
+            return true;
+        }
+        if (contentType.includes('markdown')) return true;
+    }
+    if (filename && filename.toLowerCase().endsWith('.md')) {
+        return true;
+    }
+    return false;
+}
+
 /**
- * Pre-fetch file contents for any file variables referenced in the text
- * This modifies the state in-place by adding 'content' to the file objects
+ * Prefetches file contents and injects them into the workflow state.
  */
 export async function prefetchFileContents(text: string, state: WorkflowState): Promise<void> {
     console.log('[FileUtils] ========== prefetchFileContents called ==========');
@@ -147,8 +175,20 @@ export async function prefetchFileContents(text: string, state: WorkflowState): 
                 // Extract text from PDF
                 content = await handler(buffer);
                 // console.log(`[FileUtils] Extracted ${content.length} characters from PDF`);
+            } else if (isDocxFile(contentType, filename)) {
+                console.log(`[FileUtils] Detected DOCX file: ${filename || storageId}`);
+
+                // Fetch as array buffer for DOCX processing
+                const arrayBuffer = await response.arrayBuffer();
+                const buffer = Buffer.from(arrayBuffer);
+
+                // Extract text from DOCX
+                content = await docxHandler(buffer);
+            } else if (isMarkdownFile(contentType, filename)) {
+                // Read as text for Markdown
+                content = await response.text();
             } else {
-                // Read as text for non-PDF files
+                // Read as text for other files
                 content = await response.text();
             }
 

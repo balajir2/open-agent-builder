@@ -184,7 +184,7 @@ export default function StartNodePanel({ node, onClose, onUpdate }: StartNodePan
                             <option value="boolean">Boolean</option>
                             <option value="url">URL</option>
                             <option value="object">Object</option>
-                            <option value="document">Document (PDF)</option>
+                            <option value="document">Document (PDF/Word/Markdown)</option>
                           </select>
                         </div>
 
@@ -209,7 +209,7 @@ export default function StartNodePanel({ node, onClose, onUpdate }: StartNodePan
                               value={variable.documentName || ""}
                               onChange={(e) => updateVariable(index, { documentName: e.target.value })}
                               className="w-full px-12 py-8 bg-accent-white border border-border-faint rounded-8 text-sm text-accent-black focus:outline-none focus:border-heat-100"
-                              placeholder="e.g. Passport scan (PDF)"
+                              placeholder="Enter document variable name (e.g. input.doc or PDF/Word/Markdown)"
                             />
                             <p className="text-xs text-heat-100 mt-8">
                               This is the friendly name for the document that will be requested when running the workflow. The workflow runner should prompt the user to upload a file that matches this name.

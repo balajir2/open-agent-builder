@@ -262,7 +262,7 @@ export async function executeAgentNode(
             };
           })
         ].filter((tool, index, self) =>
-            index === self.findIndex((t) => t.name === tool.name)
+          index === self.findIndex((t) => t.name === tool.name)
         );
 
         console.log('[Agent] Final Tools passed to LLM:', JSON.stringify(finalTools.map(t => ({ name: t.name, description: t.description })), null, 2));
@@ -1256,7 +1256,7 @@ export async function executeAgentNode(
       },
     };
 
-    return result;
+
 
   } catch (error) {
     console.error('Agent execution error:', error);
