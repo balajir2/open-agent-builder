@@ -19,7 +19,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/api/test-mcp-connection") ||
     pathname.startsWith("/api/workflows") || // Allow workflows API - auth handled by getAuthenticatedConvexClient
     pathname.startsWith("/api/team-workflows") || // Allow team workflows API
-    pathname.startsWith("/api/upload") || // Allow file uploads for workflow runner
+    pathname.startsWith("/api/upload") || // Allow file upload - proxies to Convex HTTP action with CORS
     pathname.startsWith("/api/auth");
 
   // Define API routes that require API key authentication (bypass auth check here)

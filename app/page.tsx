@@ -141,7 +141,7 @@ function StyleGuidePageContent() {
                   {/* GitHub Template Button */}
                   <a
                     className="contents"
-                    href="https://github.com/firecrawl/firecrawl"
+                    href="https://github.com/balajir2/open-agent-builder"
                     target="_blank"
                   >
                     <ButtonUI variant="secondary">
