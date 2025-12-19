@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import WorkflowRunnerUI from "@/components/workflow-runner/WorkflowRunnerUI";
 import { SignedIn, SignedOut, SignInButton } from "@/components/shared/auth-helpers";
 import { UserMenu } from "@/components/shared/UserMenu";
@@ -13,7 +13,7 @@ import GithubIcon from "@/components/layout/header/Github/_svg/GithubIcon";
 import { Connector } from "@/components/shared/layout/curvy-rect";
 import { HeaderProvider } from "@/components/layout/header/HeaderContext";
 
-export default function WorkflowRunnerPage() {
+function WorkflowRunnerContent() {
   const searchParams = useSearchParams();
   const workflowId = searchParams.get('workflowid');
   const [workflowName, setWorkflowName] = useState<string>('');
@@ -35,6 +35,7 @@ export default function WorkflowRunnerPage() {
 
     fetchWorkflowName();
   }, [workflowId]);
+
   return (
     <HeaderProvider>
       <div className="min-h-screen bg-background-base">
@@ -125,6 +126,25 @@ export default function WorkflowRunnerPage() {
           </div>
         </SignedOut>
       </div>
-    </HeaderProvider >
+    </HeaderProvider>
+  );
+}
+
+function WorkflowRunnerLoading() {
+  return (
+    <div className="min-h-screen bg-background-base flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-heat-100 mx-auto mb-4"></div>
+        <p className="text-foreground-muted">Loading workflow runner...</p>
+      </div>
+    </div>
+  );
+}
+
+export default function WorkflowRunnerPage() {
+  return (
+    <Suspense fallback={<WorkflowRunnerLoading />}>
+      <WorkflowRunnerContent />
+    </Suspense>
   );
 }

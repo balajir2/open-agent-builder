@@ -223,7 +223,7 @@ function parseMarkdownToWorkflow(markdown: string, userId: string): any {
           const instructions = instructionsMatch[1]
             .trim()
             .replace(/\n+/g, '\n') // Normalize newlines
-            .replace(/\n---\n.*$/s, ''); // Remove trailing section markers
+            .replace(/\n---\n[\s\S]*$/, ''); // Remove trailing section markers
           node.data.prompt = instructions;
         }
         if (toolsMatch) node.data.tools = toolsMatch[1].split(',').map((t: string) => t.trim());

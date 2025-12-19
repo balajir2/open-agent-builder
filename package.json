@@ -1,6 +1,7 @@
 {
   "name": "firecrawl-style-guide",
   "version": "1.0.0",
+  "type": "module",
   "private": true,
   "scripts": {
     "predev": "node scripts/check-dependencies.cjs",
