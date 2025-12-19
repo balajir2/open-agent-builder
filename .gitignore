@@ -39,9 +39,9 @@ tsc_output*.log
 .env.test.local
 .env.production.local
 
-# Keep environment templates
-!.env.local.dev
-!.env.local.prod
+# Environment files with credentials (ignored)
+.env.local.dev
+.env.local.prod
 
 # vercel
 /.vercel
