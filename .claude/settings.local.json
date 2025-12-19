@@ -83,7 +83,11 @@
       "Bash(cmd.exe /c \"taskkill /F /PID 10332\")",
       "Bash(if [ -d \".next/dev/lock\" ])",
       "Bash(cmd.exe /c \"if exist .next\\dev\\lock (rmdir /s /q .next\\dev\\lock && echo Removed lock) else (echo No lock found)\")",
-      "Bash(CONVEX_DEPLOYMENT=prod:sensible-ermine-579 NEXT_PUBLIC_CONVEX_URL=https://sensible-ermine-579.convex.cloud NEXT_PUBLIC_CONVEX_UPLOAD_ACTION_URL=https://sensible-ermine-579.convex.site/http/uploadFile npm run dev:*)"
+      "Bash(CONVEX_DEPLOYMENT=prod:sensible-ermine-579 NEXT_PUBLIC_CONVEX_URL=https://sensible-ermine-579.convex.cloud NEXT_PUBLIC_CONVEX_UPLOAD_ACTION_URL=https://sensible-ermine-579.convex.site/http/uploadFile npm run dev:*)",
+      "Bash(cmd.exe /c \"taskkill /F /IM node.exe /T\")",
+      "Bash(cmd.exe /c \"taskkill /F /PID 42688\")",
+      "Bash(powershell:*)",
+      "Bash(npm start)"
     ],
     "deny": [],
     "ask": []
