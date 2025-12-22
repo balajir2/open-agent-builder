@@ -41,6 +41,8 @@ export const getSystemApiKey = action({
       'gamma': 'GAMMA_API_KEY',
       'gamma-api': 'GAMMA_API_KEY',
       'encryption': 'ENCRYPTION_KEY',
+      'langchain': 'LANGCHAIN_API_KEY',
+      'langsmith': 'LANGCHAIN_API_KEY',
     };
 
     const envKey = envKeyMap[args.keyName.toLowerCase()];
@@ -76,6 +78,11 @@ export const getAllSystemApiKeys = action({
       scraperapi: process.env.SCRAPERAPI_API_KEY || null,
       browserless: process.env.BROWSERLESS_API_KEY || null,
       gamma: process.env.GAMMA_API_KEY || null,
+      // LangSmith tracing configuration
+      langchainApiKey: process.env.LANGCHAIN_API_KEY || null,
+      langchainProject: process.env.LANGCHAIN_PROJECT || null,
+      langchainEndpoint: process.env.LANGCHAIN_ENDPOINT || null,
+      langchainTracingV2: process.env.LANGCHAIN_TRACING_V2 || null,
     };
   },
 });

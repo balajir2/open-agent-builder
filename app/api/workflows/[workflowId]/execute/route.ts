@@ -88,6 +88,20 @@ export async function POST(
     const convex = await getAuthenticatedConvexClient();
     const systemKeys = await convex.action(api.systemApiKeys.getAllSystemApiKeys);
 
+    // Set LangSmith environment variables from Convex (for tracing)
+    if (systemKeys.langchainApiKey) {
+      process.env.LANGCHAIN_API_KEY = systemKeys.langchainApiKey;
+    }
+    if (systemKeys.langchainProject) {
+      process.env.LANGCHAIN_PROJECT = systemKeys.langchainProject;
+    }
+    if (systemKeys.langchainEndpoint) {
+      process.env.LANGCHAIN_ENDPOINT = systemKeys.langchainEndpoint;
+    }
+    if (systemKeys.langchainTracingV2) {
+      process.env.LANGCHAIN_TRACING_V2 = systemKeys.langchainTracingV2;
+    }
+
     const apiKeys = {
       anthropic: (userId ? await getLLMApiKey('anthropic', userId) : undefined) ?? systemKeys.anthropic,
       groq: (userId ? await getLLMApiKey('groq', userId) : undefined) ?? systemKeys.groq,

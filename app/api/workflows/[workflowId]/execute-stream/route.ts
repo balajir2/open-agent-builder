@@ -194,6 +194,20 @@ export async function POST(
         let systemKeys: any = {};
         try {
           systemKeys = await convex.action(api.systemApiKeys.getAllSystemApiKeys);
+
+          // Set LangSmith environment variables from Convex (for tracing)
+          if (systemKeys.langchainApiKey) {
+            process.env.LANGCHAIN_API_KEY = systemKeys.langchainApiKey;
+          }
+          if (systemKeys.langchainProject) {
+            process.env.LANGCHAIN_PROJECT = systemKeys.langchainProject;
+          }
+          if (systemKeys.langchainEndpoint) {
+            process.env.LANGCHAIN_ENDPOINT = systemKeys.langchainEndpoint;
+          }
+          if (systemKeys.langchainTracingV2) {
+            process.env.LANGCHAIN_TRACING_V2 = systemKeys.langchainTracingV2;
+          }
         } catch (err) {
           console.warn('Failed to fetch system API keys:', err);
           // Continue without system keys
