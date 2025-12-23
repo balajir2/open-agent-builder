@@ -1,0 +1,214 @@
+{
+  "name": "Competitive Battle Card",
+  "nodes": [
+    {
+      "data": {
+        "inputVariables": [
+          {
+            "defaultValue": "",
+            "description": "Upload the Opportunity Brief",
+            "name": "opportunity_brief_document",
+            "required": true,
+            "type": "document"
+          },
+          {
+            "description": "•\tNamed competitors (and any known angles/alliances/platforms)",
+            "documentName": "",
+            "name": "named_competitors",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Upload any evaluation criteria",
+            "name": "evaluation_criteria_and_weights",
+            "required": false,
+            "type": "document"
+          }
+        ],
+        "isRunning": false,
+        "label": {
+          "type": "div",
+          "key": null,
+          "ref": null,
+          "props": {
+            "className": "flex items-center gap-8",
+            "children": [
+              {
+                "type": "div",
+                "key": null,
+                "ref": null,
+                "props": {
+                  "className": "w-32 h-32 rounded-8 bg-gray-600 flex items-center justify-center flex-shrink-0",
+                  "children": {
+                    "type": "div",
+                    "key": null,
+                    "ref": null,
+                    "props": {
+                      "className": "w-16 h-16 bg-white rounded-2"
+                    }
+                  }
+                }
+              },
+              {
+                "type": "span",
+                "key": null,
+                "ref": null,
+                "props": {
+                  "className": "text-sm font-medium text-[#18181b]",
+                  "children": "Start"
+                }
+              }
+            ]
+          }
+        },
+        "nodeName": "Start",
+        "nodeType": "start"
+      },
+      "id": "node_0",
+      "position": {
+        "x": 100,
+        "y": 400
+      },
+      "type": "start",
+      "measured": {
+        "width": 140,
+        "height": 54
+      }
+    },
+    {
+      "data": {
+        "includeChatHistory": true,
+        "instructions": "You are a **senior competitive strategist** building **INTERNAL battle cards for Bounteous** based strictly on the provided Opportunity Brief and related inputs.\n\n---\n\n## INPUTS\n\n### 1) OPPORTUNITY BRIEF\n\n```\n{{input.opportunity_brief_document}}\n```\n\n### 2) COMPETITORS\n\n```\n{{input.named_competitors}}\n```\n\n### 3) Client Evaluation Criteria\n\n(Client evaluation criteria, weights, stakeholders, procurement priorities)\n\n```\n{{input.evaluation_criteria_and_weights}}\n```\n\n---\n\n## TASK\n\nUsing **ONLY** the inputs above, create a **pragmatic, internal COMPETITIVE POSITIONING PACK** for Bounteous.\n\n* **Do NOT invent facts**\n* If required information is missing, explicitly label it as **[Assumption]**\n* If you rely on broadly observed industry behavior, label it as **[Market Pattern]**\n* Use **plain, executive-ready English**\n* Optimize for **internal sales, pursuit, and executive decision-making**\n\n---\n\n## OUTPUTS\n\n### 1) Competitive Field Overview *(table)*\n\n**Columns**\n\n* Competitor\n* What they reliably win with *(in this context)*\n* Where they reliably stumble\n* Typical offer / configuration *(scope, team shape, platform bias)*\n* Pricing / commercial posture\n* Procurement perception\n\n---\n\n### 2) Head-to-Head Battle Cards\n\n*(Create ONE section per competitor)*\n\nFor **each competitor**, include concise bullets:\n\n* Core strengths for **THIS scope** (≥5)\n* Recurring weaknesses for **THIS scope** (≥5)\n* Likely narratives / angles they will run\n* Discovery prompts that expose gaps (≥3)\n* Counters to their common claims *(specific one-liners; cite proof assets where applicable)*\n* Proof moments **we** should emphasize against them *(cases, metrics, delivery patterns)*\n* Watch-outs *(commercial, delivery, compliance, governance)*\n\n---\n\n### 3) Differentiation Matrix *(table)*\n\n**Rows**: Client needs / evaluation criteria from the Opportunity Brief\n**Columns**:\n\n* Criterion\n* Weight *(if known)*\n* Our edge\n* Competitor A edge\n* Competitor B edge\n* Notes\n\n➡️ Mark **[Assumption]** wherever weights or edges are inferred.\n\n---\n\n### 4) Narrative Guide *(Internal Positioning)*\n\n* Three **win themes** that steer evaluators toward criteria where **we lead**\n  *(explicitly tie to client KPIs or stated success metrics)*\n* How to **reframe rival strengths into risk or cost** *(one sharp line per rival)*\n* Which capabilities and proof points we should **foreground vs. background**, and **why**\n\n---\n\n### 5) Counterplay Library *(Cheat Sheet)*\n\nFormat as a table or tight bullets:\n\n* Rival claim\n  → Short counter line\n  → Evidence / case / metric to cite\n  → Optional risk to flag\n\n---\n\n### 6) Gaps & Validation Checklist *(3–5 items)*\n\nList facts or signals that must be validated with:\n\n* Sales\n* Solution Architecture\n* Procurement / Commercial\n\nbefore finalizing this pack.\n\n---\n\n## RULES (STRICT)\n\n* Every statement must be tied to:\n\n  * The Opportunity Brief, **or**\n  * **[Assumption]**, **or**\n  * **[Market Pattern]**\n* Prefer **tables** for comparisons\n* Prefer **bullets** for clarity\n* Keep the entire pack **concise, skimmable, and exec-ready**\n* This is **INTERNAL ONLY** — do not write marketing copy\n\n---\n\n## FINAL CHECK\n\nEnd with a **5-line internal TL;DR** in this exact structure:\n\n* **Where we win**\n* **Where each rival leads**\n* **The narrative we’ll run**\n* **Proof to foreground**\n* **Biggest open risk**\n",
+        "label": {
+          "type": "div",
+          "key": null,
+          "ref": null,
+          "props": {
+            "className": "flex items-center gap-8",
+            "children": [
+              {
+                "type": "div",
+                "key": null,
+                "ref": null,
+                "props": {
+                  "className": "w-32 h-32 rounded-8 bg-blue-500 flex items-center justify-center flex-shrink-0",
+                  "children": {
+                    "type": {
+                      "displayName": "MousePointer2"
+                    },
+                    "key": null,
+                    "ref": null,
+                    "props": {
+                      "className": "w-18 h-18 text-white",
+                      "strokeWidth": 2
+                    }
+                  }
+                }
+              },
+              {
+                "type": "span",
+                "key": null,
+                "ref": null,
+                "props": {
+                  "className": "text-sm font-medium text-[#18181b]",
+                  "children": "Agent"
+                }
+              }
+            ]
+          }
+        },
+        "model": "anthropic/claude-haiku-4-5-20251001",
+        "name": "Agent",
+        "nodeName": "Agent",
+        "nodeType": "agent",
+        "outputFormat": "Text",
+        "showSearchSources": false,
+        "tokenLimit": 4096
+      },
+      "id": "node_6",
+      "position": {
+        "x": 450,
+        "y": 400
+      },
+      "type": "agent",
+      "measured": {
+        "width": 140,
+        "height": 54
+      }
+    },
+    {
+      "data": {
+        "label": {
+          "type": "div",
+          "key": null,
+          "ref": null,
+          "props": {
+            "className": "flex items-center gap-8",
+            "children": [
+              {
+                "type": "div",
+                "key": null,
+                "ref": null,
+                "props": {
+                  "className": "w-32 h-32 rounded-8 bg-teal-500 flex items-center justify-center flex-shrink-0",
+                  "children": {
+                    "type": {
+                      "displayName": "CircleStop"
+                    },
+                    "key": null,
+                    "ref": null,
+                    "props": {
+                      "className": "w-18 h-18 text-white",
+                      "strokeWidth": 2
+                    }
+                  }
+                }
+              },
+              {
+                "type": "span",
+                "key": null,
+                "ref": null,
+                "props": {
+                  "className": "text-sm font-medium text-[#18181b]",
+                  "children": "End"
+                }
+              }
+            ]
+          }
+        },
+        "nodeName": "End",
+        "nodeType": "end"
+      },
+      "id": "node_7",
+      "position": {
+        "x": 800,
+        "y": 400
+      },
+      "type": "end",
+      "measured": {
+        "width": 140,
+        "height": 54
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "xy-edge__node_0output-node_6input",
+      "source": "node_0",
+      "sourceHandle": "output",
+      "target": "node_6",
+      "targetHandle": "input",
+      "type": "smoothstep"
+    },
+    {
+      "id": "xy-edge__node_6output-node_7input",
+      "source": "node_6",
+      "sourceHandle": "output",
+      "target": "node_7",
+      "targetHandle": "input",
+      "type": "smoothstep"
+    }
+  ],
+  "exportedAt": "2025-12-22T14:31:05.197Z",
+  "version": "1.0"
+}

@@ -210,7 +210,6 @@ export async function POST(
           }
         } catch (err) {
           console.warn('Failed to fetch system API keys:', err);
-          // Continue without system keys
         }
 
         const apiKeys = {

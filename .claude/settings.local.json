@@ -87,7 +87,8 @@
       "Bash(cmd.exe /c \"taskkill /F /IM node.exe /T\")",
       "Bash(cmd.exe /c \"taskkill /F /PID 42688\")",
       "Bash(powershell:*)",
-      "Bash(npm start)"
+      "Bash(npm start)",
+      "Bash(git remote add:*)"
     ],
     "deny": [],
     "ask": []

@@ -20,7 +20,18 @@
 
 ## What is Open Agent Builder?
 
-**Open Agent Builder** is an enterprise-grade, visual workflow platform for building, deploying, and managing sophisticated AI agent workflows. Originally inspired by Firecrawl's workflow concepts, this project has evolved into a comprehensive agent orchestration platform with extensive tool integrations, multi-LLM support, and production-ready security features.
+**Open Agent Builder** is an enterprise-grade, visual workflow platform for building, deploying, and managing sophisticated AI agent workflows. Originally inspired by Firecrawl's workflow concepts, this project has been extensively enhanced by **[Bounteous](https://www.bounteous.com)** to become a comprehensive agent orchestration platform.
+
+### Bounteous Enhancements
+
+Bounteous has transformed the original concept into a production-ready platform with:
+
+- **Visual No-Code UI** - Intuitive drag-and-drop workflow builder with real-time execution visualization
+- **Generic Agent Framework** - Create and configure AI agents that work with any LLM provider
+- **Multi-LLM Support** - Seamlessly switch between Claude, GPT-4, Gemini, and Groq models
+- **Tool Attachment System** - Attach any combination of tools to agents for autonomous task execution
+- **MCP Protocol Integration** - Full Model Context Protocol support for extensible tool connectivity
+- **Enterprise Security** - Azure AD SSO, encrypted API keys, OWASP compliance, and sandboxed execution
 
 ### Built for Enterprise & Scale
 

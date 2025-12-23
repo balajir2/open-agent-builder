@@ -104,14 +104,11 @@ Diageo is seeking a scalable MVP version of “Smart Shelf,” a GenAI applicati
 
 ## **9. Known Competitors**
 
-*Not mentioned in RFI — treat as assumption.*
-Potential competitive categories:
-
-* Content enrichment platforms (Salsify, Akeneo).
-* AI product content startups.
-* Martech agencies with AI capabilities.
-  Mark as **[Assumption]**.
-
+* **Accenture Interactive
+* **Publicis Sapient
+* **Salsify
+* **Jellyfish
+* **Aki Technologies
 ---
 
 ## **10. Existing Relationships (From RFI)**

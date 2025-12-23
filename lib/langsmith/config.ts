@@ -16,12 +16,13 @@
 
 /**
  * Check if LangSmith tracing is enabled
+ * NOTE: Reads environment variables dynamically each time it's called
+ * to support runtime configuration from Convex
  */
 export function isLangSmithEnabled(): boolean {
-  return (
-    process.env.LANGCHAIN_TRACING_V2 === 'true' &&
-    !!process.env.LANGCHAIN_API_KEY
-  );
+  const enabled = process.env.LANGCHAIN_TRACING_V2 === 'true' &&
+    !!process.env.LANGCHAIN_API_KEY;
+  return enabled;
 }
 
 /**
