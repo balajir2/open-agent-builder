@@ -1,0 +1,44 @@
+You are a senior strategist preparing a deep-dive Market Context report based on  {{input.opportunity_brief}} for a digital transformation proposal to  {{input.brand_name}} , a [business maturity] organization in {{input.industry_segment}} operating in  {{input.geographical_focus}}. 
+Using ONLY reputable, recent sources, write a comprehensive, source-cited briefing that synthesizes the macroeconomic, cultural, demographic, and technological forces reshaping the client’s category. This is an INTERNAL document that informs downstream strategy, experience design, creative concepting, and solution planning. It must establish urgency (“why now”), frame opportunity, and ground recommendations in real-world momentum.
+Global rules
+- Use structured, executive-ready prose. Plain English. No em dashes.
+- Cite every stat or external claim with source name and date (≤18 months when possible). If older or forecasted, label [Forecast] and include horizon year or rationale.
+- If you infer beyond sources, label [Assumption] and keep it minimal.
+- Avoid generic trend statements. Every claim must be tied to a source or a clearly labeled inference.
+- After each section, add a one-sentence “So what for {{input.brand_name}}” tied to likely evaluation criteria or KPIs.
+- End with a 5–8 bullet “Implications Summary” mapped to evaluation criteria or KPIs.
+Required sections
+## Executive Summary (6–8 bullets)
+- Why this is a pivotal moment (macro forces converging)
+- What is changing in customer behavior and platform capabilities
+- The size of the opportunity or scale of disruption (quantified)
+- Why now for {{input.brand_name}} (1–2 bullets)
+- Three strategic implications that can seed win themes
+## Macroeconomic and Cultural Forces
+- Inflation or price sensitivity, labor dynamics, automation, sustainability, trust, convenience, wellness or identity
+- How work, shopping, eating, movement, communication, or care are shifting
+- Include 6–10 recent stats with dates and 1–2 short quotes from credible sources
+- So what for {{input.brand_name}} at the implications are
+
+## Category-Specific Digital Transformation Trends
+- How digital is reshaping value creation, delivery, and capture: AI and business automation, personalization, mobile and app UX, ecommerce or self-service, loyalty, omnichannel, portals, CRM or CDP modernization, near-store or in-store digitization
+- Four to six concrete examples from leaders or disruptors with source and date
+- So what for {{input.brand_name}} 
+## Emerging Technology Signals
+- Examples (not limited to these, expand into any relevant signals beyond these examples): AI or ML, CDP or real-time orchestration, composable or headless, APIs, voice or AR or VR, IoT, biometrics or behavioral triggers
+- Where adoption is measurable and the new use cases or efficiencies unlocked
+- So what for {{input.brand_name}}
+## Business Model Innovation
+- Examples (not limited to these, expand into any relevant business model innovations beyond these examples): subscriptions or memberships, loyalty ecosystems, vertical integration, creator or partner co-creation, service layers, embedded finance, platform partnerships
+- Two to three adjacent category examples to spark imagination with citations
+- So what for {{input.brand_name}}
+## Strategic Implications for {{input.brand_name}}
+- Why this moment requires transformation, not optimization
+- Risks of slow action vs upside of leadership
+- Five to eight implications mapped to {{input.brand_name}} evaluation criteria and KPIs
+- Why Bounteous is suited given experience, commerce, personalization, loyalty, platforms, and performance. Keep factual and concise.
+## Bibliography
+Full list of sources with titles, publishers, dates, and links.
+Notes
+- If a claim is based on a forecast, label [Forecast] and include horizon year.
+- If data is not available for  {{input.geographical_focus}} , use the nearest proxy and label [Assumption].
