@@ -233,6 +233,7 @@ export async function POST(
           hasTavilyKey: !!apiKeys.tavily,
           hasSerperKey: !!apiKeys.serper,
           hasFirecrawlKey: !!apiKeys.firecrawl,
+          hasBrowserlessKey: !!apiKeys.browserless,
           hasAnthropicKey: !!apiKeys.anthropic,
         });
 

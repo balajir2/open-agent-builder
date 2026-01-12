@@ -26,8 +26,10 @@ export class ToolFactory {
         switch (id) {
             case "tavily-search":
                 if (!apiKeys.tavily) {
+                    console.warn('[ToolFactory] ⚠️ Missing Tavily API key - tavily_search tool will not be available. Set TAVILY_API_KEY in Convex environment.');
                     return null;
                 }
+                console.log('[ToolFactory] Creating tavily_search tool');
                 // Tavily is a retriever, wrap it as a tool
                 const retriever = new TavilySearchAPIRetriever({
                     apiKey: apiKeys.tavily,
@@ -44,6 +46,7 @@ export class ToolFactory {
 
             case "serper-search":
                 if (!apiKeys.serper) {
+                    console.warn('[ToolFactory] ⚠️ Missing Serper API key - serper_search tool will not be available. Set SERPER_API_KEY in Convex environment.');
                     return null;
                 }
                 console.log('[ToolFactory] Creating serper_search tool');
@@ -59,9 +62,10 @@ export class ToolFactory {
 
             case "serpapi-search":
                 if (!apiKeys.serpapi) {
-                    console.warn('[ToolFactory] Missing SerpAPI key');
+                    console.warn('[ToolFactory] ⚠️ Missing SerpAPI key - serpapi_search tool will not be available. Set SERPAPI_API_KEY in Convex environment.');
                     return null;
                 }
+                console.log('[ToolFactory] Creating serpapi_search tool');
                 // Wrap LangChain's SerpAPI tool for consistent error handling
                 const serpApiTool = new SerpAPI(apiKeys.serpapi);
                 return new DynamicTool({
@@ -73,7 +77,11 @@ export class ToolFactory {
                 });
 
             case "scraperapi":
-                if (!apiKeys.scraperapi) return null;
+                if (!apiKeys.scraperapi) {
+                    console.warn('[ToolFactory] ⚠️ Missing ScraperAPI key - scraperapi tool will not be available. Set SCRAPERAPI_API_KEY in Convex environment.');
+                    return null;
+                }
+                console.log('[ToolFactory] Creating scraperapi tool');
                 return new DynamicTool({
                     name: "scraperapi",
                     description: "Scrape a webpage using ScraperAPI to handle CAPTCHAs and IP rotation.",
@@ -89,7 +97,11 @@ export class ToolFactory {
                 });
 
             case "browserless":
-                if (!apiKeys.browserless) return null;
+                if (!apiKeys.browserless) {
+                    console.warn('[ToolFactory] ⚠️ Missing Browserless API key - browserless tool will not be available. Set BROWSERLESS_API_KEY in Convex environment.');
+                    return null;
+                }
+                console.log('[ToolFactory] Creating browserless tool');
                 return new DynamicTool({
                     name: "browserless",
                     description: "Advanced web scraping using Browserless (Headless Chrome/Playwright). Supports JavaScript execution, screenshots, PDF generation, and custom selectors. Input should be a valid URL.",
@@ -234,10 +246,10 @@ export class ToolFactory {
 
             case "firecrawl":
                 if (!apiKeys.firecrawl) {
-                    console.warn('[ToolFactory] Missing Firecrawl API key');
+                    console.warn('[ToolFactory] ⚠️ Missing Firecrawl API key - firecrawl_scrape tool will not be available. Set FIRECRAWL_API_KEY in Convex environment.');
                     return null;
                 }
-
+                console.log('[ToolFactory] Creating firecrawl_scrape tool');
                 return new DynamicTool({
                     name: "firecrawl_scrape",
                     description: "Scrape and extract content from any website URL using Firecrawl. Returns clean, LLM-ready markdown content including main text, links, and images. Input should be a valid URL (e.g., 'https://example.com').",
