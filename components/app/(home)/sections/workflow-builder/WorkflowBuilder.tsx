@@ -571,6 +571,37 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
     setShowWorkflowMenu(false);
   }, [workflow, nodes, edges, setShowWorkflowMenu]);
 
+  // Helper function to sanitize imported nodes - removes React elements and non-serializable data
+  const sanitizeImportedNodes = useCallback((nodes: any[]) => {
+    return nodes.map((node: any) => {
+      // Deep clone to avoid mutations
+      const sanitizedNode = {
+        id: node.id,
+        type: node.type,
+        position: { ...node.position },
+        data: {} as any,
+      };
+
+      // Sanitize node.data - remove React elements (objects with type/key/ref/props)
+      if (node.data && typeof node.data === 'object') {
+        Object.entries(node.data).forEach(([key, value]) => {
+          // Skip React elements (have type, key, ref, props structure)
+          if (value && typeof value === 'object' && !Array.isArray(value)) {
+            const obj = value as any;
+            if ('type' in obj && 'props' in obj && ('key' in obj || 'ref' in obj)) {
+              // This looks like a React element - skip it
+              console.log(`[Import] Skipping React element in node.data.${key}`);
+              return;
+            }
+          }
+          sanitizedNode.data[key] = value;
+        });
+      }
+
+      return sanitizedNode;
+    });
+  }, []);
+
   const handleImportJSON = useCallback(() => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -592,6 +623,9 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
           return;
         }
 
+        // Sanitize nodes to remove any React elements or non-serializable data
+        const sanitizedNodes = sanitizeImportedNodes(importedData.nodes);
+
         // Confirm before importing
         setConfirmDialog({
           isOpen: true,
@@ -599,12 +633,12 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
           description: `This will replace the current workflow with "${importedData.name || 'Imported Workflow'}". This action cannot be undone.`,
           variant: 'warning',
           onConfirm: () => {
-            // Import the nodes and edges
-            setNodes(importedData.nodes);
+            // Import the sanitized nodes and edges
+            setNodes(sanitizedNodes);
             setEdges(importedData.edges);
 
             // Reset node ID counter based on imported nodes
-            resetNodeIdCounter(importedData.nodes);
+            resetNodeIdCounter(sanitizedNodes);
 
             // Update workflow name, description, nodes, and edges
             // This single save prevents duplicate workflows
@@ -612,13 +646,13 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
               saveWorkflow({
                 name: importedData.name || workflow.name,
                 description: importedData.description || workflow.description,
-                nodes: importedData.nodes,
+                nodes: sanitizedNodes,
                 edges: importedData.edges,
               });
             }
 
             toast.success('Workflow imported successfully', {
-              description: `Loaded ${importedData.nodes.length} nodes and ${importedData.edges.length} connections`,
+              description: `Loaded ${sanitizedNodes.length} nodes and ${importedData.edges.length} connections`,
             });
           },
         });
@@ -632,7 +666,7 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
 
     input.click();
     setShowWorkflowMenu(false);
-  }, [workflow, saveWorkflow, setNodes, setEdges, setShowWorkflowMenu]);
+  }, [workflow, saveWorkflow, setNodes, setEdges, setShowWorkflowMenu, sanitizeImportedNodes]);
 
   const handleClearCanvas = useCallback(() => {
     setConfirmDialog({
