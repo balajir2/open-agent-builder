@@ -58,12 +58,13 @@ const Button = forwardRef<HTMLButtonElement, Props>(
           size === "default" && "rounded-8 px-10 py-6 gap-4",
           size === "large" && "rounded-10 px-12 py-8 gap-6",
 
-          // Primary variant (orange/heat)
+          // Primary variant (heat)
           variant === "primary" && [
-            "text-accent-white",
+            "text-accent-white bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700",
+            "shadow-[0_4px_20px_rgba(99,102,241,0.4)]",
             // Hover/active only when interactive
             !isNonInteractive &&
-            "hover:bg-[color:var(--heat-90)] active:[scale:0.995]",
+            "hover:brightness-110 active:[scale:0.98]",
             // Disabled: dim a bit, no hover, dim overlay bg layer if present
             "disabled:opacity-80",
             "disabled:[&_.button-background]:opacity-70",

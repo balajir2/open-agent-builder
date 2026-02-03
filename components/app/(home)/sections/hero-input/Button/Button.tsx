@@ -12,7 +12,7 @@ export default function HeroInputSubmitButton({
   dirty: boolean;
 }) {
   return (
-    <Button className="hero-input-button !p-0 bg-heat-100 hover:bg-heat-200" size="large" variant="primary">
+    <Button className="hero-input-button !p-0 bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 shadow-[0_4px_20px_rgba(99,102,241,0.4)] hover:brightness-110 active:scale-[0.98]" size="large" variant="primary">
       <AnimatedWidth>
         <AnimatePresence initial={false} mode="popLayout">
           <motion.div

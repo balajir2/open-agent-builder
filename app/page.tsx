@@ -40,13 +40,16 @@ function StyleGuidePageContent() {
 
   const [tab] = useState<Endpoint>(Endpoint.Scrape);
   const [url, setUrl] = useState<string>("");
-  const [showStep2, setShowStep2] = useState(false);
-  const [showWorkflowBuilder, setShowWorkflowBuilder] = useState(false);
-  const [loadWorkflowId, setLoadWorkflowId] = useState<string | null>(null);
-  const [loadTemplateId, setLoadTemplateId] = useState<string | null>(null);
 
-  // Handle URL params
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // Initialize state directly from URL params to prevent "double hop"
+  const [showStep2, setShowStep2] = useState(() => searchParams.get('view') === 'workflows');
+  const [showWorkflowBuilder, setShowWorkflowBuilder] = useState(() =>
+    searchParams.get('view') === 'builder' || !!searchParams.get('workflow') || !!searchParams.get('template')
+  );
+  const [loadWorkflowId, setLoadWorkflowId] = useState<string | null>(() => searchParams.get('workflow'));
+  const [loadTemplateId, setLoadTemplateId] = useState<string | null>(() => searchParams.get('template'));
+
+  // Sync state if URL changes externally (e.g. browser back/forward)
   useEffect(() => {
     if (!searchParams) return;
 
@@ -54,18 +57,11 @@ function StyleGuidePageContent() {
     const workflowId = searchParams.get('workflow');
     const templateId = searchParams.get('template');
 
-    if (view === 'workflows') {
-      setShowStep2(true);
-      setShowWorkflowBuilder(false);
-    } else if (workflowId) {
-      setLoadWorkflowId(workflowId);
-      setShowWorkflowBuilder(true);
-      setShowStep2(false);
-    } else if (templateId) {
-      setLoadTemplateId(templateId);
-      setShowWorkflowBuilder(true);
-      setShowStep2(false);
-    }
+    console.log('Syncing state:', { view, workflowId, templateId });
+    setShowStep2(view === 'workflows');
+    setShowWorkflowBuilder(view === 'builder' || !!workflowId || !!templateId);
+    setLoadWorkflowId(workflowId);
+    setLoadTemplateId(templateId);
   }, [searchParams]);
 
   const handleSubmit = () => {
@@ -82,6 +78,14 @@ function StyleGuidePageContent() {
     router.push('/');
   };
 
+  const handleBuilderBack = () => {
+    setShowStep2(true);
+    setShowWorkflowBuilder(false);
+    setLoadWorkflowId(null);
+    setLoadTemplateId(null);
+    router.push('/?view=workflows');
+  };
+
   const handleCreateWorkflow = () => {
     setLoadWorkflowId(null);
     setLoadTemplateId(null);
@@ -94,7 +98,7 @@ function StyleGuidePageContent() {
       {showWorkflowBuilder ? (
         <SignedIn>
           <WorkflowBuilder
-            onBack={handleReset}
+            onBack={handleBuilderBack}
             initialWorkflowId={loadWorkflowId}
             initialTemplateId={loadTemplateId}
           />
@@ -123,20 +127,20 @@ function StyleGuidePageContent() {
                 <div className="flex gap-8 items-center">
                   <SignedIn>
                     <Link href="/ui-user-workflows">
-                      <ButtonUI variant="outline">
+                      <ButtonUI variant="primary">
                         UI for Workflows
                       </ButtonUI>
                     </Link>
                   </SignedIn>
 
                   {/* UI Builder Link */}
-                  <SignedIn>
+                  {/* <SignedIn>
                     <Link href="/ui-builder">
                       <ButtonUI variant="outline">
                         UI Builder
                       </ButtonUI>
                     </Link>
-                  </SignedIn>
+                  </SignedIn> */}
 
                   {/* GitHub Template Button */}
                   <a
@@ -153,7 +157,7 @@ function StyleGuidePageContent() {
                   {/* Auth Buttons */}
                   <SignedOut>
                     <SignInButton mode="modal">
-                      <button className="px-16 py-8 bg-heat-100 hover:bg-heat-200 text-white rounded-8 text-body-medium font-medium transition-all active:scale-[0.98]">
+                      <button className="px-16 py-8 bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 text-white rounded-8 text-body-medium font-medium shadow-[0_4px_20px_rgba(99,102,241,0.4)] hover:brightness-110 transition-all active:scale-[0.98]">
                         Sign In
                       </button>
                     </SignInButton>
@@ -245,20 +249,20 @@ function StyleGuidePageContent() {
                 <SignedIn>
                   <button
                     onClick={handleSubmit}
-                    className="bg-heat-100 hover:bg-heat-200 text-white font-medium px-32 py-12 rounded-10 transition-all active:scale-[0.98] text-body-medium shadow-md cursor-pointer"
+                    className="bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 text-white font-medium px-32 py-12 rounded-10 shadow-[0_4px_20px_rgba(99,102,241,0.4)] hover:brightness-110 transition-all active:scale-[0.98] text-body-medium cursor-pointer"
                   >
                     Start building
                   </button>
                 </SignedIn>
 
                 {/* When signed out - open sign-in modal */}
-                <SignedOut>
+                {/* <SignedOut>
                   <SignInButton mode="modal">
-                    <button className="bg-heat-100 hover:bg-heat-200 text-white font-medium px-32 py-12 rounded-10 transition-all active:scale-[0.98] text-body-medium shadow-md cursor-pointer">
+                    <button className="bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 text-white font-medium px-32 py-12 rounded-10 shadow-[0_4px_20px_rgba(99,102,241,0.4)] hover:brightness-110 transition-all active:scale-[0.98] text-body-medium cursor-pointer">
                       Start building
                     </button>
                   </SignInButton>
-                </SignedOut>
+                </SignedOut> */}
               </motion.div>
             )}
           </section>

@@ -12,7 +12,7 @@ interface SlateGridProps extends HTMLAttributes<HTMLDivElement> {
 
 export function SlateGrid({
   interval = 200,
-  color = "text-black-alpha-12",
+  color = "text-violet-alpha-12",
   className,
   ...attrs
 }: SlateGridProps) {

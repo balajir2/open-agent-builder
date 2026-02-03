@@ -1555,7 +1555,7 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
             <button
               type="button"
               onClick={() => setEnvironment('draft')}
-              className={`px-12 py-6 text-label-small transition-colors ${environment === 'draft' ? 'bg-heat-100 text-white shadow-sm' : 'text-black-alpha-48 hover:text-accent-black'}`}
+              className={`px-12 py-6 text-label-small transition-all ${environment === 'draft' ? 'bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 text-white shadow-[0_4px_20px_rgba(99,102,241,0.4)] hover:brightness-110 active:scale-[0.98]' : 'text-black-alpha-48 hover:text-accent-black'}`}
             >
               Draft
             </button>
@@ -1578,7 +1578,7 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
                 }
                 setEnvironment('production');
               }}
-              className={`px-12 py-6 text-label-small transition-colors ${environment === 'production' ? 'bg-heat-100 text-white shadow-sm' : 'text-black-alpha-48 hover:text-accent-black'}`}
+              className={`px-12 py-6 text-label-small transition-all ${environment === 'production' ? 'bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 text-white shadow-[0_4px_20px_rgba(99,102,241,0.4)] hover:brightness-110 active:scale-[0.98]' : 'text-black-alpha-48 hover:text-accent-black'}`}
             >
               Production
             </button>
@@ -1727,9 +1727,9 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
         {!isRunning ? (
           <button
             onClick={handlePreview}
-            className={`px-16 py-8 border rounded-8 text-body-medium transition-colors flex items-center gap-8 ${showExecution
-              ? 'bg-heat-100 text-white border-heat-100'
-              : 'bg-accent-white text-accent-black border-border-faint hover:bg-black-alpha-4'
+            className={`px-16 py-8 rounded-8 text-body-medium transition-all flex items-center gap-8 ${showExecution
+              ? 'bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 text-white shadow-[0_4px_20px_rgba(99,102,241,0.4)] hover:brightness-110 active:scale-[0.98]'
+              : 'bg-accent-white text-accent-black border border-border-faint hover:bg-black-alpha-4'
               }`}
           >
             <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1752,7 +1752,7 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
 
         <button
           onClick={handleSaveWorkflow}
-          className="px-20 py-8 bg-heat-100 hover:bg-heat-200 text-white rounded-8 text-body-medium font-medium transition-all active:scale-[0.98] flex items-center gap-8"
+          className="px-20 py-8 bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 text-white rounded-8 text-body-medium font-medium shadow-[0_4px_20px_rgba(99,102,241,0.4)] hover:brightness-110 transition-all active:scale-[0.98] flex items-center gap-8"
         >
           <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />

@@ -10,7 +10,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/sign-in") ||
     pathname.startsWith("/sign-up") ||
     pathname.startsWith("/ui-user-workflows") || // Allow UI for Workflows - uses client-side auth
-    pathname.startsWith("/ui-builder") || // Allow UI Builder - uses client-side auth
+    // pathname.startsWith("/ui-builder") || // Allow UI Builder - uses client-side auth
     pathname.startsWith("/workflow-runner") || // Allow workflow runner - uses client-side auth
     pathname.startsWith("/api/public") ||
     pathname.startsWith("/api/config") ||

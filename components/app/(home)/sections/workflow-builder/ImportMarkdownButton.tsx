@@ -74,7 +74,7 @@ export function ImportMarkdownButton({ onImportSuccess }: ImportMarkdownButtonPr
       />
       <button
         onClick={handleButtonClick}
-        className="inline-flex items-center gap-2 px-16 py-8 text-sm font-medium text-white bg-heat-100 rounded-8 hover:bg-heat-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-heat-100 transition-all active:scale-[0.98]"
+        className="inline-flex items-center gap-2 px-16 py-8 text-sm font-medium text-white bg-heat-100 rounded-8 bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 shadow-[0_4px_20px_rgba(99,102,241,0.4)] hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-heat-100 transition-all active:scale-[0.98]"
         title="Import workflow from Markdown"
       >
         <FileUp className="w-16 h-16" />

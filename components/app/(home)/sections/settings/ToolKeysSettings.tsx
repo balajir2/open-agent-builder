@@ -103,7 +103,7 @@ export default function ToolKeysSettings() {
                                                                     <Check className="w-10 h-10" /> Configured ({existingKey.keyPrefix})
                                                                 </span>
                                                             ) : (
-                                                                <span className="text-orange-500 flex items-center gap-2">
+                                                                <span className="text-heat-100 flex items-center gap-2">
                                                                     <AlertCircle className="w-10 h-10" /> Not configured
                                                                 </span>
                                                             )}

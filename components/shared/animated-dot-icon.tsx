@@ -11,20 +11,20 @@ interface AnimatedDotIconProps {
   size?: number;
   className?: string;
   pattern?:
-    | "usage"
-    | "api-keys"
-    | "settings"
-    | "overview"
-    | "team"
-    | "billing"
-    | "account-settings"
-    | "admin"
-    | "domain-checker"
-    | "extract-playground"
-    | "extract"
-    | "logs"
-    | "playground"
-    | "teams";
+  | "usage"
+  | "api-keys"
+  | "settings"
+  | "overview"
+  | "team"
+  | "billing"
+  | "account-settings"
+  | "admin"
+  | "domain-checker"
+  | "extract-playground"
+  | "extract"
+  | "logs"
+  | "playground"
+  | "teams";
 }
 
 const initCanvas = (canvas: HTMLCanvasElement) => {
@@ -235,7 +235,7 @@ export function AnimatedDotIcon({
   const fnRefs = useRef<{
     activate: () => void;
     deactivate: () => void;
-  }>({ activate: () => {}, deactivate: () => {} });
+  }>({ activate: () => { }, deactivate: () => { } });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -253,7 +253,7 @@ export function AnimatedDotIcon({
     const scaler = size / 20;
 
     const render = () => {
-      ctx.fillStyle = "#fa5d19";
+      ctx.fillStyle = "#7e22ce";
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       for (const group of config.grid.slice(0, 4)) {
@@ -263,10 +263,10 @@ export function AnimatedDotIcon({
         for (const index of group) {
           ctx.fillRect(
             (config.offset + (index % config.gridSize) * config.spacing) *
-              scaler,
+            scaler,
             (config.offset +
               Math.floor(index / config.gridSize) * config.spacing) *
-              scaler,
+            scaler,
             config.cellSize * scaler,
             config.cellSize * scaler,
           );
@@ -382,9 +382,9 @@ export function AnimatedDotIcon({
         alwaysHeat
           ? ""
           : [
-              "[&.grayscale]:opacity-60 transition-[filter,opacity]",
-              !active && "grayscale",
-            ],
+            "[&.grayscale]:opacity-60 transition-[filter,opacity]",
+            !active && "grayscale",
+          ],
         className,
       )}
       ref={canvasRef}

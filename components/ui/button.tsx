@@ -69,14 +69,13 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           size === "default" && "rounded-8 px-10 py-6 gap-4 text-13",
           size === "large" && "rounded-10 px-12 py-8 gap-6 text-14",
 
-          // Primary variant (orange/heat)
+          // Primary variant (heat)
           variant === "primary" && [
-            "bg-heat-100 text-white",
-            "shadow-[0px_-6px_12px_0px_rgba(255,0,0,0.2)_inset,0px_2px_4px_0px_rgba(255,77,0,0.12)]",
+            "bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 text-white",
+            "shadow-[0_4px_20px_rgba(99,102,241,0.4)]",
             !isNonInteractive && [
-              "hover:bg-heat-90",
-              "hover:shadow-[0px_-6px_12px_0px_rgba(255,0,0,0.2)_inset,0px_4px_8px_0px_rgba(255,77,0,0.16)]",
-              "active:scale-[0.995]",
+              "hover:brightness-110",
+              "active:scale-[0.98]",
             ],
             "disabled:opacity-80 disabled:cursor-not-allowed",
             "focus-visible:ring-white",

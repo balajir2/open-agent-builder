@@ -14,7 +14,7 @@ type Props = Parameters<Ticker>[0] & {
 
 export const CELL_SIZE = 80;
 
-export const MAIN_COLOR = 0xe6e6e6;
+export const MAIN_COLOR = 0xa78bfa;
 
 const animations = [scrape, mapping, search, crawl];
 

@@ -19,18 +19,18 @@ export function FireActionLink({
   const baseClasses =
     variant === "button"
       ? cn(
-          "inline-block py-4 px-8 rounded-6",
-          "text-label-small text-heat-100 bg-heat-4",
-          "hover:bg-heat-8 transition-all",
-          "active:scale-[0.98]",
-          className,
-        )
+        "inline-block py-4 px-8 rounded-6",
+        "text-label-small text-heat-100 bg-heat-4",
+        "hover:bg-heat-8 transition-all",
+        "active:scale-[0.98]",
+        className,
+      )
       : cn(
-          "text-label-small text-secondary hover:text-heat-100 transition-all",
-          "hover:underline underline-offset-4",
-          "active:scale-[0.98]",
-          className,
-        );
+        "text-label-small text-secondary hover:text-heat-100 transition-all",
+        "hover:underline underline-offset-4",
+        "active:scale-[0.98]",
+        className,
+      );
 
   if (onClick) {
     return (

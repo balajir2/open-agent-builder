@@ -48,8 +48,8 @@ export function UserMenu() {
     const environmentColor = isProduction
         ? 'bg-red-100 text-red-700 border-red-200'
         : isDevelopment
-        ? 'bg-blue-100 text-blue-700 border-blue-200'
-        : 'bg-gray-100 text-gray-700 border-gray-200';
+            ? 'bg-blue-100 text-blue-700 border-blue-200'
+            : 'bg-gray-100 text-gray-700 border-gray-200';
 
     return (
         <DropdownMenu>
@@ -58,9 +58,9 @@ export function UserMenu() {
                     variant="ghost"
                     className="flex items-center gap-3 h-auto py-2 px-3 hover:bg-gray-100 rounded-lg transition-colors"
                 >
-                    <Avatar className="h-8 w-8 border-2 border-gray-200">
+                    <Avatar className="h-25 w-25 border-2 border-gray-200">
                         <AvatarImage src={session.user.image ?? ""} alt={session.user.name ?? ""} />
-                        <AvatarFallback className="bg-gradient-to-br from-orange-500 to-amber-500 text-white text-sm font-semibold">
+                        <AvatarFallback className="bg-gradient-to-br from-indigo-700 via-violet-700 to-fuchsia-700 text-white text-sm font-semibold">
                             {initials}
                         </AvatarFallback>
                     </Avatar>
@@ -72,15 +72,15 @@ export function UserMenu() {
                             {session.user.email}
                         </span>
                     </div>
-                    <ChevronDown className="h-4 w-4 text-gray-400 ml-1" />
+                    <ChevronDown className="h-16 w-16 text-gray-400 ml-1" />
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-72 z-[150]" align="end" sideOffset={8} forceMount>
+            <DropdownMenuContent className="w-90 z-[150]" align="end" sideOffset={8} forceMount>
                 <DropdownMenuLabel className="font-normal p-4">
                     <div className="flex items-center gap-3">
-                        <Avatar className="h-12 w-12 border-2 border-gray-200">
+                        <Avatar className="h-24 w-24 border-2 border-gray-200">
                             <AvatarImage src={session.user.image ?? ""} alt={session.user.name ?? ""} />
-                            <AvatarFallback className="bg-gradient-to-br from-orange-500 to-amber-500 text-white font-semibold">
+                            <AvatarFallback className="bg-gradient-to-br from-indigo-700 via-violet-700 to-fuchsia-700 text-white font-semibold">
                                 {initials}
                             </AvatarFallback>
                         </Avatar>
@@ -91,8 +91,8 @@ export function UserMenu() {
                             <p className="text-xs leading-none text-gray-500 truncate">
                                 {session.user.email}
                             </p>
-                            <div className={`inline-flex items-center gap-1.5 px-2 py-1 mt-2 rounded-md text-xs font-medium border ${environmentColor}`}>
-                                <Server className="h-3 w-3" />
+                            <div className={`inline-flex items-center gap-1.5 px-3 py-3 mt-2 rounded-md text-xs font-medium border ${environmentColor}`}>
+                                <Server className="h-15 w-15" />
                                 <span>{environment}</span>
                             </div>
                         </div>
@@ -100,7 +100,7 @@ export function UserMenu() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="cursor-pointer p-3">
-                    <User className="mr-3 h-4 w-4 text-gray-500" />
+                    <User className="mr-3 h-15 w-15 text-gray-500" />
                     <span className="text-sm">Profile Settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -108,7 +108,7 @@ export function UserMenu() {
                     onClick={() => signOut({ callbackUrl: '/' })}
                     className="cursor-pointer p-3 text-red-600 focus:text-red-600 focus:bg-red-50"
                 >
-                    <LogOut className="mr-3 h-4 w-4" />
+                    <LogOut className="mr-3 h-15 w-15" />
                     <span className="text-sm font-medium">Sign Out</span>
                 </DropdownMenuItem>
             </DropdownMenuContent>

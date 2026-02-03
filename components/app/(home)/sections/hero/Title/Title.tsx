@@ -256,9 +256,9 @@ export const encryptText = (
 
 export default function HomeHeroTitle() {
   return (
-    <div className="text-title-h1 mx-auto text-center [&_span]:text-heat-100 mb-12 lg:mb-16">
+    <div className="text-title-h1 mx-auto text-center mb-12 lg:mb-16">
       Open <br className="lg-max:hidden" />
-      <span>Agent Builder</span>
+      <span className="text-gradient bg-gradient-to-b from-indigo-700 via-violet-700 to-fuchsia-700">Agent Builder</span>
     </div>
   );
 }

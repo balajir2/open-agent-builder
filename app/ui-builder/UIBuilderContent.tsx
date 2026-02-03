@@ -52,8 +52,8 @@ export default function UIBuilderContent() {
 
                         <div className="flex gap-8 items-center">
                             {/* Back to Home */}
-                            <ButtonUI variant="outline" onClick={() => router.push('/')}>
-                                Back to Home
+                            <ButtonUI variant="primary" onClick={() => router.push('/?view=workflows')}>
+                                Back
                             </ButtonUI>
 
                             {/* GitHub Template Button */}
@@ -71,7 +71,7 @@ export default function UIBuilderContent() {
                             {/* Clerk Auth */}
                             <SignedOut>
                                 <SignInButton mode="modal">
-                                    <button className="px-16 py-8 bg-heat-100 hover:bg-heat-200 text-white rounded-8 text-body-medium font-medium transition-all active:scale-[0.98]">
+                                    <button className="px-16 py-8 bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 text-white rounded-8 text-body-medium font-medium shadow-[0_4px_20px_rgba(99,102,241,0.4)] hover:brightness-110 transition-all active:scale-[0.98]">
                                         Sign In
                                     </button>
                                 </SignInButton>
@@ -95,7 +95,7 @@ export default function UIBuilderContent() {
                     <div className="text-center">
                         <h2 className="text-2xl font-bold mb-4">Sign in to use the UI Builder</h2>
                         <SignInButton mode="modal">
-                            <button className="px-24 py-12 bg-heat-100 hover:bg-heat-200 text-white rounded-8 text-body-medium font-medium transition-all active:scale-[0.98]">
+                            <button className="px-24 py-12 bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 text-white rounded-8 text-body-medium font-medium shadow-[0_4px_20px_rgba(99,102,241,0.4)] hover:brightness-110 transition-all active:scale-[0.98]">
                                 Sign In
                             </button>
                         </SignInButton>

@@ -33,7 +33,7 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
   const allUsers = useQuery(api.users.list, isAdmin ? {} : "skip") || [];
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [teamWorkflows, setTeamWorkflows] = useState<Workflow[]>([]);
-  const [activeTab, setActiveTab] = useState<"workflows" | "templates" | "team">("templates");
+  const [activeTab, setActiveTab] = useState<"workflows" | "templates" | "team">("workflows");
   const templates = listTemplates();
 
   function cleanName(name: string) {
@@ -270,7 +270,7 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
         <button
           onClick={() => setActiveTab("workflows")}
           className={`px-20 py-10 rounded-8 text-body-medium transition-all ${activeTab === "workflows"
-            ? "bg-heat-100 text-white"
+            ? "bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 text-white shadow-[0_4px_20px_rgba(99,102,241,0.4)] hover:brightness-110 active:scale-[0.98]"
             : "bg-background-base text-accent-black hover:bg-black-alpha-4 border border-border-faint"
             }`}
         >
@@ -280,7 +280,7 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
           <button
             onClick={() => setActiveTab("team")}
             className={`px-20 py-10 rounded-8 text-body-medium transition-all ${activeTab === "team"
-              ? "bg-heat-100 text-white"
+              ? "bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 text-white shadow-[0_4px_20px_rgba(99,102,241,0.4)] hover:brightness-110 active:scale-[0.98]"
               : "bg-background-base text-accent-black hover:bg-black-alpha-4 border border-border-faint"
               }`}
           >
@@ -290,7 +290,7 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
         <button
           onClick={() => setActiveTab("templates")}
           className={`px-20 py-10 rounded-8 text-body-medium transition-all ${activeTab === "templates"
-            ? "bg-heat-100 text-white"
+            ? "bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 text-white shadow-[0_4px_20px_rgba(99,102,241,0.4)] hover:brightness-110 active:scale-[0.98]"
             : "bg-background-base text-accent-black hover:bg-black-alpha-4 border border-border-faint"
             }`}
         >

@@ -32,7 +32,7 @@ export default function AnimatedRect(props: Props) {
     return new Graphics();
   })();
 
-  props.alpha ??= 1;
+  props.alpha ??= 0.24;
   props.scale ??= 1;
   props.centering ??= true;
   props.rotation ??= 0;

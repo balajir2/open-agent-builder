@@ -22,7 +22,8 @@
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  background-color: var(--heat-100); /* Fallback */
+  background-color: var(--heat-100);
+  /* Fallback */
 }
 
 /* Mask utilities */
@@ -37,8 +38,10 @@
 }
 
 .mask-intersect {
-  -webkit-mask-composite: source-in; /* For Chrome */
-  mask-composite: intersect; /* For Firefox */
+  -webkit-mask-composite: source-in;
+  /* For Chrome */
+  mask-composite: intersect;
+  /* For Firefox */
 }
 
 /* Blur utilities */
@@ -94,12 +97,14 @@
 }
 
 .container-narrow {
-  max-width: 48rem; /* 768px */
+  max-width: 48rem;
+  /* 768px */
   margin-inline: auto;
 }
 
 .container-wide {
-  max-width: 80rem; /* 1280px */
+  max-width: 80rem;
+  /* 1280px */
   margin-inline: auto;
 }
 
@@ -118,19 +123,19 @@
 }
 
 /* Spacing utilities */
-.stack-sm > * + * {
+.stack-sm>*+* {
   margin-top: 0.5rem;
 }
 
-.stack-md > * + * {
+.stack-md>*+* {
   margin-top: 1rem;
 }
 
-.stack-lg > * + * {
+.stack-lg>*+* {
   margin-top: 2rem;
 }
 
-.stack-xl > * + * {
+.stack-xl>*+* {
   margin-top: 3rem;
 }
 
@@ -214,6 +219,7 @@
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
@@ -226,9 +232,12 @@
 }
 
 @keyframes heat-glow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 20px rgba(250, 93, 25, 0.2);
   }
+
   50% {
     box-shadow: 0 0 40px rgba(250, 93, 25, 0.4);
   }

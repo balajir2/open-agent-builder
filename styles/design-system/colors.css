@@ -4,24 +4,27 @@
   /* Base colors */
   --white: #ffffff;
   --black: #000000;
-  
+
   /* Fire-inspired heat colors */
-  --heat-4: rgba(250, 93, 25, 0.039);
-  --heat-8: rgba(250, 93, 25, 0.078);
-  --heat-12: rgba(250, 93, 25, 0.122);
-  --heat-16: rgba(250, 93, 25, 0.161);
-  --heat-20: rgba(250, 93, 25, 0.200);
-  --heat-40: rgba(250, 93, 25, 0.400);
-  --heat-100: #fa5d19;
-  --heat-200: #ff6600;
-  
+  --heat-4: rgba(126, 34, 206, 0.039);
+  --heat-8: rgba(126, 34, 206, 0.078);
+  --heat-12: rgba(126, 34, 206, 0.122);
+  --heat-16: rgba(126, 34, 206, 0.161);
+  --heat-20: rgba(126, 34, 206, 0.200);
+  --heat-40: rgba(126, 34, 206, 0.400);
+  --heat-100: #7e22ce;
+  --heat-200: #c026d3;
+  --heat-270: #463fd6;
+  --heat-290: #33245e;
+  --heat-300: #24164d;
+
   /* Accent colors */
   --accent-black: #262626;
   --accent-white: #ffffff;
   --accent-amethyst: #9061ff;
   --accent-bluetron: #2a6dfb;
   --accent-crimson: #eb3424;
-  
+
   /* Black alpha variants */
   --black-alpha-1: rgba(0, 0, 0, 0.012);
   --black-alpha-2: rgba(0, 0, 0, 0.020);
@@ -43,28 +46,36 @@
   --black-alpha-64: rgba(38, 38, 38, 0.639);
   --black-alpha-72: rgba(38, 38, 38, 0.722);
   --black-alpha-88: rgba(38, 38, 38, 0.878);
-  
+
   /* White alpha variants */
   --white-alpha-56: rgba(255, 255, 255, 0.561);
   --white-alpha-72: rgba(255, 255, 255, 0.722);
-  
+
+  /* Violet alpha variants */
+  --violet-alpha-12: rgba(167, 139, 250, 0.239);
+  --violet-alpha-20: rgba(167, 139, 250, 0.278);
+
   /* Border colors */
-  --border-faint: #ededed;
-  --border-muted: #e8e8e8;
+  --border-faint: #f5f3ff;
+  --border-muted: #ede9fe;
   --border-loud: #e6e6e6;
-  
+
   /* Illustration colors */
   --illustrations-faint: #ededed;
   --illustrations-muted: #e6e6e6;
   --illustrations-default: #dbdbdb;
-  
+
   /* Background colors */
-  --background-lighter: #fbfbfb;
-  --background-base: #f9f9f9;
-  
+  --background-lighter: #faf9fb;
+  --background-base: #f5f3ff;
+
   /* Foreground colors */
   --foreground: #262626;
   --foreground-dimmer: rgba(38, 38, 38, 0.722);
+
+  /* Gradients */
+  --heat-gradient: linear-gradient(to right, #4338ca, #7c3aed, #c026d3);
+  --heat-gradient-hover: linear-gradient(to right, #4f46e5, #8b5cf6, #d946ef);
 }
 
 /* P3 color space enhancement for supported browsers */
@@ -73,24 +84,24 @@
     /* Base colors */
     --white: color(display-p3 1 1 1);
     --black: color(display-p3 0 0 0);
-    
+
     /* Fire-inspired heat colors */
-    --heat-4: color(display-p3 0.980392 0.364706 0.098039 / 0.039216);
-    --heat-8: color(display-p3 0.980392 0.364706 0.098039 / 0.078431);
-    --heat-12: color(display-p3 0.980392 0.364706 0.098039 / 0.121569);
-    --heat-16: color(display-p3 0.980392 0.364706 0.098039 / 0.160784);
-    --heat-20: color(display-p3 0.980392 0.364706 0.098039 / 0.200000);
-    --heat-40: color(display-p3 0.980392 0.364706 0.098039 / 0.400000);
-    --heat-100: color(display-p3 0.980392 0.364706 0.098039 / 1.000000);
-    --heat-200: color(display-p3 1.000000 0.400000 0.000000 / 1.000000);
-    
+    --heat-4: color(display-p3 0.576471 0.200000 0.917647 / 0.039216);
+    --heat-8: color(display-p3 0.576471 0.200000 0.917647 / 0.078431);
+    --heat-12: color(display-p3 0.576471 0.200000 0.917647 / 0.121569);
+    --heat-16: color(display-p3 0.576471 0.200000 0.917647 / 0.160784);
+    --heat-20: color(display-p3 0.576471 0.200000 0.917647 / 0.200000);
+    --heat-40: color(display-p3 0.576471 0.200000 0.917647 / 0.400000);
+    --heat-100: color(display-p3 0.576471 0.200000 0.917647 / 1.000000);
+    --heat-200: color(display-p3 0.486275 0.227451 0.929412 / 1.000000);
+
     /* Accent colors */
     --accent-black: color(display-p3 0.149020 0.149020 0.149020 / 1.000000);
     --accent-white: color(display-p3 1.000000 1.000000 1.000000 / 1.000000);
     --accent-amethyst: color(display-p3 0.564706 0.380392 1.000000 / 1.000000);
     --accent-bluetron: color(display-p3 0.164706 0.427451 0.984314 / 1.000000);
     --accent-crimson: color(display-p3 0.921569 0.203922 0.141176 / 1.000000);
-    
+
     /* Black alpha variants */
     --black-alpha-1: color(display-p3 0.000000 0.000000 0.000000 / 0.011765);
     --black-alpha-2: color(display-p3 0.000000 0.000000 0.000000 / 0.019608);
@@ -112,24 +123,27 @@
     --black-alpha-64: color(display-p3 0.149020 0.149020 0.149020 / 0.639216);
     --black-alpha-72: color(display-p3 0.149020 0.149020 0.149020 / 0.721569);
     --black-alpha-88: color(display-p3 0.149020 0.149020 0.149020 / 0.878431);
-    
+
     /* White alpha variants */
     --white-alpha-56: color(display-p3 1.000000 1.000000 1.000000 / 0.560784);
     --white-alpha-72: color(display-p3 1.000000 1.000000 1.000000 / 0.721569);
-    
+
+    /* Violet alpha variants */
+    --violet-alpha-12: color(display-p3 0.655 0.545 0.980 / 0.239216);
+    --violet-alpha-20: color(display-p3 0.655 0.545 0.980 / 0.278431);
+
     /* Border colors */
-    --border-faint: color(display-p3 0.929412 0.929412 0.929412 / 1.000000);
-    --border-muted: color(display-p3 0.909804 0.909804 0.909804 / 1.000000);
+    --border-faint: color(display-p3 0.961 0.953 1.000 / 1.000000);
+    --border-muted: color(display-p3 0.929 0.914 0.996 / 1.000000);
     --border-loud: color(display-p3 0.901961 0.901961 0.901961 / 1.000000);
-    
+
     /* Illustration colors */
     --illustrations-faint: color(display-p3 0.929412 0.929412 0.929412 / 1.000000);
     --illustrations-muted: color(display-p3 0.901961 0.901961 0.901961 / 1.000000);
     --illustrations-default: color(display-p3 0.858824 0.858824 0.858824 / 1.000000);
-    
+
     /* Background colors */
-    --background-lighter: color(display-p3 0.984314 0.984314 0.984314 / 1.000000);
-    --background-base: color(display-p3 0.976471 0.976471 0.976471 / 1.000000);
+    --background-lighter: color(display-p3 0.980 0.976 0.984 / 1.000000);
+    --background-base: color(display-p3 0.961 0.953 1.000 / 1.000000);
   }
 }
-

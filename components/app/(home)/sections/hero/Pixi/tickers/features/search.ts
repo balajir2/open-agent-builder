@@ -81,8 +81,8 @@ export default async function search(props: Props) {
 
   Promise.all(
     [
-      rects.map((rect) => rect.animate({ alpha: 0.68 })),
-      dots.map((dot) => dot.animate({ alpha: 0.68 })),
+      rects.map((rect) => rect.animate({ alpha: 0.24 })),
+      dots.map((dot) => dot.animate({ alpha: 0.24 })),
     ].flat(),
   );
 
@@ -108,16 +108,16 @@ export default async function search(props: Props) {
     await Promise.all(
       [
         surroundingDots.map((dot) =>
-          dot.animate({ alpha: 1 }, { duration: 0.75 }),
+          dot.animate({ alpha: 0.45 }, { duration: 0.75 }),
         ),
-        rect.animate({ alpha: 1, width: 14, height: 14 }, { duration: 0.75 }),
+        rect.animate({ alpha: 0.45, width: 14, height: 14 }, { duration: 0.75 }),
       ].flat(),
     );
 
-    rect.animate({ alpha: 0.68, width: 10, height: 10 }, { duration: 0.75 });
+    rect.animate({ alpha: 0.24, width: 10, height: 10 }, { duration: 0.75 });
     Promise.all(
       surroundingDots.map((dot) =>
-        dot.animate({ alpha: 0.68 }, { duration: 0.75 }),
+        dot.animate({ alpha: 0.24 }, { duration: 0.75 }),
       ),
     );
   }
