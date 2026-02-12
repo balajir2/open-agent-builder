@@ -14,7 +14,11 @@ import { marked } from "marked";
 import {
   Search, X, Save, Check, Download, ChevronDown,
   FileText, FileDown, Loader, CheckCircle,
-  Play, AlertCircle
+  Play, AlertCircle, Info,
+  CheckCircleIcon,
+  CircleAlert,
+  CrossIcon,
+  XCircleIcon
 } from "lucide-react";
 import { getDocumentSaveLocation } from '@/utils/document-export';
 import { FileLocationModal } from '@/components/ui/FileLocationModal';
@@ -362,6 +366,9 @@ export default function WorkflowRunnerUI() {
   const formatDropdownRef = useRef<HTMLDivElement>(null);
   const downloadButtonRef = useRef<HTMLButtonElement>(null);
   const [downloadMenuPosition, setDownloadMenuPosition] = useState({ top: 0, left: 0 });
+  const [pendingAuth, setPendingAuth] = useState<any>(null);
+  const [isResuming, setIsResuming] = useState(false);
+  const pendingAuthRef = useRef<any>(null);
 
   useEffect(() => {
     if (showDownloadMenu && downloadButtonRef.current) {
@@ -772,6 +779,86 @@ export default function WorkflowRunnerUI() {
     setUploadErrors(prev => ({ ...prev, [variableName]: null }));
   };
 
+  const handleResumeWorkflow = async (approved = true) => {
+    if (!pendingAuth || !selectedWorkflowId) return;
+
+    setIsExecuting(true);
+    setIsResuming(true);
+    const resumeData = {
+      threadId: pendingAuth.threadId,
+      executionId: pendingAuth.executionId,
+      resumeValue: { approved, status: approved ? 'approved' : 'rejected' }
+    };
+
+    setPendingAuth(null);
+    pendingAuthRef.current = null;
+
+    try {
+      const response = await fetch(`/api/workflows/${selectedWorkflowId}/resume`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(resumeData),
+      });
+
+      if (!response.ok) throw new Error(`Resume failed: ${response.status}`);
+
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() || '';
+
+        for (const part of parts) {
+          const lines = part.split('\n');
+          let event = 'message';
+          let data = '';
+
+          for (const line of lines) {
+            if (line.startsWith('event:')) {
+              event = line.substring(6).trim();
+            } else if (line.startsWith('data:')) {
+              data = line.substring(5).trim();
+            }
+          }
+
+          if (data) {
+            try {
+              const parsedData = JSON.parse(data);
+              setWorkflowResponses((prev) => [...prev, {
+                event,
+                data: parsedData,
+                timestamp: parsedData.timestamp || new Date().toISOString(),
+              }]);
+
+              if (event === 'workflow_paused') {
+                setPendingAuth(parsedData.pendingAuth);
+                pendingAuthRef.current = parsedData.pendingAuth;
+              }
+            } catch (e) {
+              console.error('Error parsing resume SSE:', e);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Resume error:", error);
+      setWorkflowResponses((prev) => [...prev, {
+        event: 'error',
+        data: { error: error instanceof Error ? error.message : "Resume failed" },
+        timestamp: new Date().toISOString(),
+      }]);
+    } finally {
+      setIsExecuting(false);
+      setIsResuming(false);
+    }
+  };
+
   const handleRunWorkflow = async () => {
     if (!selectedWorkflowId) {
       alert("Please provide a workflow id in the URL (workflowid query param).");
@@ -785,6 +872,8 @@ export default function WorkflowRunnerUI() {
 
     setIsExecuting(true);
     setWorkflowResponses([]);
+    setPendingAuth(null);
+    pendingAuthRef.current = null;
 
     try {
       const response = await fetch(`/api/workflows/${selectedWorkflowId}/execute-stream`, {
@@ -844,6 +933,11 @@ export default function WorkflowRunnerUI() {
               };
 
               setWorkflowResponses((prev) => [...prev, responseData]);
+
+              if (event === 'workflow_paused') {
+                setPendingAuth(parsedData.pendingAuth);
+                pendingAuthRef.current = parsedData.pendingAuth;
+              }
             } catch (parseError) {
               console.error('Error parsing SSE data:', parseError, 'Raw data:', data);
               // Only show error if it's not just an empty keep-alive or similar
@@ -2072,6 +2166,45 @@ export default function WorkflowRunnerUI() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-4">
+                {pendingAuth && (
+                  <div className="mb-6 p-6 bg-amber-50 border border-amber-200 rounded-xl shadow-sm animate-in fade-in slide-in-from-top-4 duration-300">
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 bg-amber-100 rounded-lg">
+                        <AlertCircle className="w-15 h-15 text-amber-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-amber-900 mb-1">
+                          Action Required
+                        </h3>
+                        <div
+                          className="text-amber-800 mb-4 bg-white/50 p-4 rounded-lg border border-amber-100 prose prose-amber max-w-none prose-sm"
+                          dangerouslySetInnerHTML={{
+                            __html: DOMPurify.sanitize(marked.parse(pendingAuth.message || 'The workflow requires your approval to continue.') as string)
+                          }}
+                        />
+                        <div className="flex items-center gap-6">
+                          <button
+                            onClick={() => handleResumeWorkflow(true)}
+                            disabled={isResuming}
+                            className="inline-flex items-center gap-4 px-8 py-3.5 bg-amber-700 hover:bg-amber-600 text-white rounded-lg font-medium transition-all shadow-sm hover:shadow-md active:scale-95 opacity-80 disabled:opacity-50"
+                          >
+                            {isResuming ? <Loader className="w-14 h-14 animate-spin" /> : <CheckCircleIcon className="w-15 h-15" />}
+                            Approve & Continue
+                          </button>
+                          <button
+                            onClick={() => handleResumeWorkflow(false)}
+                            disabled={isResuming}
+                            className="inline-flex items-center gap-3 px-20 py-3.5 text-amber-700 hover:bg-amber-100 rounded-lg font-medium transition-colors disabled:opacity-50"
+                          >
+                            <XCircleIcon className="w-18 h-18" />
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {showDownloadSuccess && (
                   <div className="flex items-start gap-2 p-3 mb-4 bg-green-50 rounded-md border border-green-200">
                     <div>
@@ -2215,9 +2348,29 @@ const displayAsText = (content: any): string => {
 };
 
 const getFinalWorkflowResult = (responses: any[], workflowDetails: any) => {
-  const errorEvent = responses.find(r => r.event === "error" || r.event === "node_failed");
+  const errorEvent = responses.find(r => (r.event === "error" || r.event === "node_failed") && r.data.error) ||
+    responses.find(r => r.event === "error" || r.event === "node_failed");
 
   if (errorEvent) {
+    const isRejection = errorEvent.data.error?.toLowerCase().includes('rejected') ||
+      errorEvent.data.error?.toLowerCase().includes('denied');
+
+    if (isRejection) {
+      return (
+        <div className="p-6 border border-slate-200 rounded-lg bg-slate-50">
+          <div className="flex items-start gap-3">
+            <Info className="w-10 h-10 text-slate-500 mt-1" />
+            <div>
+              <h3 className="text-lg font-medium text-slate-800 mb-2">Workflow Stopped</h3>
+              <p className="text-sm text-slate-700">
+                {errorEvent.data.error || "Workflow was stopped by user"}
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="p-6 border border-red-200 rounded-lg bg-red-50">
         <div className="flex items-start gap-3">
@@ -2337,8 +2490,8 @@ const formatOutput = (output: any) => {
   function formatTextToHTML(text: string): string {
     if (!text) return "";
 
-    // Convert markdown to HTML using marked
-    const html = marked.parse(text);
+    // Convert markdown to HTML using marked with GFM line breaks
+    const html = marked.parse(text, { breaks: true });
 
     // SECURITY FIX: Sanitize the final HTML with DOMPurify
     return DOMPurify.sanitize(html as string, {

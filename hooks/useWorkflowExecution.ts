@@ -273,22 +273,22 @@ export function useWorkflowExecution() {
     setCurrentNodeId(null);
   }, []);
 
-  const resumeWorkflow = useCallback(async () => {
+  const resumeWorkflow = useCallback(async (resId?: string, execId?: string, approved: boolean = true) => {
     if (!currentWorkflow) {
       console.error('❌ No workflow to resume');
       return;
     }
 
-    if (!pendingAuth) {
+    if (!pendingAuth && !resId) {
       console.error('❌ No pending authorization to resume from');
       return;
     }
 
-    const threadId = pendingAuth.threadId;
-    const executionId = pendingAuth.executionId;
+    const threadId = resId || pendingAuth?.threadId;
+    const executionId = execId || pendingAuth?.executionId;
 
     if (!threadId) {
-      console.error('❌ No threadId in pendingAuth');
+      console.error('❌ No threadId provided or in pendingAuth');
       return;
     }
 
@@ -302,7 +302,7 @@ export function useWorkflowExecution() {
         body: JSON.stringify({
           threadId,
           executionId,
-          resumeValue: { approved: true, status: 'approved' },
+          resumeValue: { approved, status: approved ? 'approved' : 'rejected' },
         }),
         signal: abortControllerRef.current?.signal,
       });

@@ -252,4 +252,23 @@ export default defineSchema({
   })
     .index("by_key", ["key"])
     .index("by_expiration", ["expiresAt"]), // For cleanup of expired entries
+
+  // LangGraph Checkpoints - For workflow persistence
+  checkpoints: defineTable({
+    threadId: v.string(),
+    checkpointId: v.optional(v.string()),
+    checkpoint: v.any(),
+    metadata: v.any(),
+    parentConfig: v.optional(v.any()),
+    createdAt: v.string(),
+  }).index("by_thread", ["threadId"]),
+
+  checkpoint_writes: defineTable({
+    threadId: v.string(),
+    checkpointId: v.string(),
+    taskId: v.string(),
+    idx: v.number(),
+    channel: v.string(),
+    value: v.any(),
+  }).index("by_thread_checkpoint", ["threadId", "checkpointId"]),
 });

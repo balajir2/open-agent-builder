@@ -377,7 +377,7 @@ export class ToolFactory {
 
             //             // Step 1: Create generation with hardcoded headers
             //             const createResponse = await fetch(
-            //                 'https://public-api.gamma.app/v0.2/generations',
+            //                 'https://public-api.gamma.app/v1.0/generations/generations',
             //                 {
             //                     method: 'POST',
             //                     headers: {
@@ -423,7 +423,7 @@ export class ToolFactory {
             //                 // Step 3: Check generation status
             //                 console.log(`[gamma-api] Poll #${pollCount}: Checking status...`);
             //                 const statusResponse = await fetch(
-            //                     `https://public-api.gamma.app/v0.2/generations/${generationId}`,
+            //                     `https://public-api.gamma.app/v1.0/generations/${generationId}`,
             //                     {
             //                         headers: {
             //                             'Authorization': `Bearer ${apiKeys.gamma}`,
@@ -477,7 +477,7 @@ export class ToolFactory {
             //                 generationId,
             //                 state: 'processing',
             //                 message: 'Generation is still processing in background. Use the generation ID to check status later.',
-            //                 checkUrl: `https://public-api.gamma.app/v0.2/generations/${generationId}`,
+            //                 checkUrl: `https://public-api.gamma.app/v1.0/generations/${generationId}`,
             //             };
             //             console.log('[gamma-api] Returning timeout result:', JSON.stringify(timeoutResult, null, 2));
             //             console.log('[gamma-api] ========== TOOL EXECUTION ENDED (TIMEOUT) ==========');

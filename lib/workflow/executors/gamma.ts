@@ -45,7 +45,7 @@ export async function executeGammaNode(
 
         // Step 1: Create generation
         const createResponse = await fetch(
-            'https://public-api.gamma.app/v0.2/generations',
+            'https://public-api.gamma.app/v1.0/generations',
             {
                 method: 'POST',
                 headers: {
@@ -83,7 +83,7 @@ export async function executeGammaNode(
 
         while (Date.now() - startTime < maxWaitTime) {
             const statusResponse = await fetch(
-                `https://public-api.gamma.app/v0.2/generations/${generationId}`,
+                `https://public-api.gamma.app/v1.0/generations/${generationId}`,
                 {
                     headers: {
                         'X-API-KEY': apiKey,
@@ -119,7 +119,7 @@ export async function executeGammaNode(
                         await new Promise(resolve => setTimeout(resolve, exportPollInterval));
 
                         const exportCheckResponse = await fetch(
-                            `https://public-api.gamma.app/v0.2/generations/${generationId}`,
+                            `https://public-api.gamma.app/v1.0/generations/${generationId}`,
                             {
                                 headers: {
                                     'X-API-KEY': apiKey,
@@ -175,7 +175,7 @@ export async function executeGammaNode(
 
         // Fetch latest status one last time
         const finalStatusResponse = await fetch(
-            `https://public-api.gamma.app/v0.2/generations/${generationId}`,
+            `https://public-api.gamma.app/v1.0/generations/${generationId}`,
             {
                 headers: {
                     'X-API-KEY': apiKey,

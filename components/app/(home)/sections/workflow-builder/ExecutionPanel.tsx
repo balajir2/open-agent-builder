@@ -28,7 +28,7 @@ interface ExecutionPanelProps {
   isRunning: boolean;
   currentNodeId: string | null;
   onRun: (input: string) => void;
-  onResumePendingAuth: () => Promise<void>;
+  onResumePendingAuth: (threadId?: string, executionId?: string, approved?: boolean) => Promise<void>;
   onClose: () => void;
   environment: 'draft' | 'production';
   pendingAuth: WorkflowPendingAuth | null;
@@ -98,8 +98,14 @@ export default function ExecutionPanel({
     if (isResumingAuth) return;
     setIsResumingAuth(true);
     try {
-      await onResumePendingAuth();
-      toast.success('Resuming workflow...');
+      if (pendingAuth?.toolName === 'user-approval') {
+        // Default to true if called generally, but this handler is mostly for the button click
+        await onResumePendingAuth(pendingAuth?.threadId, pendingAuth?.executionId, true);
+        toast.success('Approved');
+      } else {
+        await onResumePendingAuth(pendingAuth?.threadId, pendingAuth?.executionId);
+        toast.success('Resuming workflow...');
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to resume workflow';
       toast.error(message);
@@ -591,7 +597,7 @@ export default function ExecutionPanel({
                   onClick={async () => {
                     setIsResumingAuth(true);
                     try {
-                      await onResumePendingAuth();
+                      await onResumePendingAuth(pendingAuth.threadId, pendingAuth.executionId);
                       toast.success('Approved');
                     } catch (error) {
                       toast.error('Failed to resume workflow');
@@ -606,13 +612,21 @@ export default function ExecutionPanel({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    toast.error('Rejected');
-                    onClose();
+                  onClick={async () => {
+                    setIsResumingAuth(true);
+                    try {
+                      await onResumePendingAuth(pendingAuth.threadId, pendingAuth.executionId, false);
+                      toast.success('Rejected');
+                    } catch (error) {
+                      toast.error('Failed to resume workflow');
+                    } finally {
+                      setIsResumingAuth(false);
+                    }
                   }}
+                  disabled={isResumingAuth}
                   className="flex-1 px-14 py-8 bg-background-base hover:bg-black-alpha-4 text-accent-black border border-border-faint rounded-6 text-body-small font-medium transition-all active:scale-[0.98]"
                 >
-                  Reject
+                  {isResumingAuth ? 'Rejecting...' : 'Reject'}
                 </button>
               </div>
             </div>

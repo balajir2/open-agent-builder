@@ -210,7 +210,8 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
                       <FileDown className="w-16 h-16" />
                     </button>
                     {/* Only show delete button if user is the owner */}
-                    {user?.id === workflow.userId && (
+
+                    {(user?.id === workflow.userId || isAdmin) && (
                       <button
                         onClick={(e) => handleDelete(e, workflow.id, isTeam)}
                         className="text-black-alpha-32 hover:text-red-500 transition-colors p-4 -mr-4 -mt-4 rounded-full hover:bg-red-50"

@@ -22,6 +22,7 @@ This document provides a centralized index to all documentation in the project. 
 |----------|---------|----------|
 | **[User Guide](./docs/USER-GUIDE.md)** 📖 | Complete guide to using the application (500+ lines) | `docs/USER-GUIDE.md` |
 | **[Workflow Runner Guide](./docs/guides/WORKFLOW-RUNNER-README.md)** | End-user workflow execution interface | `docs/guides/` |
+| **[Human Approval Guide](./docs/HUMAN_APPROVAL_GUIDE.md)** | Guide for approvers and builders on approval flows | `docs/HUMAN_APPROVAL_GUIDE.md` |
 
 ### For Administrators
 

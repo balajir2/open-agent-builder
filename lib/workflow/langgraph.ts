@@ -11,7 +11,8 @@
  */
 
 import 'server-only';
-import { StateGraph, Annotation, START, END, MemorySaver, Command, Send, interrupt, isInterrupted } from "@langchain/langgraph";
+import { StateGraph, Annotation, START, END, Command, Send, interrupt, isInterrupted } from "@langchain/langgraph";
+import { ConvexCheckpointSaver } from './convex-checkpointer';
 import { safeEvaluate } from './safe-expression-evaluator';
 import { Workflow, WorkflowState, NodeExecutionResult, WorkflowNode, WorkflowEdge, WorkflowPendingAuth } from './types';
 import { executeAgentNode } from './executors/agent';
@@ -95,7 +96,7 @@ export class LangGraphExecutor {
   private graph: any; // Compiled StateGraph
   private apiKeys?: { anthropic?: string; groq?: string; openai?: string; firecrawl?: string; arcade?: string; gamma?: string };
   private onNodeUpdate?: (nodeId: string, result: NodeExecutionResult) => void;
-  private checkpointer: MemorySaver;
+  private checkpointer: any;
   private parallelNodeIds = new Set<string>();
   private activeThreadId?: string;
   private activeExecutionId?: string;
@@ -115,8 +116,17 @@ export class LangGraphExecutor {
     // Initialize checkpointer for state persistence
     // - Required for human-in-the-loop (interrupts)
     // - Time-travel debugging
-    // Note: MemorySaver is lightweight and doesn't impact performance
-    this.checkpointer = new MemorySaver();
+    // Using persistent Convex-based checkpointer to support resume across requests
+    const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+    if (convexUrl) {
+      this.checkpointer = new ConvexCheckpointSaver(convexUrl);
+    } else {
+      console.warn('⚠️ NEXT_PUBLIC_CONVEX_URL not set, falling back to MemorySaver');
+      // @ts-ignore - Importing MemorySaver dynamically if needed or just use it if available
+      import('@langchain/langgraph').then(m => {
+        this.checkpointer = new m.MemorySaver();
+      });
+    }
 
     // Build the LangGraph StateGraph
     this.graph = this.buildGraph();
@@ -246,6 +256,35 @@ export class LangGraphExecutor {
           builder.addConditionalEdges(sourceId as any, routingFunction, pathMap as any);
           conditionalNodes.add(sourceId);
         }
+        continue;
+      }
+
+      // Handle user-approval nodes with conditional routing
+      if (['user-approval', 'user approval', 'approval'].includes(sourceType?.toLowerCase() || '')) {
+        const routingFunction = this.createApprovalRouter(sourceId);
+        const pathMap: Record<string, string> = {};
+
+        // Build path map based on edge handles
+        for (const edge of sourceEdges) {
+          const handle = (edge.sourceHandle || edge.label || '').toLowerCase();
+
+          if (['approved', 'approve', 'yes', 'true', 'confirm'].includes(handle)) {
+            pathMap['approved'] = edge.target;
+          } else if (['rejected', 'reject', 'no', 'false', 'deny', 'cancel'].includes(handle)) {
+            pathMap['rejected'] = edge.target;
+          } else {
+            // Fallback for default handle - assume approved if not specified, or use as specific handle
+            // For safety, let's map unknown handles to 'approved' if they look positive, otherwise generic
+            pathMap['default'] = edge.target;
+            if (!pathMap['approved']) pathMap['approved'] = edge.target;
+          }
+        }
+
+        // Ensure we have targets for both branches if possible, or fallback to END checking
+        // LangGraph requires all return values from router to be in pathMap if strictly typed, 
+        // but here it's flexible. 
+
+        builder.addConditionalEdges(sourceId as any, routingFunction, pathMap as any);
         continue;
       }
 
@@ -386,7 +425,7 @@ export class LangGraphExecutor {
         // Check if output is a pending approval (user-approval node)
         if (output && typeof output === 'object' && output !== null && '__pendingApproval' in output) {
           console.log(`Detected pending approval from node ${node.id}`);
-          return await this.handlePendingApproval(node, result, output as ApprovalPendingResponse);
+          return await this.handlePendingApproval(node, result, output as ApprovalPendingResponse, state);
         }
 
         // Extract tool calls and chat history if this is an agent node
@@ -471,8 +510,13 @@ export class LangGraphExecutor {
           ...(loopResultsUpdate ? { loopResults: loopResultsUpdate } : {}),
         };
       } catch (error) {
+        // Robust check for LangGraph interrupts (can be an object or an array of records)
+        if (this.isInterrupt(error)) {
+          throw error;
+        }
+
         result.status = 'failed';
-        result.error = error instanceof Error ? error.message : 'Unknown error';
+        result.error = error instanceof Error ? error.message : String(error);
         result.completedAt = new Date().toISOString();
         this.onNodeUpdate?.(node.id, result);
 
@@ -603,6 +647,30 @@ export class LangGraphExecutor {
 
       // Return the branch handle ('if' or 'else')
       return result.branch || 'else';
+    };
+  }
+
+  /**
+   * Create conditional router for approval nodes
+   */
+  private createApprovalRouter(nodeId: string) {
+    return async (state: typeof WorkflowStateAnnotation.State) => {
+      const nodeResult = state.nodeResults?.[nodeId];
+
+      // Check the output from the node execution
+      // In handlePendingApproval, we set output to 'Approved' or 'Rejected'
+      // We also verify the rejection status
+
+      const output = nodeResult?.output;
+
+      console.log(`Approval router for ${nodeId}:`, { output });
+
+      if (output === 'Rejected' || output === 'Rejected by user') {
+        return 'rejected';
+      }
+
+      // Default to approved for safety, or if output is 'Approved'
+      return 'approved';
     };
   }
 
@@ -939,6 +1007,7 @@ export class LangGraphExecutor {
     node: WorkflowNode,
     result: NodeExecutionResult,
     pending: ApprovalPendingResponse,
+    state: typeof WorkflowStateAnnotation.State
   ) {
     const message = pending.message || 'Approval required';
     const pendingAuth: WorkflowPendingAuth = {
@@ -973,13 +1042,48 @@ export class LangGraphExecutor {
     });
 
     this.pendingAuth = null;
-    result.status = 'running';
+
+    // Check if approved
+    const isApproved = (resumeValue as any)?.approved !== false && (resumeValue as any)?.status !== 'rejected';
+
+    if (!isApproved) {
+      // User requested change: invalid/rejected approval should still proceed to next node
+      result.status = 'completed';
+      result.output = 'Rejected';
+      result.completedAt = new Date().toISOString();
+      this.onNodeUpdate?.(node.id, result);
+
+      // Return full state update so router sees the rejection
+      return {
+        variables: {
+          ...state.variables,
+          lastOutput: 'Rejected',
+          [node.id]: 'Rejected'
+        },
+        nodeResults: { [node.id]: result },
+        pendingAuth: null,
+        currentNodeId: node.id
+      };
+    }
+
+    result.status = 'completed';
     result.pendingAuth = undefined;
-    result.output = undefined;
-    delete result.completedAt;
+    const outputValue = (resumeValue as any)?.status === 'approved' ? 'Approved' : 'Action received';
+    result.output = outputValue;
+    result.completedAt = new Date().toISOString();
     this.onNodeUpdate?.(node.id, result);
 
-    return resumeValue ?? { approved: true };
+    // Return full state update
+    return {
+      variables: {
+        ...state.variables,
+        lastOutput: outputValue,
+        [node.id]: outputValue
+      },
+      nodeResults: { [node.id]: result },
+      pendingAuth: null,
+      currentNodeId: node.id
+    };
   }
 
   /**
@@ -1131,6 +1235,43 @@ export class LangGraphExecutor {
     };
   }
 
+  private isInterrupt(error: any): boolean {
+    if (!error) return false;
+    if (isInterrupted(error)) return true;
+    if (error.__interrupt__) return true;
+    if (Array.isArray(error)) {
+      return error.some(e => e && ((e.id && e.value) || isInterrupted(e)));
+    }
+    if (error instanceof Error && (error.message.includes('"pendingAuth"') || error.message.includes('"__interrupt__"'))) {
+      return true;
+    }
+    return false;
+  }
+
+  private extractPendingAuth(error: any): any {
+    if (!error) return null;
+    if (isInterrupted(error)) return (error as any).__interrupt__?.[0]?.value?.pendingAuth;
+    if (error.__interrupt__) return error.__interrupt__?.[0]?.value?.pendingAuth;
+
+    let array = null;
+    if (Array.isArray(error)) {
+      array = error;
+    } else if (error instanceof Error && error.message.includes('"pendingAuth"')) {
+      try {
+        const parsed = JSON.parse(error.message);
+        array = Array.isArray(parsed) ? parsed : parsed.__interrupt__;
+      } catch (e) { /* ignore */ }
+    }
+
+    if (array && Array.isArray(array)) {
+      for (const item of array) {
+        if (item?.value?.pendingAuth) return item.value.pendingAuth;
+        if (item?.__interrupt__?.[0]?.value?.pendingAuth) return item.__interrupt__[0].value.pendingAuth;
+      }
+    }
+    return null;
+  }
+
   private wrapStreamWithInterruptHandling(rawStream: AsyncIterable<any>, fallbackState: any) {
     const self = this;
 
@@ -1139,9 +1280,9 @@ export class LangGraphExecutor {
 
       try {
         for await (const chunk of rawStream) {
-          if (isInterrupted(chunk)) {
-            const interruptRecord = (chunk as any).__interrupt__?.[0] ?? null;
-            const pendingAuth = self.pendingAuth ?? interruptRecord?.value?.pendingAuth ?? null;
+          if (self.isInterrupt(chunk)) {
+            const interruptRecord = Array.isArray(chunk) ? chunk[0] : (chunk as any).__interrupt__?.[0] ?? null;
+            const pendingAuth = self.pendingAuth ?? self.extractPendingAuth(chunk) ?? interruptRecord?.value?.pendingAuth ?? null;
             const pauseState = {
               ...(latestState ?? {}),
               pendingAuth,
@@ -1164,11 +1305,25 @@ export class LangGraphExecutor {
           yield enrichedChunk;
         }
       } catch (streamError) {
+        // If it's an interrupt thrown by the stream, handle it as a pause
+        if (self.isInterrupt(streamError)) {
+          const pauseState = {
+            ...(latestState ?? {}),
+            pendingAuth: self.pendingAuth ?? self.extractPendingAuth(streamError),
+            currentNodeId: (Array.isArray(streamError) ? streamError[0] : null)?.value?.nodeId ?? latestState?.currentNodeId ?? '',
+            nodeResults: latestState?.nodeResults ?? {},
+          };
+
+          self.lastStreamState = pauseState;
+          yield pauseState;
+          return;
+        }
+
         console.error('ERROR: Stream iteration error in wrapStreamWithInterruptHandling:', streamError);
         // Yield error state instead of throwing
         const errorState = {
           ...(latestState ?? {}),
-          error: streamError instanceof Error ? streamError.message : 'Stream error',
+          error: streamError instanceof Error ? streamError.message : String(streamError),
           status: 'failed'
         };
         self.lastStreamState = errorState;
