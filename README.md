@@ -11,6 +11,7 @@
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
 [![Built with Next.js](https://img.shields.io/badge/Built%20with-Next.js%2016-black)](https://nextjs.org/)
 [![Powered by LangGraph](https://img.shields.io/badge/Powered%20by-LangGraph-blue)](https://github.com/langchain-ai/langgraph)
+[![Built with Love By bounteous](https://img.shields.io/badge/Built%20with%20Love%20by-Bounteous-yellow)](https://www.bounteous.com)
 
 [Documentation](#-documentation) • [Examples](#example-workflows) • [Architecture](#architecture)
 
@@ -28,7 +29,7 @@ Bounteous has transformed the original concept into a production-ready platform 
 
 - **Visual No-Code UI** - Intuitive drag-and-drop workflow builder with real-time execution visualization
 - **Generic Agent Framework** - Create and configure AI agents that work with any LLM provider
-- **Multi-LLM Support** - Seamlessly switch between Claude, GPT-4, Gemini, and Groq models
+- **Multi-LLM Support** - Seamlessly switch between Claude, GPT-5.2/o3, Gemini 3, and Groq models
 - **Tool Attachment System** - Attach any combination of tools to agents for autonomous task execution
 - **MCP Protocol Integration** - Full Model Context Protocol support for extensible tool connectivity
 - **Enterprise Security** - Azure AD SSO, encrypted API keys, OWASP compliance, and sandboxed execution
@@ -37,7 +38,7 @@ Bounteous has transformed the original concept into a production-ready platform 
 
 - **Visual No-Code Interface** - Drag-and-drop workflow builder with 15 node types
 - **Multi-Tool Integration** - 6+ integrated tools (Firecrawl, Tavily, Serper, E2B, Arcade, Gamma AI)
-- **Multi-LLM Support** - Choose from Claude, GPT-4, Gemini, or Groq (all models support tools)
+- **Multi-LLM Support** - Choose from Claude, GPT-5.2/o3, Gemini 3, or Groq (all models support tools)
 - **Real-Time Execution** - Server-Sent Events (SSE) streaming with live progress updates
 - **Enterprise Authentication** - Azure AD integration with automatic token refresh
 - **Production Security** - OWASP Top 10 compliance, sandboxed code execution, input validation
@@ -82,13 +83,13 @@ Bounteous has transformed the original concept into a production-ready platform 
 - **MCP Protocol Support** - Extensible Model Context Protocol for custom tool integration
 - **Tool Auto-Discovery** - Agents automatically receive tool definitions and invocation rights
 - **Two-Tier API Keys** - System-level fallback keys + user-level encrypted keys
-- **Universal Tool Support** - All LLM providers (Claude, GPT-4, Gemini, Groq) support all tools
+- **Universal Tool Support** - All LLM providers (Claude, GPT-5.2/o3, Gemini 3, Groq) support all tools
 
 ### 🧠 Multi-LLM Support
-- **Anthropic Claude** - Haiku 4.5, Sonnet 4.5, Opus 4.5
-- **OpenAI** - GPT-4o, GPT-4o-mini
-- **Google Gemini** - 2.0 Flash Experimental, 2.0 Flash, 2.0 Flash-Lite
-- **Groq** - Llama 3.3 70B, Llama 3.1 8B Instant, GPT OSS 120B/20B
+- **Anthropic Claude** - Haiku 4.5, Sonnet 4.5, Opus 4.6 (1M context)
+- **OpenAI** - GPT-5.2 (default), o3 (reasoning), GPT-4.5 (Pro), GPT-4o-mini
+- **Google Gemini** - Gemini 3 Pro Preview, Gemini 3 Flash, Gemini 2.5 Pro, Gemini 2.5 Flash
+- **Groq** - Llama 4 Maverick/Scout, Llama 3.3 70B, Llama 3.1 8B Instant, GPT OSS 120B/20B
 - **All Providers Support Tools + MCP** - Universal tool support across all LLM providers
 - **Mix and Match** - Use different models for different nodes in the same workflow
 
@@ -139,10 +140,10 @@ Bounteous has transformed the original concept into a production-ready platform 
 ### LLM Providers (Choose Any)
 | Provider | Models | Tool Support |
 |----------|--------|-------------|
-| **[Anthropic Claude](https://www.anthropic.com/)** | Haiku 4.5, Sonnet 4.5, Opus 4.5 | ✅ Tools + MCP |
-| **[OpenAI](https://platform.openai.com/)** | GPT-4o, GPT-4o-mini | ✅ Tools + MCP |
-| **[Google Gemini](https://ai.google.dev/)** | 2.0 Flash Experimental, 2.0 Flash, 2.0 Flash-Lite | ✅ Tools + MCP |
-| **[Groq](https://groq.com/)** | Llama 3.3 70B, Llama 3.1 8B Instant | ✅ Tools + MCP |
+| **[Anthropic Claude](https://www.anthropic.com/)** | Haiku 4.5, Sonnet 4.5, Opus 4.6 (1M context) | ✅ Tools + MCP |
+| **[OpenAI](https://platform.openai.com/)** | GPT-5.2, o3, GPT-4.5, GPT-4o-mini | ✅ Tools + MCP |
+| **[Google Gemini](https://ai.google.dev/)** | Gemini 3 Pro Preview, Gemini 3 Flash, Gemini 2.5 Pro, Gemini 2.5 Flash | ✅ Tools + MCP |
+| **[Groq](https://groq.com/)** | Llama 4 Maverick/Scout, Llama 3.3 70B, Llama 3.1 8B Instant, GPT OSS 120B/20B | ✅ Tools + MCP |
 
 ### Integrated Tools
 | Tool | Purpose | Integration |
@@ -194,6 +195,17 @@ We remain grateful to the Firecrawl team for the original inspiration, and Firec
 ---
 
 ## Installation & Setup
+
+### 1. Clone and Install Dependencies
+
+```bash
+git clone https://github.com/your-org/open-agent-builder.git
+cd open-agent-builder
+npm install
+```
+
+### 2. Set Up Convex Database
+
 ```bash
 # Install Convex CLI globally
 npm install -g convex
@@ -305,7 +317,7 @@ node scripts/verify-security-setup.js
 
 For complete security documentation, see [SECURITY.md](./SECURITY.md)
 
-### 8. Optional: HTTP Domain Whitelist
+### 6. Optional: HTTP Domain Whitelist
 
 For enhanced security, restrict HTTP nodes to specific domains:
 
@@ -393,15 +405,20 @@ Provides a more customizable execution interface with embedded workflow visualiz
 
 | Node Type | Purpose | Example Use | Tool Support |
 |-----------|---------|-------------|--------------|
-| **Start** | Workflow entry point | Define input variables | N/A |
+| **Start** | Workflow entry point | Define input variables, document uploads | N/A |
 | **Agent** | AI reasoning with LLMs | Analyze data, make decisions | ✅ MCP + Standard Tools |
 | **MCP Tool** | External tool calls | Firecrawl scraping, APIs | N/A |
-| **Transform** | Data manipulation | Parse JSON, filter arrays | N/A |
+| **Transform** | Data manipulation | Parse JSON, filter arrays (E2B sandbox) | N/A |
 | **Extract** | LLM-powered extraction | Extract structured data with JSON schema | N/A |
 | **HTTP** | HTTP API requests | Call REST APIs with custom headers/auth | N/A |
 | **If/Else** | Conditional logic | Route based on conditions | N/A |
 | **While Loop** | Iteration | Process multiple pages | N/A |
 | **User Approval** | Human-in-the-loop | Review before posting | N/A |
+| **Set-State** | State manipulation | Direct variable updates | N/A |
+| **Guardrails** | Content moderation | Safety checks, content filtering | N/A |
+| **Arcade** | Browser automation | Form filling, login flows | ✅ Arcade API |
+| **Gamma AI** | Content generation | Presentations, documents, webpages | ✅ Gamma API |
+| **Note** | Documentation | Annotate workflows | N/A |
 | **End** | Workflow completion | Return final output | N/A |
 
 ---
@@ -412,10 +429,10 @@ Provides a more customizable execution interface with embedded workflow visualiz
 
 | Provider | Models | Tool Support | Notes |
 |----------|--------|-------------|-------|
-| **Anthropic Claude** | Haiku 4.5, Sonnet 4.5, Opus 4.5 | ✅ Tools + MCP | All tools supported |
-| **OpenAI** | GPT-4o, GPT-4o-mini | ✅ Tools + MCP | All tools supported |
-| **Google Gemini** | 2.0 Flash Experimental, 2.0 Flash, 2.0 Flash-Lite | ✅ Tools + MCP | All tools supported |
-| **Groq** | Llama 3.3 70B, Llama 3.1 8B Instant, GPT OSS 120B/20B | ✅ Tools + MCP | All tools supported |
+| **Anthropic Claude** | Haiku 4.5, Sonnet 4.5, Opus 4.6 (1M context) | ✅ Tools + MCP | All tools supported |
+| **OpenAI** | GPT-5.2 (default), o3 (reasoning), GPT-4.5 (Pro), GPT-4o-mini | ✅ Tools + MCP | All tools supported |
+| **Google Gemini** | Gemini 3 Pro Preview, Gemini 3 Flash, Gemini 2.5 Pro, Gemini 2.5 Flash | ✅ Tools + MCP | All tools supported |
+| **Groq** | Llama 4 Maverick/Scout, Llama 3.3 70B, Llama 3.1 8B Instant, GPT OSS 120B/20B | ✅ Tools + MCP | All tools supported |
 
 **Universal Tool Support**: All LLM providers support both standard tools and MCP protocol. The tool integration is handled at the LangGraph orchestration layer, making it provider-agnostic.
 
@@ -508,12 +525,12 @@ Output: "Firecrawl is a web scraping API that converts websites into LLM-ready m
 Users can add their own API keys via **Settings → API Keys**:
 
 - **LLM Providers:** Anthropic, OpenAI, Google Gemini, Groq (all support Tools + MCP)
-- **Firecrawl:** Personal API key (Optional - falls back to environment variable)
+- **Tools:** Firecrawl, Tavily, Serper, E2B, Arcade, Gamma AI (all optional - falls back to system keys)
 - **Custom MCP Servers:** Authentication tokens
 
 This allows:
 - Each user to use their own API quotas
-- Fallback to environment variables if not set
+- Fallback to system-level Convex keys if not set
 - Easy key rotation and management
 
 ### MCP Server Registry
@@ -547,11 +564,13 @@ Add custom MCP servers in **Settings → MCP Registry**:
    vercel
    ```
 
-3. **Set environment variables** in Vercel dashboard:
+3. **Set environment variables** in Vercel dashboard (Next.js config only):
    - `NEXT_PUBLIC_CONVEX_URL` (from Convex)
-   - Azure AD authentication keys (from Azure Portal)
-   - `FIRECRAWL_API_KEY` (Required)
-   - Optional: Default LLM provider keys
+   - `CONVEX_DEPLOYMENT` (Convex deployment ID)
+   - Azure AD authentication keys (`AUTH_MICROSOFT_ID`, `AUTH_MICROSOFT_SECRET`, `AUTH_MICROSOFT_TENANT_ID`)
+   - `AUTH_SECRET` (NextAuth session secret)
+
+   > **Note:** All API keys (LLM providers, tools) go in **Convex environment**, not Vercel. See [API Key Architecture](#two-tier-api-key-architecture) in CLAUDE.md.
 
 4. **Deploy Convex to production:**
    ```bash
@@ -564,24 +583,28 @@ Add custom MCP servers in **Settings → MCP Registry**:
 
 ### Environment Variables Checklist
 
-**Required:**
-- `NEXT_PUBLIC_CONVEX_URL` - Convex database
+**In `.env.local` / Vercel Dashboard (Next.js config only):**
+- `NEXT_PUBLIC_CONVEX_URL` - Convex database URL
 - `CONVEX_DEPLOYMENT` - Convex deployment ID
-- `NEXTAUTH_URL` - Your application URL
+- `NEXT_PUBLIC_CONVEX_UPLOAD_ACTION_URL` - File upload endpoint
 - `AUTH_MICROSOFT_ID` - Azure AD Application (client) ID
 - `AUTH_MICROSOFT_SECRET` - Azure AD Client secret
 - `AUTH_MICROSOFT_TENANT_ID` - Azure AD Directory (tenant) ID
 - `AUTH_SECRET` - NextAuth session secret (32-byte random string)
-- `FIRECRAWL_API_KEY` - Web scraping
-- `ENCRYPTION_KEY` - AES-256 encryption for user API keys (32 bytes base64)
-- `E2B_API_KEY` - Secure sandboxed code execution (REQUIRED for transform nodes)
 
-**Optional (can be added in UI instead):**
-- `ANTHROPIC_API_KEY` - Claude provider (all models support Tools + MCP)
-- `OPENAI_API_KEY` - GPT-4o provider (all models support Tools + MCP)
-- `GOOGLE_API_KEY` - Gemini provider (all models support Tools + MCP)
-- `GROQ_API_KEY` - Groq provider (all models support Tools + MCP)
-- `ALLOWED_HTTP_DOMAINS` - Whitelist for HTTP node requests (security)
+**In Convex Environment (all API keys):**
+- `ENCRYPTION_KEY` - AES-256 encryption for user API keys (32 bytes base64)
+- `FIRECRAWL_API_KEY` - Web scraping
+- `E2B_API_KEY` - Secure sandboxed code execution (required for transform nodes)
+- `ANTHROPIC_API_KEY` - Claude provider (Haiku 4.5, Sonnet 4.5, Opus 4.6)
+- `OPENAI_API_KEY` - OpenAI provider (GPT-5.2, o3, GPT-4.5, GPT-4o-mini)
+- `GOOGLE_API_KEY` - Gemini provider (Gemini 3 Pro/Flash, Gemini 2.5 Pro/Flash)
+- `GROQ_API_KEY` - Groq provider (Llama 4, Llama 3.3, GPT OSS)
+- `TAVILY_API_KEY` - AI web search (optional)
+- `SERPER_API_KEY` - Google Search API (optional)
+- `ARCADE_API_KEY` - Browser automation (optional)
+- `GAMMA_API_KEY` - Presentation generation (optional)
+- `ALLOWED_HTTP_DOMAINS` - Whitelist for HTTP node requests (optional)
 
 ---
 
@@ -640,7 +663,7 @@ Before deploying to production:
 
 ### 🔍 Security Status
 
-**Latest Security Audit:** December 3, 2025
+**Latest Security Audit:** February 2026
 
 - ✅ **15/15 vulnerabilities fixed** (8 CRITICAL, 5 HIGH, 2 MEDIUM)
 - ✅ **0 exploitable vulnerabilities** remaining
@@ -661,7 +684,7 @@ cat docs/security/security-fixes.md
 ### 📚 Security Documentation
 
 **Complete Documentation:**
-- **[docs/security/security-fixes.md](./docs/security/security-fixes.md)** - Comprehensive security audit and fixes (Dec 2025)
+- **[docs/security/security-fixes.md](./docs/security/security-fixes.md)** - Comprehensive security audit and fixes
 - **[CLEANUP-SUMMARY.md](./CLEANUP-SUMMARY.md)** - API key migration to Convex
 - **[lib/api/validation-schemas.ts](./lib/api/validation-schemas.ts)** - Input validation schemas
 - **[CLAUDE.md](./CLAUDE.md)** - Security architecture and best practices
@@ -715,7 +738,7 @@ If you discover a security vulnerability, please report it via GitHub Security A
 
 **Security & Operations:**
 - **[Security Guide](./SECURITY.md)** 🔐 - Security features and best practices
-- **[Security Audit Report](./docs/security/security-fixes.md)** 🛡️ - December 2025 audit results
+- **[Security Audit Report](./docs/security/security-fixes.md)** 🛡️ - Security audit results
 
 ### Specialized Guides
 
@@ -771,7 +794,7 @@ flowchart TD
 
   subgraph Integrations
     D1["Firecrawl API"]
-    D2["LLMs (Claude, GPT-4o, Groq)"]
+    D2["LLMs (Claude, GPT-5.2, Gemini, Groq)"]
     D3["MCP Servers"]
     C_desc --> D1
     C_desc --> D2
@@ -791,23 +814,25 @@ flowchart TD
 
 ## Project Status & Roadmap
 
+### Completed (Feb 2026)
+- ✅ **Universal MCP + Tool Support** - All 4 LLM providers (Claude, OpenAI, Gemini, Groq) fully support tools and MCP
+- ✅ **6 Integrated Tools** - Firecrawl, Tavily, Serper, E2B, Arcade, Gamma AI
+- ✅ **15 Node Types** - Including Set-State, Guardrails, Arcade, Gamma AI, Note
+- ✅ **Document Upload/Processing** - PDF, DOCX, Markdown extraction in workflows
+- ✅ **Latest Model Support** - Claude Opus 4.6, GPT-5.2, o3, Gemini 3, Llama 4
+- ✅ **E2B Code Interpreter** - Sandboxed code execution for Transform nodes
+- ✅ **Two-Tier API Key System** - System keys + user-level encrypted keys
+
 ### In Progress
-- **MCP Support for OpenAI & Groq** - Adding native MCP protocol support
 - **OAuth MCP Authentication** - Support for OAuth-based MCP servers
-- **Additional MCP Integrations** - More pre-built MCP server connections
 - **Workflow Sharing** - Public template marketplace
 - **Scheduled Executions** - Cron-based workflow triggers
 
-### Partial Support
-- **E2B Code Interpreter** - Transform node sandboxing (requires E2B API key)
-- **Complex Loop Patterns** - Nested loops and advanced iteration
-- **Custom Node Types** - Plugin system for community nodes
-
 ### Coming Soon
-- OAuth authentication for MCP servers
 - Parallel tool execution for agents
 - Workflow versioning and rollback
 - Custom plugin system for community nodes
+- Complex nested loop patterns
 
 We welcome contributions and PRs to help build these features!
 

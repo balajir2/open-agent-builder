@@ -834,6 +834,128 @@ test.describe('Model Regression Tests', () => {
   });
 
   // ====================================================================================
+  // BUILD VERIFICATION - Ensure TypeScript compilation succeeds
+  // ====================================================================================
+  test.describe('Build Verification', () => {
+    /**
+     * Verifies that TypeScript compilation succeeds without errors.
+     * This catches type errors that would cause Vercel deployment failures.
+     *
+     * Examples of errors caught:
+     * - Type mismatches (string | undefined vs string)
+     * - Missing imports
+     * - Incomplete type definitions
+     * - Property access on potentially undefined values
+     */
+
+    test('TypeScript compilation succeeds', async ({ page }) => {
+      const startTime = Date.now();
+
+      try {
+        console.log('[Build] Running TypeScript compilation check...');
+
+        // Use dynamic import for Node.js modules
+        const { exec } = await import('child_process');
+        const { promisify } = await import('util');
+        const execAsync = promisify(exec);
+
+        // Run TypeScript compiler in check mode (no emit)
+        // This is faster than full build and catches all type errors
+        const { stdout, stderr } = await execAsync('npx tsc --noEmit', {
+          timeout: 120000, // 2 minute timeout
+          maxBuffer: 10 * 1024 * 1024, // 10MB buffer for output
+        });
+
+        if (stderr && stderr.includes('error TS')) {
+          throw new Error(`TypeScript compilation failed:\n${stderr}`);
+        }
+
+        console.log('[Build] ✅ TypeScript compilation passed');
+
+        addTestResult({
+          provider: 'build',
+          model: 'TypeScript Compilation',
+          modelId: 'tsc',
+          status: 'passed',
+          duration: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          testType: 'build',
+        });
+      } catch (error: any) {
+        console.error('[Build] ❌ TypeScript compilation failed:', error.message);
+
+        addTestResult({
+          provider: 'build',
+          model: 'TypeScript Compilation',
+          modelId: 'tsc',
+          status: 'failed',
+          error: error.message,
+          duration: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          testType: 'build',
+        });
+        throw error;
+      }
+    });
+
+    test('Next.js build succeeds', async ({ page }) => {
+      const startTime = Date.now();
+
+      try {
+        console.log('[Build] Running Next.js build...');
+
+        // Use dynamic import for Node.js modules
+        const { exec } = await import('child_process');
+        const { promisify } = await import('util');
+        const execAsync = promisify(exec);
+
+        // Run full Next.js build
+        // This validates the entire build pipeline
+        const { stdout, stderr } = await execAsync('npm run build', {
+          timeout: 300000, // 5 minute timeout
+          maxBuffer: 20 * 1024 * 1024, // 20MB buffer for build output
+        });
+
+        // Check for build errors
+        if (stderr && (stderr.includes('Error:') || stderr.includes('Failed to compile'))) {
+          throw new Error(`Next.js build failed:\n${stderr}`);
+        }
+
+        // Check for successful build indicators
+        if (!stdout.includes('Route (app)') && !stdout.includes('Compiled successfully')) {
+          console.warn('[Build] ⚠️ Build output may be incomplete');
+        }
+
+        console.log('[Build] ✅ Next.js build passed');
+
+        addTestResult({
+          provider: 'build',
+          model: 'Next.js Build',
+          modelId: 'nextjs',
+          status: 'passed',
+          duration: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          testType: 'build',
+        });
+      } catch (error: any) {
+        console.error('[Build] ❌ Next.js build failed:', error.message);
+
+        addTestResult({
+          provider: 'build',
+          model: 'Next.js Build',
+          modelId: 'nextjs',
+          status: 'failed',
+          error: error.message,
+          duration: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          testType: 'build',
+        });
+        throw error;
+      }
+    });
+  });
+
+  // ====================================================================================
   // TOOL-SPECIFIC TESTS - Verify API keys passed to tools correctly
   // ====================================================================================
   test.describe('Tool API Key Passing - Verify keys reach tool executors', () => {
