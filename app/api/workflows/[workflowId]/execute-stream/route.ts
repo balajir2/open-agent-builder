@@ -397,6 +397,13 @@ export async function POST(
         // TODO: Save execution results to Convex
         // await convex.mutation(api.executions.completeExecution, {...})
 
+        // LANGSMITH FIX: Wait for LangSmith to finalize trace before closing stream
+        // LangSmith needs time to upload trace data to servers asynchronously
+        // Without this delay, traces remain in "in progress" state
+        // See: https://docs.langchain.com/langsmith/trace-with-langgraph
+        const { waitForTraceFinalization } = await import('@/lib/langsmith/config');
+        await waitForTraceFinalization();
+
         closeStream();
       } catch (error) {
         sendEvent('error', {

@@ -1,4 +1,4 @@
-import { getAuthenticatedConvexClient, api } from "./lib/convex/client";
+import { getAuthenticatedConvexClient, api } from "../lib/convex/client";
 import * as dotenv from "dotenv";
 
 dotenv.config({ path: ".env.local" });

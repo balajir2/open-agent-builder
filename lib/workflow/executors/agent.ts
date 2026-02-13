@@ -1042,7 +1042,13 @@ export async function executeAgentNode(
           tools: tools as any,
         });
 
-        usage = response.response_metadata?.usage || {};
+        usage = (response.response_metadata?.usage || {
+          input_tokens: 0,
+          output_tokens: 0,
+          total_tokens: 0,
+          prompt_tokens: 0,
+          completion_tokens: 0,
+        }) as LLMUsage;
 
         if (response.tool_calls && response.tool_calls.length > 0) {
           const toolResults = await Promise.all(
@@ -1122,11 +1128,14 @@ export async function executeAgentNode(
             });
 
             // Accumulate usage
+            const nextUsage = (nextResponse.response_metadata?.usage || {}) as LLMUsage;
             usage = {
-              prompt_tokens: (usage.prompt_tokens || 0) + (nextResponse.response_metadata?.usage?.prompt_tokens || 0),
-              completion_tokens: (usage.completion_tokens || 0) + (nextResponse.response_metadata?.usage?.completion_tokens || 0),
-              total_tokens: (usage.total_tokens || 0) + (nextResponse.response_metadata?.usage?.total_tokens || 0),
-            };
+              input_tokens: (usage.input_tokens || 0) + (nextUsage.input_tokens || 0),
+              output_tokens: (usage.output_tokens || 0) + (nextUsage.output_tokens || 0),
+              prompt_tokens: (usage.prompt_tokens || 0) + (nextUsage.prompt_tokens || 0),
+              completion_tokens: (usage.completion_tokens || 0) + (nextUsage.completion_tokens || 0),
+              total_tokens: (usage.total_tokens || 0) + (nextUsage.total_tokens || 0),
+            } as LLMUsage;
 
             // If no more tool calls, we're done
             if (!nextResponse.tool_calls || nextResponse.tool_calls.length === 0) {
@@ -1220,7 +1229,13 @@ export async function executeAgentNode(
         });
         const response = await model.invoke(messages);
         responseText = response.content as string;
-        usage = response.response_metadata?.usage || {};
+        usage = (response.response_metadata?.usage || {
+          input_tokens: 0,
+          output_tokens: 0,
+          total_tokens: 0,
+          prompt_tokens: 0,
+          completion_tokens: 0,
+        }) as LLMUsage;
       }
 
     } else {

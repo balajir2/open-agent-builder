@@ -115,7 +115,7 @@ Start (query) → MCP (Firecrawl Search) → Agent (Summarize) → End
 **3. Agent Node - Summarize**
 ```json
 {
-  "model": "claude-3-5-sonnet-20240620",
+  "model": "claude-sonnet-4-5-20250929",
   "provider": "anthropic",
   "systemPrompt": "You are a research assistant that summarizes web search results.",
   "userPrompt": "Summarize these search results about {{query}}:\n\n{{searchResults}}",
@@ -279,7 +279,7 @@ Start (topic) → Agent (Research with Tools) → End
 **2. Agent Node - Research Agent**
 ```json
 {
-  "model": "claude-3-5-sonnet-20240620",
+  "model": "claude-sonnet-4-5-20250929",
   "provider": "anthropic",
   "systemPrompt": "You are a research assistant. Use the available tools to search and scrape relevant information, then provide a comprehensive summary.",
   "userPrompt": "Research {{topic}} and provide a detailed summary with sources.",
@@ -422,7 +422,7 @@ If-Else (needs_more_data) →
 **2. Agent Node - Analyze**
 ```json
 {
-  "model": "claude-3-5-sonnet-20240620",
+  "model": "claude-sonnet-4-5-20250929",
   "provider": "anthropic",
   "systemPrompt": "Analyze data and determine if more information is needed.",
   "userPrompt": "Analyze: {{initialData}}\n\nReturn JSON: {\"complete\": true/false, \"reasoning\": \"...\"}",

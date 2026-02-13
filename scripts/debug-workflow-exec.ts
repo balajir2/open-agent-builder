@@ -1,6 +1,6 @@
 
-import { LangGraphExecutor } from "./lib/workflow/langgraph";
-import { Workflow } from "./lib/workflow/types";
+import { LangGraphExecutor } from "../lib/workflow/langgraph";
+import { Workflow } from "../lib/workflow/types";
 import * as dotenv from "dotenv";
 
 dotenv.config({ path: ".env.local" });

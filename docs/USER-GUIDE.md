@@ -260,11 +260,15 @@ The most powerful node - an AI assistant that can reason, search, and use tools.
 |-------|----------|-------|------|
 | **Claude Sonnet 4.5** | General tasks, analysis | Fast | Medium |
 | **Claude Haiku 4.5** | Simple tasks | Very Fast | Low |
-| **Claude Opus 4.5** | Complex reasoning | Medium | High |
-| **GPT-4o** | General tasks | Medium | Medium |
-| **GPT-4o Mini** | Quick tasks | Fast | Low |
-| **Gemini 2.0 Flash** | Fast responses | Very Fast | Low |
-| **Llama 3.3 70B (Groq)** | Fast inference | Very Fast | Low |
+| **Claude Opus 4.6** | Complex reasoning, 1M context | Medium | High |
+| **GPT-5.2** | Latest flagship model | Medium | High |
+| **GPT-4.5** | General tasks | Medium | Medium |
+| **o3** | Advanced reasoning | Medium | High |
+| **Gemini 3 Pro Preview** | Latest Google model | Fast | Medium |
+| **Gemini 3 Flash** | Fast responses | Very Fast | Low |
+| **Gemini 2.5 Pro** | Stable production | Medium | Medium |
+| **Llama 4 Maverick (Groq)** | Latest Llama flagship | Very Fast | Low |
+| **Llama 4 Scout (Groq)** | Fast inference | Very Fast | Low |
 
 **Example Instructions:**
 ```
@@ -1195,7 +1199,7 @@ Note        - Documentation (not executed)
 
 **Need More Help?**
 
-- Technical Documentation: [TECHNICAL-DOCUMENTATION.md](./TECHNICAL-DOCUMENTATION.md)
+- Architecture Documentation: [ARCHITECTURE.md](./ARCHITECTURE.md)
 - Architecture Guide: [ARCHITECTURE.md](./ARCHITECTURE.md)
 - Contact your system administrator
 

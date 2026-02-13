@@ -10,7 +10,6 @@
  * Server-side only - should not be imported in client code
  */
 
-import 'server-only';
 import { StateGraph, Annotation, START, END, Command, Send, interrupt, isInterrupted } from "@langchain/langgraph";
 import { ConvexCheckpointSaver } from './convex-checkpointer';
 import { safeEvaluate } from './safe-expression-evaluator';
@@ -137,16 +136,16 @@ export class LangGraphExecutor {
    */
   private buildGraph() {
     console.log('Building LangGraph from workflow:', {
-      workflowId: this.workflow.id,
-      workflowName: this.workflow.name,
-      nodes: this.workflow.nodes.length,
-      edges: this.workflow.edges.length,
-      nodeIds: this.workflow.nodes.map(n => n.id),
-      nodeTypes: this.workflow.nodes.map(n => (n.data as any)?.nodeType || n.type),
-      edgeSources: this.workflow.edges.map(e => e.source),
-      edgeTargets: this.workflow.edges.map(e => e.target),
-      fullNodes: this.workflow.nodes,
-      fullEdges: this.workflow.edges,
+      workflowId: this.workflow?.id || 'test-workflow',
+      workflowName: this.workflow?.name,
+      nodes: this.workflow?.nodes?.length || 0,
+      edges: this.workflow?.edges?.length || 0,
+      nodeIds: this.workflow?.nodes?.map(n => n.id) || [],
+      nodeTypes: this.workflow?.nodes?.map(n => (n.data as any)?.nodeType || n.type) || [],
+      edgeSources: this.workflow?.edges?.map(e => e.source) || [],
+      edgeTargets: this.workflow?.edges?.map(e => e.target) || [],
+      fullNodes: this.workflow?.nodes || [],
+      fullEdges: this.workflow?.edges || [],
     });
 
     const builder = new StateGraph(WorkflowStateAnnotation);
@@ -154,10 +153,10 @@ export class LangGraphExecutor {
     this.edgesBySource = new Map();
 
     // Create a set of valid node IDs for edge validation
-    const validNodeIds = new Set(this.workflow.nodes.map(n => n.id));
+    const validNodeIds = new Set(this.workflow?.nodes?.map(n => n.id) || []);
 
     // Build edge map, skipping edges with invalid source/target
-    for (const edge of this.workflow.edges) {
+    for (const edge of this.workflow?.edges || []) {
       // Validate that both source and target nodes exist
       if (!validNodeIds.has(edge.source)) {
         console.warn(`⚠️ Skipping edge ${edge.id}: source node '${edge.source}' does not exist`);
@@ -177,7 +176,7 @@ export class LangGraphExecutor {
     console.log('Edges by source:', Object.fromEntries(this.edgesBySource));
 
     // Add nodes to the graph
-    for (const node of this.workflow.nodes) {
+    for (const node of this.workflow?.nodes || []) {
       const nodeType = (node.data as any)?.nodeType || node.type;
 
       // Skip note nodes entirely - they are visual-only sticky notes
@@ -313,7 +312,7 @@ export class LangGraphExecutor {
 
     // Connect LangGraph's START to our start node
     console.log('Connecting LangGraph START to workflow start node...');
-    const startNode = this.workflow.nodes.find(n => {
+    const startNode = this.workflow?.nodes?.find(n => {
       const nodeType = (n.data as any)?.nodeType || n.type;
       return nodeType === 'start';
     });
@@ -324,10 +323,10 @@ export class LangGraphExecutor {
     }
 
     // Connect all end nodes to LangGraph's END
-    const endNodes = this.workflow.nodes.filter(n => {
+    const endNodes = this.workflow?.nodes?.filter(n => {
       const nodeType = (n.data as any)?.nodeType || n.type;
       return nodeType === 'end';
-    });
+    }) || [];
 
     for (const endNode of endNodes) {
       console.log(`Connecting end node ${endNode.id} to LangGraph END`);
@@ -1227,7 +1226,7 @@ export class LangGraphExecutor {
 
     return {
       id: `exec_${Date.now()}`,
-      workflowId: this.workflow.id,
+      workflowId: this.workflow?.id || 'unknown',
       status: 'completed' as const,
       nodeResults: result.nodeResults || {},
       startedAt: new Date().toISOString(),

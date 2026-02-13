@@ -655,13 +655,13 @@ npm audit
 npm audit fix
 
 # View comprehensive security report
-cat docs/SECURITY-FIXES-REPORT.md
+cat docs/security/security-fixes.md
 ```
 
 ### 📚 Security Documentation
 
 **Complete Documentation:**
-- **[docs/SECURITY-FIXES-REPORT.md](./docs/SECURITY-FIXES-REPORT.md)** - Comprehensive security audit and fixes (Dec 2025)
+- **[docs/security/security-fixes.md](./docs/security/security-fixes.md)** - Comprehensive security audit and fixes (Dec 2025)
 - **[CLEANUP-SUMMARY.md](./CLEANUP-SUMMARY.md)** - API key migration to Convex
 - **[lib/api/validation-schemas.ts](./lib/api/validation-schemas.ts)** - Input validation schemas
 - **[CLAUDE.md](./CLAUDE.md)** - Security architecture and best practices
@@ -700,7 +700,7 @@ If you discover a security vulnerability, please report it via GitHub Security A
 
 **For Users:**
 - **[User Guide](./docs/USER-GUIDE.md)** 📖 - Complete user documentation (500+ lines)
-- **[Workflow Runner](./docs/guides/WORKFLOW-RUNNER-README.md)** - End-user execution interface
+- **[Workflow Runner](./docs/guides/workflow-runner.md)** - End-user execution interface
 
 **For Administrators:**
 - **[Admin Guide](./docs/ADMIN-GUIDE.md)** 🔧 - Installation, configuration, deployment (900+ lines)
@@ -715,17 +715,18 @@ If you discover a security vulnerability, please report it via GitHub Security A
 
 **Security & Operations:**
 - **[Security Guide](./SECURITY.md)** 🔐 - Security features and best practices
-- **[Security Audit Report](./docs/SECURITY-FIXES-REPORT.md)** 🛡️ - December 2025 audit results
+- **[Security Audit Report](./docs/security/security-fixes.md)** 🛡️ - December 2025 audit results
 
 ### Specialized Guides
 
-**UI Builder** (4 guides in `docs/guides/`):
-- Complete UI Builder documentation
-- 5-minute quickstart tutorial
-- Architecture diagrams and examples
+**Specialized Guides** (`docs/guides/`):
+- [UI Builder Guide](./docs/guides/ui-builder.md) - Complete UI Builder documentation
+- [Regression Testing Guide](./docs/guides/regression-testing.md) - Model regression testing
+- [Human Approval Guide](./docs/guides/human-approval.md) - Human-in-the-loop workflows
+- [Gamma Node Guide](./docs/guides/gamma-node.md) - Gamma AI presentation generation
 
 **Additional Resources:**
-- [Vercel Deployment Guide](./docs/guides/VERCEL_DEPLOYMENT_GUIDE.md)
+- [Vercel Deployment Guide](./docs/guides/vercel-deployment.md)
 - [Architecture Documentation](./docs/architecture/) - Database schema, execution engine
 - [Historical Documentation](./docs/archive/) - Archived summaries and logs
 

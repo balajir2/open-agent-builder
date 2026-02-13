@@ -123,6 +123,11 @@ export async function POST(
 
     console.log('API: Execution complete:', execution.status);
 
+    // LANGSMITH FIX: Wait for LangSmith to finalize trace
+    // This ensures traces are properly marked as complete in LangSmith
+    const { waitForTraceFinalization } = await import('@/lib/langsmith/config');
+    await waitForTraceFinalization();
+
     return NextResponse.json({
       success: execution.status === 'completed',
       execution,

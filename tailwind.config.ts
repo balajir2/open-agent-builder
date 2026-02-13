@@ -2,7 +2,7 @@
 import defaultTheme from "tailwindcss/defaultTheme";
 import { Config } from "tailwindcss/types/config";
 
-import colorsJson from "./colors.json";
+import colorsJson from "./lib/config/colors.json";
 
 const colors = Object.keys(colorsJson).reduce(
   (acc, key) => {

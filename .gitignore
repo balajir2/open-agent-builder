@@ -9,6 +9,7 @@
 /coverage
 playwright-report/
 /test-results/
+test-reports/
 
 # next.js
 /.next/
@@ -65,3 +66,5 @@ firecrawl-responses-api/.env
 nul
 *-ISSUE.md
 *-DEBUG.md
+.vercel
+.env*.local

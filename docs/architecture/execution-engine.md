@@ -283,10 +283,10 @@ sequenceDiagram
 ```
 
 **Supported Providers (All support MCP & tools):**
-- **Anthropic:** Claude Haiku 4.5, Sonnet 4.5, Opus 4.5
-- **OpenAI:** GPT-4o, GPT-4o-mini
-- **Google:** Gemini 2.0 Flash Experimental, 2.0 Flash, 2.0 Flash-Lite
-- **Groq:** Llama 3.3 70B, Llama 3.1 8B Instant, GPT OSS 120B, GPT OSS 20B
+- **Anthropic:** Claude Haiku 4.5, Sonnet 4.5, Opus 4.6 (1M context)
+- **OpenAI:** GPT-5.2, GPT-4.5, o3 (advanced reasoning)
+- **Google:** Gemini 3 Pro Preview, Gemini 3 Flash, Gemini 2.5 Pro, Gemini 2.5 Flash
+- **Groq:** Llama 4 Maverick, Llama 4 Scout, Llama 3.3 70B, Llama 3.1 8B Instant
 
 ### MCP Node
 

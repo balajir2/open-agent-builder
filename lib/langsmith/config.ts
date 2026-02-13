@@ -60,9 +60,40 @@ export function getLangGraphConfig(baseConfig?: Record<string, any>) {
 
   if (isLangSmithEnabled()) {
     console.log('[LangSmith] Tracing enabled for project:', process.env.LANGCHAIN_PROJECT || 'open-agent-builder');
+
+    // Add metadata to help identify and group traces
+    config.metadata = {
+      ...config.metadata,
+      environment: process.env.NODE_ENV || 'development',
+      timestamp: new Date().toISOString(),
+    };
+
+    // Add tags for better organization in LangSmith
+    config.tags = [
+      ...(config.tags || []),
+      'open-agent-builder',
+      process.env.NODE_ENV || 'development'
+    ];
   }
 
   return config;
+}
+
+/**
+ * Wait for LangSmith trace to finalize
+ * Call this after workflow execution completes to ensure trace is uploaded
+ */
+export async function waitForTraceFinalization(delayMs: number = 1000): Promise<void> {
+  if (!isLangSmithEnabled()) {
+    return; // No need to wait if tracing is disabled
+  }
+
+  // LangSmith uploads trace data asynchronously after execution completes
+  // This delay ensures the trace is fully uploaded and marked as complete
+  // Without this, traces may remain in "in progress" state
+  console.log('[LangSmith] Waiting for trace finalization...');
+  await new Promise(resolve => setTimeout(resolve, delayMs));
+  console.log('[LangSmith] Trace finalization complete');
 }
 
 /**

@@ -82,3 +82,28 @@ export const getWorkflowExecutions = query({
     return executions;
   },
 });
+
+/**
+ * Mark execution as failed
+ * Used by tests for error handling scenarios
+ */
+export const failExecution = mutation({
+  args: {
+    id: v.optional(v.id("executions")), // For test compatibility
+    executionId: v.optional(v.id("executions")),
+    error: v.string(),
+  },
+  handler: async ({ db }, args) => {
+    const execId = args.executionId || args.id;
+    if (!execId) {
+      throw new Error("executionId or id is required");
+    }
+
+    await db.patch(execId, {
+      status: "failed",
+      error: args.error,
+      completedAt: new Date().toISOString(),
+    });
+    return execId;
+  },
+});

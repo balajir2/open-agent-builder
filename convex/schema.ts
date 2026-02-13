@@ -91,7 +91,7 @@ export default defineSchema({
     name: v.string(),
     url: v.string(),
     description: v.optional(v.string()),
-    category: v.string(), // "web" | "ai" | "data" | "custom"
+    category: v.optional(v.string()), // "web" | "ai" | "data" | "custom"
 
     // Authentication
     authType: v.string(), // "none" | "api-key" | "bearer" | "oauth-coming-soon"

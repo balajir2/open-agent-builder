@@ -12,6 +12,7 @@ import type * as admin from "../admin.js";
 import type * as apiKeys from "../apiKeys.js";
 import type * as apiKeysActions from "../apiKeysActions.js";
 import type * as approvals from "../approvals.js";
+import type * as checkpoints from "../checkpoints.js";
 import type * as executions from "../executions.js";
 import type * as files from "../files.js";
 import type * as functions_cache_cleanup from "../functions/cache/cleanup.js";
@@ -55,6 +56,7 @@ declare const fullApi: ApiFromModules<{
   apiKeys: typeof apiKeys;
   apiKeysActions: typeof apiKeysActions;
   approvals: typeof approvals;
+  checkpoints: typeof checkpoints;
   executions: typeof executions;
   files: typeof files;
   "functions/cache/cleanup": typeof functions_cache_cleanup;

@@ -202,3 +202,21 @@ export const cleanup = mutation({
     return { deleted: oldApprovals.length };
   },
 });
+
+// Delete approval by approvalId (for testing)
+export const deleteByApprovalId = mutation({
+  args: { approvalId: v.string() },
+  handler: async (ctx, args) => {
+    const approval = await ctx.db
+      .query("approvals")
+      .withIndex("by_approvalId", (q) => q.eq("approvalId", args.approvalId))
+      .first();
+
+    if (approval) {
+      await ctx.db.delete(approval._id);
+      return { success: true };
+    }
+
+    return { success: false, message: "Approval not found" };
+  },
+});

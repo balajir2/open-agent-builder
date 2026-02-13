@@ -7,6 +7,7 @@ import { WorkflowNode, WorkflowState } from '@/lib/workflow/types';
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
+import { setTestAuth } from './test-auth-helper';
 
 // --- Test Configuration ---
 const CONVEX_URL = process.env.CONVEX_URL || process.env.NEXT_PUBLIC_CONVEX_URL!;
@@ -123,6 +124,7 @@ test.describe('Interoperability and E2E Tests', () => {
     cleanupGlobalFetch = setupGlobalFetchMock(); // Setup global fetch mock
 
     convexClient = new ConvexHttpClient(CONVEX_URL);
+    setTestAuth(convexClient, TEST_USER_ID);
     standardTools = toolRegistry;
 
     // Clean up any existing servers for TEST_USER_ID to ensure a clean state.

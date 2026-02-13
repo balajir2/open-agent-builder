@@ -5,6 +5,7 @@ import { WorkflowNode, WorkflowState } from '@/lib/workflow/types';
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
+import { setTestAuth } from './test-auth-helper';
 
 // --- Test Configuration ---
 const CONVEX_URL = process.env.CONVEX_URL || process.env.NEXT_PUBLIC_CONVEX_URL!;
@@ -91,6 +92,7 @@ test.describe.serial('Custom MCP Server Lifecycle', () => {
     test.beforeAll(async () => {
         cleanupGlobalFetch = setupGlobalFetchMock();
         convexClient = new ConvexHttpClient(CONVEX_URL);
+    setTestAuth(convexClient, TEST_USER_ID);
         // Before this suite runs, ensure a clean slate by deleting all servers for the user.
         const existingServers = await convexClient.query(api.mcpServers.listUserMCPs, { userId: TEST_USER_ID });
         for (const server of existingServers) {
@@ -113,15 +115,18 @@ test.describe.serial('Custom MCP Server Lifecycle', () => {
         // Force a re-import of agent and tool modules to clear any cached global state.
         // This is the definitive fix for the state pollution that occurs when Playwright
         // runs test files sequentially in the same worker process (as it does in CI).
-        Object.keys(require.cache).forEach(key => {
-            if (
-                key.includes('lib/workflow/executors/agent') ||
-                key.includes('lib/tools/registry') ||
-                key.includes('lib/mcp')
-            ) {
-                delete require.cache[key];
-            }
-        });
+        // Note: require.cache only exists in Node.js, not in browser/Playwright environment
+        if (typeof require !== 'undefined' && require.cache) {
+            Object.keys(require.cache).forEach(key => {
+                if (
+                    key.includes('lib/workflow/executors/agent') ||
+                    key.includes('lib/tools/registry') ||
+                    key.includes('lib/mcp')
+                ) {
+                    delete require.cache[key];
+                }
+            });
+        }
     });
 
     test('Step 1: should add a new custom MCP server', async () => {

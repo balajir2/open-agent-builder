@@ -197,6 +197,10 @@ export async function POST(
           timestamp: new Date().toISOString(),
         });
 
+        // LANGSMITH FIX: Wait for LangSmith to finalize trace before closing stream
+        const { waitForTraceFinalization } = await import('@/lib/langsmith/config');
+        await waitForTraceFinalization();
+
         controller.close();
       } catch (error) {
         sendEvent('error', {

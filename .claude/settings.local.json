@@ -88,7 +88,12 @@
       "Bash(cmd.exe /c \"taskkill /F /PID 42688\")",
       "Bash(powershell:*)",
       "Bash(npm start)",
-      "Bash(git remote add:*)"
+      "Bash(git remote add:*)",
+      "Bash(vercel ls:*)",
+      "Bash(gh api:*)",
+      "Bash(vercel whoami:*)",
+      "Bash(npx playwright test:*)",
+      "Bash(1)"
     ],
     "deny": [],
     "ask": []

@@ -485,16 +485,16 @@ Find the provider and add the model to its `models` array:
   models: [
     // ... existing models
     {
-      id: 'claude-4-20260115',  // Use exact model ID from provider
-      name: 'Claude 4',
+      id: 'claude-opus-4-6-20260115',  // Use exact model ID from provider
+      name: 'Claude Opus 4.6',
       provider: 'anthropic',
-      contextWindow: 200000,
+      contextWindow: 1000000,  // 1M context window
       inputCostPer1M: 3.00,
       outputCostPer1M: 15.00,
       supportsJSON: true,
       supportsMCP: true,
       maxTokens: 8192,
-      description: 'Most capable Claude model'
+      description: 'Most capable Claude model with 1M context'
     }
   ]
 }
@@ -707,7 +707,29 @@ After any integration change, verify:
 - [ ] Basic execution works (create simple workflow, execute)
 - [ ] Tool invocation works (if applicable)
 - [ ] Error handling works (test with invalid inputs)
+- [ ] Model regression tests pass (`npm run test:regression`)
 - [ ] Production deployment works (`npx convex deploy`)
+
+### Model Regression Testing
+
+When adding new models, run the regression test suite to verify compatibility:
+
+```bash
+# Test all models
+npm run test:regression
+
+# Generate HTML report
+npm run test:regression:report
+```
+
+The regression tests verify:
+- Model availability and authentication
+- Tool support (Firecrawl, Tavily, etc.)
+- MCP protocol compatibility
+- Response quality and structured output
+- Error handling
+
+Test reports are saved to `test-reports/` directory with detailed pass/fail status for each model.
 
 ---
 

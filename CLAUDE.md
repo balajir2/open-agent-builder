@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-**Last Updated:** December 13, 2025
+**Last Updated:** February 13, 2026
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -109,7 +109,32 @@ npm run test:research     # Content research template
 npm run test:comprehensive
 npm run test:templates
 npm run test:all:comprehensive
+
+# Run model regression tests (tests all providers and models)
+npm run test:regression           # Run regression suite
+npm run test:regression:headed    # Run with visible browser
+npm run test:regression:report    # Run and open HTML report
+
+# Run file upload/download tests
+npm run test:files                # All file-related tests
+npm run test:files:headed         # With visible browser
+npm run test:upload-download      # Upload/download only
+npm run test:file-integration     # Workflow integration only
 ```
+
+**Model Regression Testing:**
+The regression test suite (`tests/model-regression.spec.ts`) automatically tests all LLM providers and models to ensure compatibility. It generates detailed JSON and HTML reports in the `test-reports/` directory, showing:
+- Test results for each provider/model combination
+- Pass/fail rates by provider
+- Detailed error messages for failed tests
+- Test duration and performance metrics
+
+**File Upload/Download Testing:**
+The file test suite covers comprehensive file handling functionality across three test files (~1,070 lines total):
+- `tests/file-processing.spec.ts` - Document extraction (PDF, DOCX, Markdown)
+- `tests/file-upload-download.spec.ts` - HTTP upload/download endpoints
+- `tests/file-workflow-integration.spec.ts` - Files in workflow execution
+See [docs/guides/file-upload-download-testing.md](docs/guides/file-upload-download-testing.md) for complete documentation.
 
 ## Architecture
 
@@ -271,6 +296,217 @@ Execute workflow → Stream SSE events → Display results
 
 ## Key Development Patterns
 
+### LLM Provider Response Formats
+
+**CRITICAL PATTERN**: Each LLM provider returns responses in a unique format. Any code that handles LLM responses (executors, tests, parsers) MUST account for these provider-specific formats.
+
+#### Response Format Reference
+
+**1. Anthropic (Claude)**
+```typescript
+// Response structure
+{
+  id: 'msg_xxx',
+  type: 'message',
+  role: 'assistant',
+  content: [
+    { type: 'text', text: 'response text' }
+  ],
+  model: 'claude-sonnet-4-5-20250929',
+  stop_reason: 'end_turn',
+  usage: { input_tokens: 10, output_tokens: 5 }
+}
+
+// Accessing content
+response.content[0].type === 'text' ? response.content[0].text : ''
+```
+
+**Tool Use Format:**
+```typescript
+{
+  content: [{
+    type: 'tool_use',
+    id: 'toolu_xxx',
+    name: 'tool_name',
+    input: { param: 'value' }
+  }],
+  stop_reason: 'tool_use'
+}
+```
+
+**2. Google Gemini**
+```typescript
+// Response structure
+{
+  candidates: [{
+    content: {
+      parts: [{ text: 'response text' }],
+      role: 'model'
+    },
+    finishReason: 'STOP'
+  }],
+  usageMetadata: {
+    promptTokenCount: 10,
+    candidatesTokenCount: 5,
+    totalTokenCount: 15
+  }
+}
+
+// Accessing content (via ChatGoogleGenerativeAI)
+response.content as string  // Library handles extraction
+```
+
+**Tool Use Format:**
+```typescript
+{
+  candidates: [{
+    content: {
+      parts: [{
+        functionCall: {
+          name: 'tool_name',
+          args: { param: 'value' }
+        }
+      }],
+      role: 'model'
+    }
+  }]
+}
+```
+
+**3. OpenAI & Groq**
+```typescript
+// Response structure
+{
+  id: 'chatcmpl-xxx',
+  object: 'chat.completion',
+  model: 'gpt-5.2',
+  choices: [{
+    index: 0,
+    message: {
+      role: 'assistant',
+      content: 'response text'
+    },
+    finish_reason: 'stop'
+  }],
+  usage: {
+    prompt_tokens: 10,
+    completion_tokens: 5,
+    total_tokens: 15
+  }
+}
+
+// Accessing content
+response.choices[0].message.content
+```
+
+**Tool Use Format:**
+```typescript
+{
+  choices: [{
+    message: {
+      tool_calls: [{
+        id: 'call_xxx',
+        type: 'function',
+        function: {
+          name: 'tool_name',
+          arguments: '{"param":"value"}'  // JSON string
+        }
+      }],
+      content: null
+    }
+  }]
+}
+```
+
+#### When This Pattern Matters
+
+1. **Writing Tests**: Mock responses must match provider format
+   ```typescript
+   // ❌ WRONG - Using OpenAI format for Anthropic
+   if (provider === 'anthropic') {
+     return { choices: [{ message: { content: 'test' } }] };
+   }
+
+   // ✅ CORRECT - Provider-specific format
+   if (provider === 'anthropic') {
+     return { content: [{ type: 'text', text: 'test' }] };
+   }
+   ```
+
+2. **Response Parsing**: Different extraction logic per provider
+   ```typescript
+   // In lib/workflow/executors/agent.ts
+   if (provider === 'anthropic') {
+     responseText = response.content[0].text;  // Anthropic
+   } else if (provider === 'google') {
+     responseText = response.content as string;  // Google (library handles)
+   } else {
+     responseText = response.choices[0].message.content;  // OpenAI/Groq
+   }
+   ```
+
+3. **Tool Handling**: Different tool call structures
+   - Anthropic: `content.type === 'tool_use'` with `name` and `input`
+   - Google: `parts[].functionCall` with `name` and `args`
+   - OpenAI/Groq: `tool_calls[]` array with `function.name` and `arguments` (JSON string)
+
+4. **Error Debugging**: Error format varies by provider
+   - Anthropic: `error.error.message`
+   - Google: `error.message`
+   - OpenAI: `error.error.message`
+
+#### Model ID Patterns
+
+Each provider also has unique model naming conventions:
+
+- **Anthropic**: `claude-{model}-{version}` (e.g., `claude-sonnet-4-5-20250929`)
+- **Google**: `gemini-{version}-{variant}-{status}` (e.g., `gemini-3-flash-preview`)
+- **OpenAI**: `{model}-{version}` (e.g., `gpt-5.2`, `o3`)
+- **Groq**: Uses provider prefixes for some models (e.g., `meta-llama/llama-4-maverick-17b-128e-instruct`)
+
+**IMPORTANT**: Always verify model IDs against official provider documentation. Model names change frequently:
+- Preview/experimental models require suffix: `-preview`, `-experimental`
+- Stable models may not need version dates
+- Check `https://ai.google.dev/gemini-api/docs/models` for Google models
+- Check `https://docs.anthropic.com/en/docs/models-overview` for Anthropic models
+- Check `https://platform.openai.com/docs/models` for OpenAI models
+
+#### Testing Guidelines
+
+When writing regression tests or integration tests:
+
+1. **Use provider-specific mocks** - Don't use generic mocks for all providers
+2. **Test all response types** - Basic, tool use, streaming, errors
+3. **Verify actual API format** - Consult official docs, don't guess
+4. **Handle edge cases** - Empty responses, malformed data, missing fields
+
+**Example: Regression Test Pattern**
+```typescript
+// tests/model-regression.spec.ts
+llmProviders.forEach(provider => {
+  provider.models.forEach(model => {
+    test(`${model.name} - Basic`, async () => {
+      // Provider-specific mock
+      if (provider.id === 'anthropic') {
+        addFetchMock({ url: /api\.anthropic\.com/ }, {
+          body: { content: [{ type: 'text', text: 'response' }] }
+        });
+      } else if (provider.id === 'google') {
+        addFetchMock({ url: /generativelanguage\.googleapis\.com/ }, {
+          body: { candidates: [{ content: { parts: [{ text: 'response' }] } }] }
+        });
+      } else {
+        addFetchMock({ url: /(openai|groq)\.com/ }, {
+          body: { choices: [{ message: { content: 'response' } }] }
+        });
+      }
+
+      // Execute test...
+    });
+  });
+});
+```
+
 ### Adding a New Node Type
 
 1. **Define Type** in `lib/workflow/types.ts`:
@@ -411,12 +647,18 @@ MCP servers provide tools to agents (e.g., Firecrawl for web scraping):
 4. **Agent Integration** - Agents can use MCP tools via `tools` property
 
 **All LLM Providers Support MCP & Tools:**
-- **Anthropic Claude** - Haiku 4.5, Sonnet 4.5, Opus 4.5
-- **OpenAI** - GPT-4o, GPT-4o-mini
-- **Google Gemini** - 2.0 Flash Experimental, 2.0 Flash, 2.0 Flash-Lite
-- **Groq** - Llama 3.3 70B, Llama 3.1 8B Instant, GPT OSS 120B, GPT OSS 20B
+- **Anthropic Claude** - Haiku 4.5, Sonnet 4.5, Opus 4.6 (1M context, Feb 2026)
+- **OpenAI** - GPT-5.2 (default), o3 (reasoning), GPT-4.5 (Pro), GPT-4o-mini
+- **Google Gemini** - Gemini 3 Pro Preview, Gemini 3 Flash, Gemini 2.5 Pro, Gemini 2.5 Flash
+- **Groq** - Llama 4 Maverick/Scout, Llama 3.3 70B, Llama 3.1 8B Instant, GPT OSS 120B, GPT OSS 20B
 
-All models work with both standard tools (Firecrawl, Tavily, Serper, E2B) and MCP protocol.
+All models work with both standard tools (Firecrawl, Tavily, Serper, E2B, Arcade, Gamma AI) and MCP protocol.
+
+**Recent Model Updates (Feb 2026):**
+- ✅ **Anthropic**: Updated to Claude Opus 4.6 (1M context window)
+- ✅ **OpenAI**: Added GPT-5.2, o3, GPT-4.5 (replaced deprecated GPT-4o)
+- ✅ **Google**: Added Gemini 3 series and Gemini 2.5 series (replaced deprecated Gemini 2.0)
+- ✅ **Groq**: Added Llama 4 Maverick and Scout models
 
 ### Gamma AI Integration
 
@@ -486,7 +728,7 @@ The Gamma node returns a `__variableUpdates` object that updates `lastOutput` wi
 }
 ```
 
-For detailed implementation docs, see [docs/GAMMA-NODE-IMPLEMENTATION.md](docs/GAMMA-NODE-IMPLEMENTATION.md).
+For detailed implementation docs, see [docs/guides/gamma-node.md](docs/guides/gamma-node.md).
 
 ## Agent Tools Integration
 
@@ -993,7 +1235,7 @@ When working on this codebase:
 
 #### Security Documentation
 
-- **Comprehensive Security Report:** [docs/SECURITY-FIXES-REPORT.md](docs/SECURITY-FIXES-REPORT.md)
+- **Comprehensive Security Report:** [docs/security/security-fixes.md](docs/security/security-fixes.md)
 - **API Key Migration:** [CLEANUP-SUMMARY.md](CLEANUP-SUMMARY.md)
 - **Validation Schemas:** [lib/api/validation-schemas.ts](lib/api/validation-schemas.ts)
 
@@ -1014,7 +1256,7 @@ npm audit
 npm audit fix
 
 # View security report
-cat docs/SECURITY-FIXES-REPORT.md
+cat docs/security/security-fixes.md
 ```
 
 ## Configuration
@@ -1302,10 +1544,12 @@ return state;
 ## Documentation Resources
 
 - **README.md** - Setup instructions and features
-- **UI-BUILDER-README.md** - UI Builder complete documentation
-- **UI-BUILDER-QUICKSTART.md** - 5-minute tutorial
-- **UI-BUILDER-ARCHITECTURE.md** - Architecture diagrams
-- **IMPLEMENTATION-SUMMARY.md** - Recent implementation details
+- **docs/guides/ui-builder.md** - UI Builder complete documentation
+- **docs/guides/regression-testing.md** - Model regression testing guide
+- **docs/guides/vercel-deployment.md** - Vercel deployment guide
+- **docs/guides/human-approval.md** - Human-in-the-loop workflows
+- **docs/guides/workflow-runner.md** - Workflow runner documentation
+- **docs/guides/gamma-node.md** - Gamma AI node implementation
 
 ## Testing Guidance
 

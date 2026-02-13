@@ -26,10 +26,10 @@ export async function executeLogicNode(
 
   switch (type) {
     case 'if-else':
-      return await executeIfElse(data, state);
+      return await executeIfElseNode(data, state);
 
     case 'while':
-      return await executeWhile(node, data, state);
+      return await executeWhileNode(node, data, state);
 
     case 'user-approval':
       return await executeUserApproval(data, state);
@@ -39,7 +39,7 @@ export async function executeLogicNode(
   }
 }
 
-async function executeIfElse(data: any, state: WorkflowState): Promise<any> {
+export async function executeIfElseNode(data: any, state: WorkflowState): Promise<any> {
   // Simulate delay
   await new Promise(resolve => setTimeout(resolve, 200));
 
@@ -92,7 +92,7 @@ async function executeIfElse(data: any, state: WorkflowState): Promise<any> {
   }
 }
 
-async function executeWhile(node: WorkflowNode, data: any, state: WorkflowState): Promise<any> {
+export async function executeWhileNode(node: WorkflowNode, data: any, state: WorkflowState): Promise<any> {
   // This function is deprecated and should not be used
   // While loops are now handled by LangGraph's executeWhileNode method
   // This is kept for backward compatibility but will throw an error if called
