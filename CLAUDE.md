@@ -4,6 +4,24 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ CRITICAL: Git Push Policy
+
+**DO NOT push to git repositories until explicitly asked by the user.**
+
+Every push triggers a Vercel deployment. To avoid repeated deployments:
+- ✅ Commit changes locally with `git commit`
+- ❌ DO NOT run `git push` unless user explicitly requests it
+- 🎯 Accumulate multiple fixes before pushing
+- 📦 Wait for user to say "push" or "deploy" before running `git push origin main && git push vercel main`
+
+**Exception**: Only push immediately if user explicitly says:
+- "push this"
+- "deploy now"
+- "push to repos"
+- "commit and push"
+
+Otherwise, commit locally and inform user that changes are ready to push when they're ready.
+
 ## 🔑 CRITICAL: API Key Architecture Principle
 
 **ALL API keys MUST be stored in Convex environment variables ONLY. NO keys in `.env.local`.**
