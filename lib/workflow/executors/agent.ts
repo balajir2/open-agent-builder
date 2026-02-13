@@ -9,6 +9,11 @@ import { prefetchFileContents } from '../file-utils';
 import { unwrapMCPResponse, convertMcpToOpenAiTool, executeMcpTool, fetchMcpTools } from './mcp-utils';
 import { DEFAULT_MODELS } from '@/lib/api/models';
 
+// Helper: Check if model is a reasoning model (o1, o3 series)
+function isReasoningModel(modelName: string): boolean {
+  const lowerModel = modelName.toLowerCase();
+  return lowerModel.startsWith('o1') || lowerModel.startsWith('o3');
+}
 
 export async function executeAgentNode(
   node: WorkflowNode,
@@ -834,7 +839,10 @@ export async function executeAgentNode(
           model: modelName,
           messages: messages as any,
           ...(hasValidTools ? { tools, tool_choice: "auto" } : {}),
-          ...(data.tokenLimit ? { max_tokens: maxTokens } : {}),
+          ...(data.tokenLimit ? (isReasoningModel(modelName)
+            ? { max_completion_tokens: maxTokens }
+            : { max_tokens: maxTokens })
+          : {}),
         });
 
         const message = response.choices[0].message;
@@ -911,7 +919,10 @@ export async function executeAgentNode(
               messages: currentMessages,
               tools: tools as any,
               tool_choice: "auto",
-              ...(data.tokenLimit ? { max_tokens: maxTokens } : {}),
+              ...(data.tokenLimit ? (isReasoningModel(modelName)
+                ? { max_completion_tokens: maxTokens }
+                : { max_tokens: maxTokens })
+              : {}),
             });
 
             const nextMessage = nextResponse.choices[0].message;
@@ -1016,7 +1027,10 @@ export async function executeAgentNode(
         const response = await client.chat.completions.create({
           model: modelName,
           messages: messages as any,
-          ...(data.tokenLimit ? { max_tokens: maxTokens } : {}),
+          ...(data.tokenLimit ? (isReasoningModel(modelName)
+            ? { max_completion_tokens: maxTokens }
+            : { max_tokens: maxTokens })
+          : {}),
         });
         responseText = response.choices[0].message.content || '';
         usage = (response.usage as unknown as LLMUsage) || ({} as LLMUsage);
