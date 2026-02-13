@@ -9,10 +9,13 @@ import { prefetchFileContents } from '../file-utils';
 import { unwrapMCPResponse, convertMcpToOpenAiTool, executeMcpTool, fetchMcpTools } from './mcp-utils';
 import { DEFAULT_MODELS } from '@/lib/api/models';
 
-// Helper: Check if model is a reasoning model (o1, o3 series)
+// Helper: Check if model is a reasoning model (o1, o3, gpt-5 series)
+// These models use max_completion_tokens instead of max_tokens
 function isReasoningModel(modelName: string): boolean {
   const lowerModel = modelName.toLowerCase();
-  return lowerModel.startsWith('o1') || lowerModel.startsWith('o3');
+  return lowerModel.startsWith('o1') ||
+         lowerModel.startsWith('o3') ||
+         lowerModel.startsWith('gpt-5');
 }
 
 export async function executeAgentNode(
