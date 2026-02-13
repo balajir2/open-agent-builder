@@ -166,7 +166,7 @@ export default function MCPPanel({
                       <div className="p-16 bg-background-base rounded-12 border border-border-faint">
                         <div className="flex items-start gap-12">
                           <div className={`text-heat-100`}>
-                            {getCategoryIcon(selectedServer.category)}
+                            {getCategoryIcon(selectedServer.category || 'custom')}
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-8 mb-4">
