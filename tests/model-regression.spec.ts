@@ -761,7 +761,7 @@ test.describe('Model Regression Tests', () => {
     });
 
     // Test that non-reasoning models still use max_tokens
-    test('GPT-4o - Should use max_tokens parameter (not max_completion_tokens)', async () => {
+    test('GPT-5.2 - Should use max_tokens parameter (not max_completion_tokens)', async () => {
       const startTime = Date.now();
 
       let capturedRequestBody: any = null;
@@ -790,7 +790,7 @@ test.describe('Model Regression Tests', () => {
           position: { x: 0, y: 0 },
           data: {
             label: 'Standard Model Test',
-            model: 'openai/gpt-4o',
+            model: 'openai/gpt-5.2',
             instructions: 'Test standard model',
             tokenLimit: 1000,
           },
@@ -810,8 +810,8 @@ test.describe('Model Regression Tests', () => {
 
         addTestResult({
           provider: 'openai',
-          model: 'GPT-4o (control)',
-          modelId: 'gpt-4o',
+          model: 'GPT-5.2 (control)',
+          modelId: 'gpt-5.2',
           status: 'passed',
           duration: Date.now() - startTime,
           timestamp: new Date().toISOString(),
@@ -820,8 +820,8 @@ test.describe('Model Regression Tests', () => {
       } catch (error: any) {
         addTestResult({
           provider: 'openai',
-          model: 'GPT-4o (control)',
-          modelId: 'gpt-4o',
+          model: 'GPT-5.2 (control)',
+          modelId: 'gpt-5.2',
           status: 'failed',
           error: error.message,
           duration: Date.now() - startTime,

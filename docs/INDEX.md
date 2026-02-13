@@ -1,6 +1,6 @@
 # Open Agent Builder - Documentation Index
 
-**Last Updated:** December 18, 2025
+**Last Updated:** February 13, 2026
 
 This document provides a centralized index to all documentation in the project. Documentation is organized by audience and purpose.
 
@@ -47,7 +47,7 @@ This document provides a centralized index to all documentation in the project. 
 | Document | Purpose | Location |
 |----------|---------|----------|
 | **[Security Guide](./SECURITY.md)** | Security features, OWASP compliance, best practices | Root directory |
-| **[Security Fixes Report](./docs/SECURITY-FIXES-REPORT.md)** | December 2025 security audit and fixes | `docs/` |
+| **[Security Fixes Report](./docs/SECURITY-FIXES-REPORT.md)** | Security audit and fixes report | `docs/` |
 
 ---
 
@@ -74,9 +74,9 @@ These documents provide historical context and are kept for reference:
 
 | Document | Purpose | Status |
 |----------|---------|--------|
-| `SESSION-FIXES-SUMMARY.md` | December 18, 2025 session fixes | ✅ Current |
+| `SESSION-FIXES-SUMMARY.md` | Session fixes summary | 📦 Archive |
 | `DOCUMENTATION-UPDATE-SUMMARY.md` | Documentation restructure summary | ✅ Current |
-| `CLEANUP-AND-SECURITY-SUMMARY-DEC-2025.md` | December 2025 cleanup & security | 📦 Archive |
+| `CLEANUP-AND-SECURITY-SUMMARY-DEC-2025.md` | Cleanup & security summary | 📦 Archive |
 | `CLEANUP-SUMMARY.md` | API key migration summary | 📦 Archive |
 | `QUALITY-IMPROVEMENTS.md` | Code quality improvements | 📦 Archive |
 | `GAMMA-NODE-CHANGELOG.md` | Gamma node development log | 📦 Archive |
@@ -188,5 +188,5 @@ open-agent-builder/
 ---
 
 **Maintained by**: Bounteous Team
-**Last Review**: December 18, 2025
+**Last Review**: February 13, 2026
 **Next Review**: March 2026

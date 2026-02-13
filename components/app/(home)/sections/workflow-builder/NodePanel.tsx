@@ -557,12 +557,18 @@ export default function NodePanel({
                             const modelId = modelOption.id;
                             let limit = 4096; // Default fallback
 
-                            if (modelId.includes('gpt-4o-mini')) limit = 16384;
-                            else if (modelId.includes('gpt-4o')) limit = 4096;
-                            else if (modelId.includes('claude-3-5-sonnet')) limit = 8192;
-                            else if (modelId.includes('claude-3-opus')) limit = 4096;
-                            else if (modelId.includes('gemini')) limit = 8192;
-                            else if (modelId.includes('gpt-oss-120b')) limit = 32768;
+                            if (modelId.includes('gpt-5.2')) limit = 32768;
+                            else if (modelId.includes('o3')) limit = 32768;
+                            else if (modelId.includes('gpt-4.5')) limit = 24576;
+                            else if (modelId.includes('gpt-4o-mini')) limit = 16384;
+                            else if (modelId.includes('claude-opus-4')) limit = 8192;
+                            else if (modelId.includes('claude-sonnet-4')) limit = 8192;
+                            else if (modelId.includes('claude-haiku-4')) limit = 8192;
+                            else if (modelId.includes('gemini')) limit = 16384;
+                            else if (modelId.includes('llama-4')) limit = 65536;
+                            else if (modelId.includes('llama-3')) limit = 32768;
+                            else if (modelId.includes('gpt-oss-120b')) limit = 65536;
+                            else if (modelId.includes('gpt-oss-20b')) limit = 65536;
 
                             setTokenLimit(limit);
                             setShowModelsDropdown(false);

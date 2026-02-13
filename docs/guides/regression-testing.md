@@ -38,33 +38,33 @@ As the platform supports 18+ models across 4 providers, regression testing ensur
 
 ### Models Under Test
 
-**Total: 18 Models across 4 Providers**
+**Total: 19 Models across 4 Providers**
 
 #### Anthropic (3 models)
-- **Claude Haiku 4.5** (`claude-3-5-haiku-20241022`) - Fast, lightweight model
-- **Claude Sonnet 4.5** (`claude-3-5-sonnet-20241022`) - Balanced performance
-- **Claude Opus 4.6** (`claude-opus-4-20250514`) - Most capable model
+- **Claude Sonnet 4.5** (`claude-sonnet-4-5-20250929`) - Balanced performance
+- **Claude Opus 4.6** (`claude-opus-4-6`) - Most capable model (1M context)
+- **Claude Haiku 4.5** (`claude-haiku-4-5-20251001`) - Fast, lightweight model
 
-#### OpenAI (3 models)
-- **GPT-5.2** (`gpt-5.2-turbo`) - Next-generation model
-- **GPT-4.5** (`gpt-4.5-turbo`) - Enhanced GPT-4
-- **o3** (`o3-mini`) - Reasoning-optimized model
+#### OpenAI (4 models)
+- **GPT-5.2** (`gpt-5.2`) - Default flagship model
+- **o3** (`o3`) - Advanced reasoning model
+- **GPT-4.5** (`gpt-4.5`) - Pro-tier model
+- **GPT-4o Mini** (`gpt-4o-mini`) - Fast and affordable
 
-#### Google (6 models)
-- **Gemini 3 Pro Preview** (`gemini-3.0-pro-preview`) - Latest preview
-- **Gemini 3 Flash** (`gemini-3.0-flash`) - Fast inference
+#### Google (5 models)
+- **Gemini 3 Pro Preview** (`gemini-3-pro-preview`) - Latest preview
+- **Gemini 3 Flash Preview** (`gemini-3-flash-preview`) - Fast inference
 - **Gemini 2.5 Pro** (`gemini-2.5-pro`) - Production stable
 - **Gemini 2.5 Flash** (`gemini-2.5-flash`) - Fast production
-- **Gemini 2.0 Flash Experimental** (`gemini-2.0-flash-exp`) - Experimental features
-- **Gemini 2.0 Flash** (`gemini-2.0-flash`) - Current generation
+- **Gemini 2.5 Flash Lite** (`gemini-2.5-flash-lite`) - Cost-effective
 
 #### Groq (6 models)
-- **Llama 4 Maverick** (`llama-4-70b-maverick`) - Latest large model
-- **Llama 4 Scout** (`llama-4-8b-scout`) - Latest compact model
+- **Llama 4 Maverick 17B** (`meta-llama/llama-4-maverick-17b-128e-instruct`) - Latest Llama 4
+- **Llama 4 Scout 17B** (`meta-llama/llama-4-scout-17b-16e-instruct`) - Llama 4 scout
 - **Llama 3.3 70B** (`llama-3.3-70b-versatile`) - Previous generation
 - **Llama 3.1 8B Instant** (`llama-3.1-8b-instant`) - Ultra-fast inference
-- **GPT OSS 120B** (`gpt-oss-120b`) - Open-source alternative
-- **GPT OSS 20B** (`gpt-oss-20b`) - Compact open-source
+- **GPT OSS 120B** (`openai/gpt-oss-120b`) - Open-source alternative
+- **GPT OSS 20B** (`openai/gpt-oss-20b`) - Compact open-source
 
 ### Test Scenarios
 
@@ -305,19 +305,17 @@ Summary:
 
 Provider Breakdown:
 - Anthropic: 9/9 passed (100%) ✅
-- OpenAI: 8/9 passed (88.9%) ⚠️
-- Google: 16/18 passed (88.9%) ⚠️
+- OpenAI: 11/12 passed (91.7%) ⚠️
+- Google: 14/15 passed (93.3%) ⚠️
 - Groq: 17/18 passed (94.4%) ✅
 
 Failures:
 1. OpenAI GPT-5.2 - Tool Test - "Rate limit exceeded"
-2. Google Gemini 2.0 Flash Exp - MCP Test - "Invalid tool response format"
-3. Google Gemini 3 Pro Preview - Tool Test - "Model not available"
-4. Groq Llama 4 Scout - Basic Test - "Connection timeout"
+2. Google Gemini 3 Pro Preview - Tool Test - "Model not available"
+3. Groq Llama 4 Scout - Basic Test - "Connection timeout"
 
 Recommendations:
 - Retry OpenAI test with backoff (rate limit is temporary)
-- Update Gemini 2.0 Flash Exp MCP handler (format issue)
 - Check Google API quota (model availability)
 - Investigate Groq connection stability
 ```

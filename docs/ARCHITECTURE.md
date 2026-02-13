@@ -110,10 +110,10 @@ Open Agent Builder is a visual workflow automation platform that enables users t
 
 | Provider | Models/Services |
 |----------|----------------|
-| **Anthropic** | Claude Haiku 4.5, Sonnet 4.5, Opus 4.5 |
-| **OpenAI** | GPT-4o, GPT-4o-mini |
-| **Google** | Gemini 2.0 Flash |
-| **Groq** | Llama 3.3 70B |
+| **Anthropic** | Claude Sonnet 4.5, Opus 4.6 (1M context), Haiku 4.5 |
+| **OpenAI** | GPT-5.2, o3, GPT-4.5, GPT-4o Mini |
+| **Google** | Gemini 3 Pro Preview, Gemini 3 Flash, Gemini 2.5 Pro/Flash |
+| **Groq** | Llama 4 Maverick/Scout, Llama 3.3 70B, Llama 3.1 8B, GPT OSS 120B/20B |
 | **Firecrawl** | Web scraping |
 | **Tavily** | Web search |
 | **E2B** | Code interpreter sandbox |
@@ -374,7 +374,7 @@ Agent Node Execution
     │
     ├─> Initialize LLM client
     │   ├─> Anthropic (Claude)
-    │   ├─> OpenAI (GPT-4o)
+    │   ├─> OpenAI (GPT-5.2)
     │   ├─> Google (Gemini)
     │   └─> Groq (Llama)
     │

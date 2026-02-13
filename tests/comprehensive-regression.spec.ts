@@ -365,12 +365,12 @@ test.describe('Comprehensive Regression Suite', () => {
 
   test.describe('Model Testing', () => {
     const modelsToTest = [
-      { provider: 'anthropic', model: 'claude-sonnet-4' },
-      { provider: 'anthropic', model: 'claude-haiku-4' },
-      { provider: 'openai', model: 'gpt-4o' },
+      { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
+      { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
+      { provider: 'openai', model: 'gpt-5.2' },
       { provider: 'openai', model: 'gpt-4o-mini' },
-      { provider: 'google', model: 'gemini-2.0-flash' },
-      { provider: 'groq', model: 'llama-3.3-70b' },
+      { provider: 'google', model: 'gemini-3-pro-preview' },
+      { provider: 'groq', model: 'llama-3.3-70b-versatile' },
     ];
 
     for (const { provider, model } of modelsToTest) {

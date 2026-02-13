@@ -29,16 +29,16 @@ export const SUPPORTED_MODELS = {
  * Derived from llm-config.ts
  */
 export const DEFAULT_MODELS = {
-  openai: llmProviders.find(p => p.id === 'openai')?.defaultModel || 'gpt-4o',
+  openai: llmProviders.find(p => p.id === 'openai')?.defaultModel || 'gpt-5.2',
   anthropic: llmProviders.find(p => p.id === 'anthropic')?.defaultModel || 'claude-sonnet-4-5-20250929',
-  groq: llmProviders.find(p => p.id === 'groq')?.defaultModel || 'gpt-oss-120b',
-  google: llmProviders.find(p => p.id === 'google')?.defaultModel || 'gemini-2.0-flash-exp',
+  groq: llmProviders.find(p => p.id === 'groq')?.defaultModel || 'llama-3.3-70b-versatile',
+  google: llmProviders.find(p => p.id === 'google')?.defaultModel || 'gemini-3-pro-preview',
 } as const;
 
 /**
  * Parse a model string into provider and model name
  * Supports formats:
- * - "provider/model-name" (e.g., "openai/gpt-4o")
+ * - "provider/model-name" (e.g., "openai/gpt-5.2")
  * - "model-name" (defaults to openai provider)
  */
 export function parseModelString(modelString?: string): { provider: Provider; modelName: string } {

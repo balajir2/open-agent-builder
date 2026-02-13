@@ -2,7 +2,7 @@
 
 **Your Visual AI Workflow Builder**
 
-**Version 2.0** | Last Updated: December 2025
+**Version 2.1** | Last Updated: February 2026
 
 ---
 

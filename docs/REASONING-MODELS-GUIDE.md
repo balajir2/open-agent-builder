@@ -36,9 +36,9 @@ Use 'max_completion_tokens' instead.
 
 | Model | Parameter | Status |
 |-------|-----------|--------|
-| **GPT-4o** | `max_tokens` | ✅ Supported |
+| **GPT-5.2** | `max_tokens` | ✅ Supported |
 | **GPT-4.5** | `max_tokens` | ✅ Supported |
-| **gpt-4o-mini** | `max_tokens` | ✅ Supported |
+| **GPT-4o Mini** | `max_tokens` | ✅ Supported |
 
 ---
 
@@ -159,7 +159,7 @@ Added comprehensive tests in `tests/model-regression.spec.ts`:
 - Ensures parameter is correct
 
 **Control Test**:
-- Verifies `max_tokens` still used for GPT-4o
+- Verifies `max_tokens` still used for standard models (GPT-5.2, GPT-4.5, GPT-4o Mini)
 - Ensures standard models unaffected
 
 Run tests:

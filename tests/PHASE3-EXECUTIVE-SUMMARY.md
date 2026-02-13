@@ -79,10 +79,10 @@ Successfully implemented comprehensive test coverage reaching **85%+** with Phas
 
 **Test Categories**:
 1. **Model Testing** (6 tests)
-   - Anthropic: Claude Sonnet 4, Claude Haiku 4
-   - OpenAI: GPT-4o, GPT-4o-mini
-   - Google: Gemini 2.0 Flash
-   - Groq: Llama 3.3 70B
+   - Anthropic: Claude Sonnet 4.5, Opus 4.6, Haiku 4.5
+   - OpenAI: GPT-5.2, o3, GPT-4.5, GPT-4o Mini
+   - Google: Gemini 3 Pro/Flash, Gemini 2.5 Pro/Flash
+   - Groq: Llama 4 Maverick/Scout, Llama 3.3 70B
 
 2. **Workflow Templates** (7 tests)
    - Load all templates

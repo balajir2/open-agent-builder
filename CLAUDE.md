@@ -253,7 +253,7 @@ open-agent-builder/
 
 **Core Node Types (10):**
 - `start` - Entry point with input variables
-- `agent` - AI agent with LLM (Claude, GPT-4o, Groq)
+- `agent` - AI agent with LLM (Claude, GPT-5.2, Gemini, Groq)
 - `mcp` - MCP tool calls (Firecrawl integration)
 - `extract` - LLM-powered structured data extraction
 - `http` - HTTP API requests
