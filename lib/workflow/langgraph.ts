@@ -93,7 +93,21 @@ export const WorkflowStateAnnotation = Annotation.Root({
 export class LangGraphExecutor {
   private workflow: Workflow;
   private graph: any; // Compiled StateGraph
-  private apiKeys?: { anthropic?: string; groq?: string; openai?: string; firecrawl?: string; arcade?: string; gamma?: string };
+  private apiKeys?: {
+    anthropic?: string;
+    groq?: string;
+    openai?: string;
+    google?: string;
+    firecrawl?: string;
+    arcade?: string;
+    gamma?: string;
+    tavily?: string;
+    serper?: string;
+    serpapi?: string;
+    e2b?: string;
+    scraperapi?: string;
+    browserless?: string;
+  };
   private onNodeUpdate?: (nodeId: string, result: NodeExecutionResult) => void;
   private checkpointer: any;
   private parallelNodeIds = new Set<string>();
@@ -106,7 +120,21 @@ export class LangGraphExecutor {
   constructor(
     workflow: Workflow,
     onNodeUpdate?: (nodeId: string, result: NodeExecutionResult) => void,
-    apiKeys?: { anthropic?: string; groq?: string; openai?: string; firecrawl?: string; arcade?: string; gamma?: string }
+    apiKeys?: {
+      anthropic?: string;
+      groq?: string;
+      openai?: string;
+      google?: string;
+      firecrawl?: string;
+      arcade?: string;
+      gamma?: string;
+      tavily?: string;
+      serper?: string;
+      serpapi?: string;
+      e2b?: string;
+      scraperapi?: string;
+      browserless?: string;
+    }
   ) {
     this.workflow = workflow;
     this.onNodeUpdate = onNodeUpdate;

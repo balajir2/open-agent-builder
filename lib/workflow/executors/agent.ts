@@ -21,7 +21,21 @@ function isReasoningModel(modelName: string): boolean {
 export async function executeAgentNode(
   node: WorkflowNode,
   state: WorkflowState,
-  apiKeys?: { anthropic?: string; groq?: string; openai?: string; firecrawl?: string; arcade?: string; google?: string }
+  apiKeys?: {
+    anthropic?: string;
+    groq?: string;
+    openai?: string;
+    google?: string;
+    firecrawl?: string;
+    arcade?: string;
+    gamma?: string;
+    tavily?: string;
+    serper?: string;
+    serpapi?: string;
+    e2b?: string;
+    scraperapi?: string;
+    browserless?: string;
+  }
 ): Promise<any> {
   const { data } = node;
 
