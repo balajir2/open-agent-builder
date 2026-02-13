@@ -1,5 +1,5 @@
 {
   "env": {
-    "NEXTAUTH_URL": "https://bounteous-open-agent.vercel.app"
+    "NEXTAUTH_URL": "https://openagent.bounteous.tools"
   }
 }
