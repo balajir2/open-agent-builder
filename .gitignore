@@ -68,3 +68,4 @@ nul
 *-DEBUG.md
 .vercel
 .env*.local
+build-output.txt
