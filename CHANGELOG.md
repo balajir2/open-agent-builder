@@ -9,12 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added - February 13, 2026
 
+- **Build Verification Tests** - Catch TypeScript errors before deployment
+  - Added TypeScript compilation check (`tsc --noEmit`) to regression suite
+  - Added Next.js build verification to validate full build pipeline
+  - Catches type mismatches, missing imports, and build configuration errors
+  - Prevents Vercel deployment failures from TypeScript errors
+  - Integrated into model regression test suite with detailed reporting
+
+- **Tool API Key Passing Tests** - Comprehensive tool integration verification (665 lines)
+  - Tests all 9 tools: Serper Search, Tavily Search, SerpAPI, Firecrawl, ScraperAPI, Browserless, E2B, Arcade, Gamma AI
+  - Verifies API keys pass correctly through execution chain: Route → Executor → Tool Factory
+  - Prevents regression of TypeScript type definition bugs that cause keys to be dropped
+  - All 9 tests passing, integrated into regression suite
+
+- **Reasoning Model Parameter Tests** - OpenAI reasoning model validation
+  - Tests o1, o1-mini, o3, o3-mini, GPT-5, GPT-5.2 use correct parameter (`max_completion_tokens`)
+  - Tests standard models (GPT-4o) use correct parameter (`max_tokens`)
+  - Prevents "Unsupported parameter" errors from OpenAI API
+  - Documentation: `docs/REASONING-MODELS-GUIDE.md`
+
 - **Model Regression Test Suite** - Comprehensive testing framework for all LLM providers and models
   - Added `tests/model-regression.spec.ts` with automated testing for all provider/model combinations
   - Tests basic execution, tool usage, and JSON mode for each model
   - Generates detailed JSON and HTML reports in `test-reports/` directory
   - New npm scripts: `test:regression`, `test:regression:headed`, `test:regression:report`
   - Reports include pass/fail rates, test duration, error details, and per-provider statistics
+  - **Total Regression Suite**: ~158+ tests (140+ model tests, 7 reasoning tests, 2 build tests, 9 tool tests)
 
 - **Updated LLM Model Support** - All providers updated with latest models (Feb 2026)
   - **Anthropic Claude**: Added Opus 4.6 with 1M token context window
@@ -50,9 +70,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - OpenAI: `gpt-4o` → `gpt-5.2`
     - Google: `gemini-2.0-flash-exp` → `gemini-3-pro-preview`
 
+- **Git Workflow Policy Update** ([CLAUDE.md](CLAUDE.md:7-31))
+  - Added requirement to ask user before committing changes
+  - Prevents accumulation of unreviewed commits
+  - Maintains existing push policy (no push without explicit approval)
+  - Updated with clear exceptions for user commands like "commit this" or "deploy now"
+
+- **README Branding Enhancement** ([README.md](README.md:11-14))
+  - Added "Built with Love by Bounteous" badge
+  - Displayed alongside MIT License, Next.js, and LangGraph badges
+  - Links to https://www.bounteous.com
+
 - **Documentation Updates**
   - Updated CLAUDE.md with latest model information
   - Added model regression testing section to documentation
+  - Added reasoning models guide: `docs/REASONING-MODELS-GUIDE.md`
   - Updated model lists across all documentation files
   - Added deprecation warnings for outdated models
 
@@ -122,6 +154,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Users remain authenticated throughout multi-hour sessions
 
 ### Fixed
+
+- **Serper Search Tool Not Accessible to Agents** ([langgraph.ts](lib/workflow/langgraph.ts:93-131), [agent.ts](lib/workflow/executors/agent.ts:21-38))
+  - **Problem**: Agent reported "I don't have access to the Serper Search tool" despite tool being attached and configured
+  - **Root Cause**: TypeScript type definitions for `apiKeys` parameter were incomplete, missing tool keys (`tavily`, `serper`, `serpapi`, `e2b`, `scraperapi`, `browserless`)
+  - **Solution**: Updated `apiKeys` type in `LangGraphExecutor` and `executeAgentNode` to include all tool API keys
+  - Even though execute-stream route passed these keys, TypeScript dropped them due to incomplete type definition
+  - **Impact**: All 6 missing tool keys now properly pass through execution chain
+  - **Prevention**: Added comprehensive tool API key passing tests (9 tests covering all tools)
+
+- **OpenAI Reasoning Model Parameter Error** ([agent.ts](lib/workflow/executors/agent.ts:355-370))
+  - **Problem**: Using o3, o3-mini, or GPT-5 models returned error: "Unsupported parameter: 'max_tokens' is not supported with this model"
+  - **Root Cause**: Reasoning models (o1, o3, GPT-5 series) require `max_completion_tokens` instead of `max_tokens`
+  - **Solution**: Added `isReasoningModel()` helper to detect reasoning models and use correct parameter
+  - Conditional logic: reasoning models use `max_completion_tokens`, standard models use `max_tokens`
+  - **Affected Models**: o1, o1-mini, o3, o3-mini, gpt-5, gpt-5.2
+  - **Prevention**: Added 7 reasoning model parameter tests to regression suite
+
+- **TypeScript Build Errors Reaching Vercel**
+  - **Problem**: TypeScript compilation errors (like MCPPanel.tsx line 169) only caught during Vercel deployment
+  - **Root Cause**: No TypeScript compilation verification in test suite
+  - **Solution**: Added build verification tests to regression suite
+  - Tests run `tsc --noEmit` (TypeScript check) and `npm run build` (full Next.js build)
+  - **Impact**: Catches type errors, missing imports, build configuration issues before deployment
+
 - **Auto-Logout During Workflow Execution** ([auth.ts](auth.ts:7-48))
   - **Problem**: Users were automatically logged out after 1 hour during long-running workflows
   - **Root Cause**: Azure AD tokens expired after 1 hour without automatic refresh

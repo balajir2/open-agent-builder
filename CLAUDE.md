@@ -4,23 +4,31 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## ⚠️ CRITICAL: Git Push Policy
+## ⚠️ CRITICAL: Git Commit & Push Policy
 
-**DO NOT push to git repositories until explicitly asked by the user.**
+**ALWAYS ask user before committing changes. NEVER commit without explicit approval.**
 
-Every push triggers a Vercel deployment. To avoid repeated deployments:
+**Commit Policy:**
+- ❌ DO NOT run `git commit` without asking user first
+- ✅ Ask: "Should I commit these changes?" or "Ready to commit?"
+- 📝 After user approves, commit with descriptive message
+- 🎯 Exception: Only commit without asking if user explicitly says "commit this" or "commit and push"
+
+**Push Policy:**
+- ❌ DO NOT push to git repositories until explicitly asked by the user
+- 📦 Every push triggers a Vercel deployment - avoid repeated deployments
 - ✅ Commit changes locally with `git commit`
-- ❌ DO NOT run `git push` unless user explicitly requests it
 - 🎯 Accumulate multiple fixes before pushing
 - 📦 Wait for user to say "push" or "deploy" before running `git push origin main && git push vercel main`
 
-**Exception**: Only push immediately if user explicitly says:
-- "push this"
-- "deploy now"
-- "push to repos"
-- "commit and push"
+**User Commands That Allow Immediate Action:**
+- "commit this" → Commit without asking
+- "push this" → Commit and push
+- "deploy now" → Commit and push
+- "push to repos" → Push to both remotes
+- "commit and push" → Do both
 
-Otherwise, commit locally and inform user that changes are ready to push when they're ready.
+Otherwise, ask before committing and inform user that changes are ready to push when they're ready.
 
 ## 🔑 CRITICAL: API Key Architecture Principle
 
