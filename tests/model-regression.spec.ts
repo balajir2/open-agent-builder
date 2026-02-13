@@ -669,4 +669,164 @@ test.describe('Model Regression Tests', () => {
       });
     });
   });
+
+  // === Reasoning Model Token Limit Tests ===
+  // Test that reasoning models (o1, o3, gpt-5) properly use max_completion_tokens
+  test.describe('Reasoning Models - Token Limit Parameter', () => {
+    const reasoningModels = [
+      { provider: 'openai', model: 'o1', displayName: 'o1' },
+      { provider: 'openai', model: 'o1-mini', displayName: 'o1-mini' },
+      { provider: 'openai', model: 'o3', displayName: 'o3' },
+      { provider: 'openai', model: 'o3-mini', displayName: 'o3-mini' },
+      { provider: 'openai', model: 'gpt-5', displayName: 'GPT-5' },
+      { provider: 'openai', model: 'gpt-5.2', displayName: 'GPT-5.2' },
+    ];
+
+    reasoningModels.forEach(({ provider, model, displayName }) => {
+      test(`${displayName} - Should use max_completion_tokens parameter`, async () => {
+        const startTime = Date.now();
+        const modelId = `${provider}/${model}`;
+
+        let capturedRequestBody: any = null;
+
+        try {
+          // Intercept the API call to verify max_completion_tokens is used
+          const originalFetch = global.fetch;
+          global.fetch = async (url, init) => {
+            const urlString = url.toString();
+            if (urlString.includes('api.openai.com')) {
+              capturedRequestBody = JSON.parse(init?.body?.toString() || '{}');
+              // Return mock response
+              return new Response(JSON.stringify({
+                choices: [{ message: { content: 'Test response' } }],
+                usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 }
+              }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+              });
+            }
+            return originalFetch(url, init);
+          };
+
+          const node: WorkflowNode = {
+            id: 'test-reasoning-model',
+            type: 'agent',
+            position: { x: 0, y: 0 },
+            data: {
+              label: 'Reasoning Model Test',
+              model: modelId,
+              instructions: 'Test reasoning model',
+              tokenLimit: 1000, // Set token limit to trigger parameter
+            },
+          };
+
+          const state: WorkflowState = {
+            chatHistory: [],
+            variables: {},
+          };
+
+          await executeAgentNode(node, state, mockApiKeys);
+
+          // Verify max_completion_tokens was used instead of max_tokens
+          expect(capturedRequestBody).toBeDefined();
+          expect(capturedRequestBody.max_completion_tokens).toBe(1000);
+          expect(capturedRequestBody.max_tokens).toBeUndefined();
+
+          addTestResult({
+            provider,
+            model: displayName,
+            modelId: model,
+            status: 'passed',
+            duration: Date.now() - startTime,
+            timestamp: new Date().toISOString(),
+            testType: 'basic',
+          });
+        } catch (error: any) {
+          addTestResult({
+            provider,
+            model: displayName,
+            modelId: model,
+            status: 'failed',
+            error: error.message,
+            duration: Date.now() - startTime,
+            timestamp: new Date().toISOString(),
+            testType: 'basic',
+          });
+          throw error;
+        }
+      });
+    });
+
+    // Test that non-reasoning models still use max_tokens
+    test('GPT-4o - Should use max_tokens parameter (not max_completion_tokens)', async () => {
+      const startTime = Date.now();
+
+      let capturedRequestBody: any = null;
+
+      try {
+        // Intercept the API call
+        const originalFetch = global.fetch;
+        global.fetch = async (url, init) => {
+          const urlString = url.toString();
+          if (urlString.includes('api.openai.com')) {
+            capturedRequestBody = JSON.parse(init?.body?.toString() || '{}');
+            return new Response(JSON.stringify({
+              choices: [{ message: { content: 'Test response' } }],
+              usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 }
+            }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+          return originalFetch(url, init);
+        };
+
+        const node: WorkflowNode = {
+          id: 'test-standard-model',
+          type: 'agent',
+          position: { x: 0, y: 0 },
+          data: {
+            label: 'Standard Model Test',
+            model: 'openai/gpt-4o',
+            instructions: 'Test standard model',
+            tokenLimit: 1000,
+          },
+        };
+
+        const state: WorkflowState = {
+          chatHistory: [],
+          variables: {},
+        };
+
+        await executeAgentNode(node, state, mockApiKeys);
+
+        // Verify max_tokens was used (NOT max_completion_tokens)
+        expect(capturedRequestBody).toBeDefined();
+        expect(capturedRequestBody.max_tokens).toBe(1000);
+        expect(capturedRequestBody.max_completion_tokens).toBeUndefined();
+
+        addTestResult({
+          provider: 'openai',
+          model: 'GPT-4o (control)',
+          modelId: 'gpt-4o',
+          status: 'passed',
+          duration: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          testType: 'basic',
+        });
+      } catch (error: any) {
+        addTestResult({
+          provider: 'openai',
+          model: 'GPT-4o (control)',
+          modelId: 'gpt-4o',
+          status: 'failed',
+          error: error.message,
+          duration: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          testType: 'basic',
+        });
+        throw error;
+      }
+    });
+  });
 });
