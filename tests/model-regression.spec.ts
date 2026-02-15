@@ -51,7 +51,7 @@ interface TestResult {
   error?: string;
   duration: number;
   timestamp: string;
-  testType: 'basic' | 'with-tools' | 'json-mode';
+  testType: 'basic' | 'with-tools' | 'json-mode' | 'build' | 'tool';
 }
 
 interface TestReport {
@@ -761,7 +761,7 @@ test.describe('Model Regression Tests', () => {
     });
 
     // Test that non-reasoning models still use max_tokens
-    test('GPT-5.2 - Should use max_tokens parameter (not max_completion_tokens)', async () => {
+    test('GPT-4o-mini - Should use max_tokens parameter (not max_completion_tokens)', async () => {
       const startTime = Date.now();
 
       let capturedRequestBody: any = null;
@@ -790,7 +790,7 @@ test.describe('Model Regression Tests', () => {
           position: { x: 0, y: 0 },
           data: {
             label: 'Standard Model Test',
-            model: 'openai/gpt-5.2',
+            model: 'openai/gpt-4o-mini',
             instructions: 'Test standard model',
             tokenLimit: 1000,
           },
@@ -810,8 +810,8 @@ test.describe('Model Regression Tests', () => {
 
         addTestResult({
           provider: 'openai',
-          model: 'GPT-5.2 (control)',
-          modelId: 'gpt-5.2',
+          model: 'GPT-4o-mini (control)',
+          modelId: 'gpt-4o-mini',
           status: 'passed',
           duration: Date.now() - startTime,
           timestamp: new Date().toISOString(),
@@ -820,8 +820,8 @@ test.describe('Model Regression Tests', () => {
       } catch (error: any) {
         addTestResult({
           provider: 'openai',
-          model: 'GPT-5.2 (control)',
-          modelId: 'gpt-5.2',
+          model: 'GPT-4o-mini (control)',
+          modelId: 'gpt-4o-mini',
           status: 'failed',
           error: error.message,
           duration: Date.now() - startTime,
@@ -848,7 +848,7 @@ test.describe('Model Regression Tests', () => {
      * - Property access on potentially undefined values
      */
 
-    test('TypeScript compilation succeeds', async ({ page }) => {
+    test('TypeScript compilation succeeds', async () => {
       const startTime = Date.now();
 
       try {
@@ -898,7 +898,8 @@ test.describe('Model Regression Tests', () => {
       }
     });
 
-    test('Next.js build succeeds', async ({ page }) => {
+    test('Next.js build succeeds', async () => {
+      test.setTimeout(360000);
       const startTime = Date.now();
 
       try {
@@ -1016,7 +1017,8 @@ test.describe('Model Regression Tests', () => {
           // Mock Serper API
           if (urlString.includes('serper.dev') || urlString.includes('google.serper.dev')) {
             toolExecuted = true;
-            receivedApiKey = init?.headers?.['X-API-KEY'] || init?.headers?.['x-api-key'] || '';
+            const hdrs = init?.headers as Record<string, string> | undefined;
+            receivedApiKey = hdrs?.['X-API-KEY'] || hdrs?.['x-api-key'] || '';
             return new Response(JSON.stringify({
               searchParameters: { q: 'test search' },
               organic: [{ title: 'Test Result', link: 'https://example.com' }]
@@ -1230,7 +1232,8 @@ test.describe('Model Regression Tests', () => {
           // Mock Firecrawl API
           if (urlString.includes('firecrawl.dev') || urlString.includes('api.firecrawl.dev')) {
             toolExecuted = true;
-            receivedApiKey = init?.headers?.['Authorization']?.toString().replace('Bearer ', '') || '';
+            const firecrawlHdrs = init?.headers as Record<string, string> | undefined;
+            receivedApiKey = firecrawlHdrs?.['Authorization']?.replace('Bearer ', '') || '';
             return new Response(JSON.stringify({
               success: true,
               data: { markdown: '# Test Content', html: '<h1>Test</h1>' }

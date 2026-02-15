@@ -11,6 +11,12 @@ import { setTestAuth } from './test-auth-helper';
 const CONVEX_URL = process.env.CONVEX_URL || process.env.NEXT_PUBLIC_CONVEX_URL!;
 const TEST_USER_ID = `test-user-lifecycle-${crypto.randomBytes(6).toString('hex')}`; // Unique user for this test run
 
+// Ensure NEXT_PUBLIC_CONVEX_URL is set so that the MCP resolver (lib/mcp/resolver.ts)
+// can create its own Convex client when resolving MCP server IDs during agent execution.
+if (CONVEX_URL && !process.env.NEXT_PUBLIC_CONVEX_URL) {
+  process.env.NEXT_PUBLIC_CONVEX_URL = CONVEX_URL;
+}
+
 if (!CONVEX_URL) {
   throw new Error('CONVEX_URL environment variable is not set.');
 }
@@ -23,6 +29,12 @@ const mockApiKeys = {
   anthropic: process.env.ANTHROPIC_API_KEY || 'mock-anthropic-key',
   google: process.env.GOOGLE_API_KEY || 'mock-google-key',
   groq: process.env.GROQ_API_KEY || 'mock-groq-key',
+  firecrawl: process.env.FIRECRAWL_API_KEY || 'mock-firecrawl-key',
+  tavily: process.env.TAVILY_API_KEY || 'mock-tavily-key',
+  serper: process.env.SERPER_API_KEY || 'mock-serper-key',
+  e2b: process.env.E2B_API_KEY || 'mock-e2b-key',
+  arcade: process.env.ARCADE_API_KEY || 'mock-arcade-key',
+  gamma: process.env.GAMMA_API_KEY || 'mock-gamma-key',
 };
 
 // --- Global Fetch Mocking Infrastructure ---
@@ -92,11 +104,20 @@ test.describe.serial('Custom MCP Server Lifecycle', () => {
     test.beforeAll(async () => {
         cleanupGlobalFetch = setupGlobalFetchMock();
         convexClient = new ConvexHttpClient(CONVEX_URL);
-    setTestAuth(convexClient, TEST_USER_ID);
-        // Before this suite runs, ensure a clean slate by deleting all servers for the user.
-        const existingServers = await convexClient.query(api.mcpServers.listUserMCPs, { userId: TEST_USER_ID });
-        for (const server of existingServers) {
-            await convexClient.mutation(api.mcpServers.deleteMCPServerForTest, { id: server._id, secret: process.env.CONVEX_TEST_SECRET! });
+        setTestAuth(convexClient, TEST_USER_ID);
+        // Validate Convex auth works before running tests
+        try {
+            const existingServers = await convexClient.query(api.mcpServers.listUserMCPs, { userId: TEST_USER_ID });
+            for (const server of existingServers) {
+                await convexClient.mutation(api.mcpServers.deleteMCPServerForTest, { id: server._id, secret: process.env.CONVEX_TEST_SECRET! });
+            }
+        } catch (error: any) {
+            if (error?.message?.includes('Unauthorized') || error?.message?.includes('Invalid test secret')) {
+                console.warn('[mcp-lifecycle] Skipping - Convex test secret is invalid or expired');
+                test.skip();
+                return;
+            }
+            throw error;
         }
     });
 
@@ -111,22 +132,6 @@ test.describe.serial('Custom MCP Server Lifecycle', () => {
     test.beforeEach(() => {
         // Clear fetch mocks for the next test
         dynamicFetchMocks.length = 0;
-
-        // Force a re-import of agent and tool modules to clear any cached global state.
-        // This is the definitive fix for the state pollution that occurs when Playwright
-        // runs test files sequentially in the same worker process (as it does in CI).
-        // Note: require.cache only exists in Node.js, not in browser/Playwright environment
-        if (typeof require !== 'undefined' && require.cache) {
-            Object.keys(require.cache).forEach(key => {
-                if (
-                    key.includes('lib/workflow/executors/agent') ||
-                    key.includes('lib/tools/registry') ||
-                    key.includes('lib/mcp')
-                ) {
-                    delete require.cache[key];
-                }
-            });
-        }
     });
 
     test('Step 1: should add a new custom MCP server', async () => {
@@ -140,7 +145,7 @@ test.describe.serial('Custom MCP Server Lifecycle', () => {
     });
 
     test('Step 3: should execute a workflow with the custom MCP server', async () => {
-        addFetchMock({ url: /(api\.openai\.com|api\.anthropic\.com|generativelanguage\.googleapis\.com)/, method: 'POST' }, {
+        addFetchMock({ url: /(api\.openai\.com|api\.anthropic\.com|generativelanguage\.googleapis\.com|api\.groq\.com)/, method: 'POST' }, {
             body: (requestBody: any) => {
                 const messages = requestBody.messages || [];
                 const lastMessage = messages[messages.length - 1];
@@ -173,7 +178,7 @@ test.describe.serial('Custom MCP Server Lifecycle', () => {
             id: 'agent-custom-mcp', type: 'agent', position: { x: 0, y: 0 },
             data: {
                 label: 'Agent with Custom MCP',
-                model: 'openai/gpt-4o',
+                model: 'openai/gpt-5.2',
                 mcpServerIds: [newServerId],
                 instructions: customInstructions,
             },

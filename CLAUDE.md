@@ -1220,7 +1220,7 @@ The Open Agent Builder implements comprehensive security measures to protect aga
 - ✅ **No Function() Constructor** - All dynamic code evaluation uses sandboxed environments
 - ✅ **E2B Sandbox** - Transform nodes execute in isolated E2B Code Interpreter
 - ✅ **mathjs Evaluator** - Safe expression evaluation for if-else and while conditions
-- ✅ **Prototype Pollution Protection** - Clean scopes with `Object.create(null)`
+- ✅ **Prototype Pollution Protection** - Clean scopes with dangerous property filtering (`__proto__`, `constructor`, `prototype`)
 
 **2. Input Validation (Zod)**
 - ✅ **Type Safety** - All API inputs validated with Zod schemas

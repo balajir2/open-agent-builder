@@ -2,7 +2,7 @@
 
 export interface WorkflowNode {
   id: string;
-  type: 'agent' | 'mcp' | 'if-else' | 'while' | 'user-approval' | 'transform' | 'set-state' | 'end' | 'start' | 'guardrails' | 'arcade' | 'note' | 'extract' | 'http' | 'data-transform';
+  type: 'agent' | 'mcp' | 'if-else' | 'while' | 'user-approval' | 'transform' | 'set-state' | 'end' | 'start' | 'guardrails' | 'arcade' | 'note' | 'extract' | 'http' | 'data-transform' | 'gamma-ai';
   position: { x: number; y: number };
   data: NodeData;
 }
@@ -90,6 +90,24 @@ export interface NodeData {
   actionOnViolation?: string;
   maxIterations?: number | string;
   timeoutMinutes?: number | string;
+
+  // HTTP node data
+  httpUrl?: string;
+  httpMethod?: string;
+  httpHeaders?: Array<{ key: string; value: string }>;
+  httpBody?: string;
+  httpAuthType?: string;
+  httpAuthToken?: string;
+
+  // Gamma AI node data
+  prompt?: string;
+  format?: string;
+  numCards?: number;
+  textAmount?: string;
+  textMode?: string;
+  imageSource?: string;
+  language?: string;
+  exportAs?: string;
 }
 
 export interface MCPServer {

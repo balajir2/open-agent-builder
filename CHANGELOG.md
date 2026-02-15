@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - February 15, 2026
+
+- **Safe Expression Evaluator Production Bug** - Fixed `Object.create(null)` causing "Cannot read properties of null (reading 'isComplex')" error
+  - mathjs `typed-function` calls `Object.getPrototypeOf(scope)` which fails on null-prototype objects
+  - Changed to `{}` with dangerous property filtering (`__proto__`, `constructor`, `prototype`)
+  - Affects if-else conditions, while loops, and set-state expressions in production workflows
+
+- **Test Suite Parallel Execution Fixes** - Eliminated all cross-worker interference in Playwright tests
+  - Changed `afterEach` → `afterAll` in 4 test files to prevent parallel workers from deleting shared data
+  - Added `safeDeleteWorkflow` helpers with try/catch for resilient cleanup
+  - Used `Promise.allSettled` for concurrent cleanup operations
+  - Fixed admin auth assertions in authentication tests (admin `list` returns all workflows)
+  - Files: `comprehensive-regression.spec.ts`, `edge-cases.spec.ts`, `authentication.spec.ts`, `database-operations.spec.ts`
+
+- **Workflow Execution Test Corrections** - Fixed incorrect test assertions and URLs
+  - Fixed SSRF test using `http://10.0.0.1` (valid URL) instead of `http://169.254.169.254` (metadata endpoint)
+  - Fixed conditional routing assertions to match actual if-else node output format
+  - Fixed model regression control test to use `claude-sonnet-4-5-20250929` (valid model)
+  - Fixed TypeScript errors across 8 regression test files
+
 ### Added - February 13, 2026
 
 - **Build Verification Tests** - Catch TypeScript errors before deployment

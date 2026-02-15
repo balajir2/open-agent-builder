@@ -13,13 +13,7 @@ import { setTestAuth } from './test-auth-helper';
 const CONVEX_URL = process.env.CONVEX_URL || process.env.NEXT_PUBLIC_CONVEX_URL!;
 const TEST_USER_ID = 'test-user-id-for-interoperability-tests';
 
-// Ensure Convex URL and test secret is set
-if (!CONVEX_URL) {
-  throw new Error('CONVEX_URL environment variable is not set.');
-}
-if (!process.env.CONVEX_TEST_SECRET) {
-    throw new Error('CONVEX_TEST_SECRET environment variable is not set for tests.');
-}
+// Environment checks moved to beforeAll for graceful skip
 
 // Mock API Keys for agent execution
 const mockApiKeys = {
@@ -121,6 +115,11 @@ test.describe('Interoperability and E2E Tests', () => {
 
   // Setup: Before all tests, initialize clients, data, and global fetch mock
   test.beforeAll(async () => {
+    if (!CONVEX_URL || !process.env.CONVEX_TEST_SECRET) {
+      console.warn('[interoperability] Skipping - CONVEX_URL or CONVEX_TEST_SECRET not set');
+      test.skip();
+      return;
+    }
     cleanupGlobalFetch = setupGlobalFetchMock(); // Setup global fetch mock
 
     convexClient = new ConvexHttpClient(CONVEX_URL);
@@ -179,20 +178,21 @@ test.describe('Interoperability and E2E Tests', () => {
           const expectedResult = `Mocked result for ${toolName}`;
           const instructions = `Use the ${toolName} tool to get information about 'test'.`;
           
-          // 1. Dynamically generate mock arguments from the tool's schema
+          // 1. Dynamically generate mock arguments from the tool's fields
           const mockArgs: { [key: string]: any } = {};
-          const functionParams = tool.parameters?.properties ?? {};
-          for (const key in functionParams) {
-            if (tool.parameters?.required?.includes(key)) {
-              const param = functionParams[key];
-              if (param.type === 'string') {
-                mockArgs[key] = `test-${key}`;
-              } else if (param.type === 'number') {
-                mockArgs[key] = 1;
-              } else if (param.type === 'boolean') {
-                mockArgs[key] = true;
+          const toolFields = tool.fields ?? [];
+          for (const field of toolFields) {
+            if (field.required) {
+              if (field.type === 'string' || field.type === 'secret') {
+                mockArgs[field.name] = `test-${field.name}`;
+              } else if (field.type === 'number') {
+                mockArgs[field.name] = 1;
+              } else if (field.type === 'boolean') {
+                mockArgs[field.name] = true;
+              } else if (field.type === 'select' && field.options?.length) {
+                mockArgs[field.name] = field.options[0].value;
               } else {
-                mockArgs[key] = 'test'; // Default fallback
+                mockArgs[field.name] = 'test'; // Default fallback
               }
             }
           }

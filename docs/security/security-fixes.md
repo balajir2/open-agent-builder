@@ -125,7 +125,9 @@ export function safeEvaluate(expression: string, context: Record<string, any>): 
   }
 
   // Create clean scope (prototype pollution protection)
-  const cleanScope = Object.create(null);
+  // Using {} instead of Object.create(null) because mathjs's typed-function
+  // requires a prototype chain. Security maintained by filtering below.
+  const cleanScope: Record<string, any> = {};
   for (const [key, value] of Object.entries(context)) {
     // Block dangerous property names
     if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
@@ -146,7 +148,7 @@ export function safeEvaluate(expression: string, context: Record<string, any>): 
 **Additional Security Features Added:**
 - Expression length limit (1000 chars) - DoS protection
 - Dangerous property name filtering - Prototype pollution protection
-- Clean scope with `Object.create(null)` - No prototype chain
+- Clean scope with `{}` and dangerous property filtering (`__proto__`, `constructor`, `prototype`)
 - Safe utility function whitelist - Only approved functions
 - Comprehensive error handling
 

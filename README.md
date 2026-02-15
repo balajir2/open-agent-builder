@@ -618,7 +618,7 @@ Open Agent Builder implements enterprise-grade security measures with comprehens
 - ✅ **No Function() Constructor** - All dynamic code evaluation uses sandboxed environments
 - ✅ **E2B Sandbox** - Transform nodes execute in isolated E2B Code Interpreter
 - ✅ **mathjs Evaluator** - Safe expression evaluation for conditions (replaces vulnerable expr-eval)
-- ✅ **Prototype Pollution Protection** - Clean scopes with `Object.create(null)`
+- ✅ **Prototype Pollution Protection** - Clean scopes with dangerous property filtering (`__proto__`, `constructor`, `prototype`)
 
 **Input Validation & SSRF Protection:**
 - ✅ **Zod Validation** - All API inputs validated with comprehensive schemas

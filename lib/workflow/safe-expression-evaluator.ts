@@ -34,8 +34,11 @@ export function safeEvaluate(expression: string, context: Record<string, any>): 
 
   try {
     // Create a clean scope with only safe variables
-    // This prevents prototype pollution attacks
-    const cleanScope = Object.create(null);
+    // NOTE: Using {} instead of Object.create(null) because mathjs's typed-function
+    // calls Object.getPrototypeOf(scope) which returns null for null-prototype objects,
+    // causing "Cannot read properties of null (reading 'isComplex')" errors.
+    // Security is maintained by filtering dangerous property names below.
+    const cleanScope: Record<string, any> = {};
 
     // Copy context variables to clean scope
     for (const [key, value] of Object.entries(context)) {

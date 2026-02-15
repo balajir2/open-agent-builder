@@ -90,10 +90,10 @@ function extractTemplateVariables(template: Workflow): string[] {
 }
 
 test.describe('Template Verification Tests', () => {
-  let convex: ConvexHttpClient;
+  let convexClient: ConvexHttpClient;
 
   test.beforeAll(() => {
-    convex = new ConvexHttpClient(CONVEX_URL);
+    convexClient = new ConvexHttpClient(CONVEX_URL);
     setTestAuth(convexClient, TEST_USER_ID);
   });
 
@@ -330,8 +330,9 @@ test.describe('Template Verification Tests', () => {
         const variables = extractTemplateVariables(template);
 
         for (const varRef of variables) {
-          // Variables should follow {{variableName}} or {{object.property}} syntax
-          expect(varRef).toMatch(/^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$/);
+          // Variables should follow {{variableName}}, {{object.property}}, {{expression(...)}}, or node-id.property syntax
+          // Allow hyphens (node IDs), dots (property access), and function calls
+          expect(varRef).toMatch(/^[a-zA-Z_][a-zA-Z0-9_.\-]*(\(.*\))?$/);
         }
       }
     });

@@ -793,7 +793,7 @@ test.describe.skip('Node Executors', () => {
         variables: { counter: 5 }
       };
 
-      const result = await executeWhileNode(node, state);
+      const result = await executeWhileNode(node, node.data, state);
 
       expect(result.__conditionResult).toBe(true);
     });
@@ -815,7 +815,7 @@ test.describe.skip('Node Executors', () => {
         variables: { counter: 15 }
       };
 
-      const result = await executeWhileNode(node, state);
+      const result = await executeWhileNode(node, node.data, state);
 
       expect(result.__conditionResult).toBe(false);
     });
@@ -837,7 +837,7 @@ test.describe.skip('Node Executors', () => {
         variables: { __loopCount: { 'while-1': 5 } }
       };
 
-      const result = await executeWhileNode(node, state);
+      const result = await executeWhileNode(node, node.data, state);
 
       // Should exit when max iterations reached
       expect(result.__conditionResult).toBe(false);
@@ -860,7 +860,7 @@ test.describe.skip('Node Executors', () => {
         variables: { counter: 5, __loopCount: {} }
       };
 
-      const result = await executeWhileNode(node, state);
+      const result = await executeWhileNode(node, node.data, state);
 
       expect(result.__variableUpdates).toBeDefined();
       expect(result.__variableUpdates.__loopCount['while-1']).toBeDefined();
@@ -903,7 +903,7 @@ test.describe.skip('Node Executors', () => {
         variables: { topic: 'AI Technology' }
       };
 
-      const result = await executeGammaNode(node, state, mockApiKeys);
+      const result = await executeGammaNode(node, state, mockApiKeys.gamma);
 
       expect(result.success).toBe(true);
       expect(result.url).toContain('gamma.app');
@@ -939,7 +939,7 @@ test.describe.skip('Node Executors', () => {
         variables: {}
       };
 
-      const result = await executeGammaNode(node, state, mockApiKeys);
+      const result = await executeGammaNode(node, state, mockApiKeys.gamma);
 
       expect(result.downloadUrl).toContain('.pptx');
     });
@@ -966,7 +966,7 @@ test.describe.skip('Node Executors', () => {
       };
 
       await expect(async () => {
-        await executeGammaNode(node, state, mockApiKeys);
+        await executeGammaNode(node, state, mockApiKeys.gamma);
       }).rejects.toThrow();
     });
   });
@@ -1004,7 +1004,7 @@ test.describe.skip('Node Executors', () => {
         variables: { content: 'Document content' }
       };
 
-      const result = await executeArcadeNode(node, state, mockApiKeys);
+      const result = await executeArcadeNode(node, state, mockApiKeys.arcade);
 
       expect(result.success).toBe(true);
     });
@@ -1032,7 +1032,7 @@ test.describe.skip('Node Executors', () => {
       };
 
       await expect(async () => {
-        await executeArcadeNode(node, state, mockApiKeys);
+        await executeArcadeNode(node, state, mockApiKeys.arcade);
       }).rejects.toThrow();
     });
   });

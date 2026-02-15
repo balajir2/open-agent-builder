@@ -22,13 +22,7 @@ const CONVEX_URL = process.env.CONVEX_URL || process.env.NEXT_PUBLIC_CONVEX_URL!
 const TEST_USER_ID = 'test-user-db-operations';
 const TEST_USER_ID_2 = 'test-user-db-operations-2';
 
-if (!CONVEX_URL) {
-  throw new Error('CONVEX_URL environment variable is not set.');
-}
-
-if (!process.env.CONVEX_TEST_SECRET) {
-  throw new Error('CONVEX_TEST_SECRET environment variable is required for tests.');
-}
+// Environment checks moved to beforeAll for graceful skip
 
 // --- Helper Functions ---
 
@@ -66,6 +60,11 @@ test.describe('Database Operations Tests', () => {
   let executionId: Id<'executions'> | null = null;
 
   test.beforeAll(async () => {
+    if (!CONVEX_URL || !process.env.CONVEX_TEST_SECRET) {
+      console.warn('[database-operations] Skipping - CONVEX_URL or CONVEX_TEST_SECRET not set');
+      test.skip();
+      return;
+    }
     convex = new ConvexHttpClient(CONVEX_URL);
     setTestAuth(convex, TEST_USER_ID);
 
@@ -125,8 +124,11 @@ test.describe('Database Operations Tests', () => {
     executionId = null;
   });
 
-  test.afterEach(async () => {
-    // Comprehensive cleanup after each test to prevent data accumulation
+  // Use afterAll (not afterEach) to prevent parallel workers from deleting
+  // data that other workers' tests are still using. With fullyParallel mode,
+  // each test runs in its own worker and afterEach can cause cross-worker interference.
+  test.afterAll(async () => {
+    // Cleanup test data after all tests complete
     try {
       // 1. Delete all workflows for TEST_USER_ID
       const workflows = await convex.query(api.workflows.list, {});
@@ -377,7 +379,7 @@ test.describe('Database Operations Tests', () => {
       // The mutation expects encrypted data
       const mockEncryptedKey = 'encrypted_mock_key_data';
 
-      await convex.mutation(api.userLLMKeys.upsertKey, {
+      await convex.mutation((api.userLLMKeys as any).upsertKey, {
         userId: TEST_USER_ID,
         provider: 'anthropic',
         encryptedKey: mockEncryptedKey,
@@ -399,7 +401,7 @@ test.describe('Database Operations Tests', () => {
 
     test('should retrieve user API keys (metadata only)', async () => {
       // Add a key
-      await convex.mutation(api.userLLMKeys.upsertKey, {
+      await convex.mutation((api.userLLMKeys as any).upsertKey, {
         userId: TEST_USER_ID,
         provider: 'openai',
         encryptedKey: 'encrypted_data',
@@ -425,7 +427,7 @@ test.describe('Database Operations Tests', () => {
 
     test('should update existing API key', async () => {
       // Add key
-      await convex.mutation(api.userLLMKeys.upsertKey, {
+      await convex.mutation((api.userLLMKeys as any).upsertKey, {
         userId: TEST_USER_ID,
         provider: 'google',
         encryptedKey: 'encrypted_v1',
@@ -434,7 +436,7 @@ test.describe('Database Operations Tests', () => {
       });
 
       // Update same provider
-      await convex.mutation(api.userLLMKeys.upsertKey, {
+      await convex.mutation((api.userLLMKeys as any).upsertKey, {
         userId: TEST_USER_ID,
         provider: 'google',
         encryptedKey: 'encrypted_v2',
@@ -454,7 +456,7 @@ test.describe('Database Operations Tests', () => {
 
     test('should delete API key', async () => {
       // Add key
-      await convex.mutation(api.userLLMKeys.upsertKey, {
+      await convex.mutation((api.userLLMKeys as any).upsertKey, {
         userId: TEST_USER_ID,
         provider: 'groq',
         encryptedKey: 'encrypted_data',
@@ -487,7 +489,7 @@ test.describe('Database Operations Tests', () => {
 
     test('should toggle key active state', async () => {
       // Add key
-      await convex.mutation(api.userLLMKeys.upsertKey, {
+      await convex.mutation((api.userLLMKeys as any).upsertKey, {
         userId: TEST_USER_ID,
         provider: 'test-provider',
         encryptedKey: 'encrypted_data',
@@ -758,7 +760,7 @@ test.describe('Database Operations Tests', () => {
 
     test('users can only access their own API keys', async () => {
       // User 1 adds key
-      await convex.mutation(api.userLLMKeys.upsertKey, {
+      await convex.mutation((api.userLLMKeys as any).upsertKey, {
         userId: TEST_USER_ID,
         provider: 'user1-provider',
         encryptedKey: 'encrypted',
@@ -766,7 +768,7 @@ test.describe('Database Operations Tests', () => {
       });
 
       // User 2 adds key
-      await convex.mutation(api.userLLMKeys.upsertKey, {
+      await convex.mutation((api.userLLMKeys as any).upsertKey, {
         userId: TEST_USER_ID_2,
         provider: 'user2-provider',
         encryptedKey: 'encrypted',

@@ -26,9 +26,7 @@ import * as path from 'path';
 const CONVEX_URL = process.env.CONVEX_URL || process.env.NEXT_PUBLIC_CONVEX_URL!;
 const TEST_USER_ID = 'test-user-file-processing';
 
-if (!CONVEX_URL) {
-  throw new Error('CONVEX_URL environment variable is not set.');
-}
+// Environment checks moved to beforeAll for graceful skip
 
 // --- Helper Functions ---
 
@@ -96,7 +94,12 @@ function createMockWorkflowState(inputVariables: any = {}): WorkflowState {
 test.describe('File Processing Tests', () => {
   let convex: ConvexHttpClient;
 
-  test.beforeAll(() => {
+  test.beforeAll(async () => {
+    if (!CONVEX_URL) {
+      console.warn('[file-processing] Skipping - CONVEX_URL not set');
+      test.skip();
+      return;
+    }
     convex = new ConvexHttpClient(CONVEX_URL);
     setTestAuth(convex, TEST_USER_ID);
   });

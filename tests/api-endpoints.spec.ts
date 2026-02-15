@@ -38,6 +38,13 @@ test.describe('API Endpoints', () => {
   let testWorkflowId: Id<'workflows'>;
 
   test.beforeAll(async () => {
+    // Skip all tests if dev server is not running
+    const serverRunning = await fetch(BASE_URL).then(() => true).catch(() => false);
+    if (!serverRunning) {
+      console.warn('[api-endpoints] Skipping - dev server not running at ' + BASE_URL);
+      test.skip();
+    }
+
     convexClient = new ConvexHttpClient(CONVEX_URL);
     setTestAuth(convexClient, TEST_USER_ID);
     console.log('🌐 Starting API Endpoints Test Suite...');
@@ -149,8 +156,7 @@ test.describe('API Endpoints', () => {
 
     test('should accept API key authentication', async ({ request }) => {
       // First, create API key for user
-      const apiKeyId = await convexClient.mutation(api.apiKeys.generate, {
-        userId: TEST_USER_ID,
+      const apiKeyResult = await convexClient.action(api.apiKeysActions.generate, {
         name: 'Test API Key',
       });
 
@@ -165,7 +171,7 @@ test.describe('API Endpoints', () => {
       });
 
       // Clean up API key
-      await convexClient.mutation(api.apiKeys.revoke, { keyId: apiKeyId });
+      await convexClient.mutation(api.apiKeys.revoke, { id: apiKeyResult.id });
 
       expect(response.ok()).toBeTruthy();
     });
@@ -253,7 +259,7 @@ test.describe('API Endpoints', () => {
         userId: TEST_USER_ID,
         name: 'Fail Workflow',
         description: 'Workflow that fails',
-        nodes: JSON.stringify([
+        nodes: [
           {
             id: 'start-1',
             type: 'start',
@@ -270,10 +276,10 @@ test.describe('API Endpoints', () => {
               httpMethod: 'GET'
             }
           }
-        ]),
-        edges: JSON.stringify([
+        ],
+        edges: [
           { id: 'e1', source: 'start-1', target: 'http-1', sourceHandle: null, targetHandle: null }
-        ]),
+        ],
       });
 
       const response = await request.get(
@@ -289,7 +295,7 @@ test.describe('API Endpoints', () => {
       expect(body).toContain('event: error');
 
       // Clean up
-      await convexClient.mutation(api.workflows.deleteWorkflow, { workflowId: failWorkflow });
+      await convexClient.mutation(api.workflows.deleteWorkflow, { id: failWorkflow });
     });
 
     test('should reject streaming without authentication', async ({ request }) => {
@@ -315,7 +321,7 @@ test.describe('API Endpoints', () => {
         userId: TEST_USER_ID,
         name: 'Approval Workflow',
         description: 'Workflow with approval',
-        nodes: JSON.stringify([
+        nodes: [
           {
             id: 'start-1',
             type: 'start',
@@ -334,11 +340,11 @@ test.describe('API Endpoints', () => {
             position: { x: 400, y: 0 },
             data: { label: 'End' }
           }
-        ]),
-        edges: JSON.stringify([
+        ],
+        edges: [
           { id: 'e1', source: 'start-1', target: 'approval-1', sourceHandle: null, targetHandle: null },
           { id: 'e2', source: 'approval-1', target: 'end-1', sourceHandle: null, targetHandle: null }
-        ]),
+        ],
       });
 
       // First, execute workflow (will pause at approval)
@@ -370,7 +376,7 @@ test.describe('API Endpoints', () => {
       expect(resumeResponse.ok()).toBeTruthy();
 
       // Clean up
-      await convexClient.mutation(api.workflows.deleteWorkflow, { workflowId: approvalWorkflow });
+      await convexClient.mutation(api.workflows.deleteWorkflow, { id: approvalWorkflow });
     });
 
     test('should reject resume without authentication', async ({ request }) => {
