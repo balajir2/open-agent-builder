@@ -575,5 +575,5 @@ If you're upgrading from an earlier version:
 ## Support
 
 - **Documentation**: [docs/README.md](./docs/README.md)
-- **Issues**: [GitHub Issues](https://github.com/firecrawl/open-agent-builder/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/firecrawl/open-agent-builder/discussions)
+- **Issues**: [GitHub Issues](https://github.com/balajir2/open-agent-builder/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/balajir2/open-agent-builder/discussions)

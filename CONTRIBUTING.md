@@ -27,7 +27,7 @@ We are committed to providing a welcoming and inclusive environment. Please be r
    ```
 3. **Add upstream remote**:
    ```bash
-   git remote add upstream https://github.com/firecrawl/open-agent-builder.git
+   git remote add upstream https://github.com/balajir2/open-agent-builder.git
    ```
 
 ## Development Setup
@@ -239,8 +239,8 @@ When adding features:
 
 ## Getting Help
 
-- **Questions**: [GitHub Discussions](https://github.com/firecrawl/open-agent-builder/discussions)
-- **Bugs**: [GitHub Issues](https://github.com/firecrawl/open-agent-builder/issues)
+- **Questions**: [GitHub Discussions](https://github.com/balajir2/open-agent-builder/discussions)
+- **Bugs**: [GitHub Issues](https://github.com/balajir2/open-agent-builder/issues)
 - **Documentation**: [docs/README.md](./docs/README.md)
 
 ## License

@@ -40,7 +40,7 @@ Before you begin, ensure you have:
 ## Step 1: Clone the Repository
 
 \`\`\`bash
-git clone https://github.com/firecrawl/open-agent-builder.git
+git clone https://github.com/balajir2/open-agent-builder.git
 cd open-agent-builder
 npm install
 \`\`\`
@@ -183,7 +183,7 @@ Visit [http://localhost:3000](http://localhost:3000)
 
 ---
 
-**Need help?** Check the [troubleshooting section](../../USER-MANUAL.md#troubleshooting) or [open an issue](https://github.com/firecrawl/open-agent-builder/issues).
+**Need help?** Check the [troubleshooting section](../../USER-MANUAL.md#troubleshooting) or [open an issue](https://github.com/balajir2/open-agent-builder/issues).
 `;
 
 writeFile('docs/getting-started/installation.md', installationContent);

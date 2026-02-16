@@ -9,6 +9,7 @@
 /coverage
 playwright-report/
 /test-results/
+test-results-*.json
 test-reports/
 
 # next.js
@@ -59,8 +60,11 @@ post_migrator.py
 # Server env
 firecrawl-responses-api/.env
 
-# Clerk build info
-.clerk/*.tsbuildinfo
+# TypeScript build info (incremental build cache)
+*.tsbuildinfo
+
+# Next.js auto-generated type declarations
+next-env.d.ts
 
 # temporary files
 nul
