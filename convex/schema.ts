@@ -59,6 +59,7 @@ export default defineSchema({
   // Workflow executions - track execution state
   executions: defineTable({
     workflowId: v.id("workflows"),
+    userId: v.optional(v.string()), // Clerk user ID who initiated this execution
     status: v.string(), // "running" | "completed" | "failed"
 
     // Execution state
@@ -79,6 +80,7 @@ export default defineSchema({
     threadId: v.optional(v.string()),
   })
     .index("by_workflow", ["workflowId"])
+    .index("by_userId", ["userId"])
     .index("by_status", ["status"])
     .index("by_started", ["startedAt"]),
 

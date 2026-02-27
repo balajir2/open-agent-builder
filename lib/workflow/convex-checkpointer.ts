@@ -14,10 +14,77 @@ type ChannelVersions = Record<string, ChannelVersion>;
 type PendingWriteValue = unknown;
 type PendingWrite<Channel = string> = [Channel, PendingWriteValue];
 
+/** Maximum JSON size (in bytes) for a single Convex document. Convex limit is 1MB. */
+const MAX_CHECKPOINT_BYTES = 900_000; // 900KB, leave headroom
+
+/** When truncating a string value, keep this many characters */
+const TRUNCATED_STRING_LIMIT = 500;
+
+/**
+ * Deep-clone an object and truncate any string values that exceed `maxLen`.
+ * File objects (with storageId) have their `content` and `text` fields replaced
+ * with a short placeholder so the checkpoint stays within Convex size limits.
+ */
+function truncateStateForCheckpoint(obj: any, maxLen = TRUNCATED_STRING_LIMIT): any {
+    if (obj === null || obj === undefined) return obj;
+
+    if (typeof obj === 'string') {
+        if (obj.length > maxLen) {
+            return obj.slice(0, maxLen) + `...[truncated, ${obj.length} chars total]`;
+        }
+        return obj;
+    }
+
+    if (Array.isArray(obj)) {
+        return obj.map(item => truncateStateForCheckpoint(item, maxLen));
+    }
+
+    if (typeof obj === 'object') {
+        // File objects with storageId: strip extracted content to save space
+        if (obj.storageId && (obj.content || obj.text)) {
+            return {
+                ...obj,
+                content: `[file content truncated for checkpoint, ${(obj.content || '').length} chars]`,
+                text: `[file text truncated for checkpoint, ${(obj.text || '').length} chars]`,
+            };
+        }
+
+        const result: Record<string, any> = {};
+        for (const [key, value] of Object.entries(obj)) {
+            result[key] = truncateStateForCheckpoint(value, maxLen);
+        }
+        return result;
+    }
+
+    return obj;
+}
+
+/**
+ * Ensure a checkpoint payload fits within Convex document size limits.
+ * First tries the raw checkpoint; if too large, truncates large values.
+ */
+function fitCheckpointToSizeLimit(checkpoint: any): any {
+    const raw = JSON.stringify(checkpoint);
+    if (raw.length <= MAX_CHECKPOINT_BYTES) {
+        return checkpoint; // fits as-is
+    }
+
+    console.warn(
+        `[Checkpointer] Checkpoint too large (${(raw.length / 1024).toFixed(0)}KB), ` +
+        `truncating to fit within ${(MAX_CHECKPOINT_BYTES / 1024).toFixed(0)}KB limit`
+    );
+
+    return truncateStateForCheckpoint(checkpoint);
+}
+
 /**
  * Convex Checkpoint Saver for LangGraph
- * 
+ *
  * Persists workflow state in Convex to support resumption across requests.
+ *
+ * Checkpoint save failures are caught and logged as warnings so they don't
+ * crash the workflow execution. This is important because large workflows
+ * with file contents can exceed Convex's 1MB document size limit.
  */
 export class ConvexCheckpointSaver extends BaseCheckpointSaver {
     private client: ConvexClient;
@@ -38,27 +105,32 @@ export class ConvexCheckpointSaver extends BaseCheckpointSaver {
             return undefined;
         }
 
-        const checkpointDoc = await this.client.query(api.checkpoints.getCheckpoint, {
-            threadId,
-            checkpointId,
-        });
+        try {
+            const checkpointDoc = await this.client.query(api.checkpoints.getCheckpoint, {
+                threadId,
+                checkpointId,
+            });
 
-        if (!checkpointDoc) {
+            if (!checkpointDoc) {
+                return undefined;
+            }
+
+            return {
+                config: {
+                    configurable: {
+                        thread_id: threadId,
+                        checkpoint_id: checkpointDoc.checkpointId || checkpointDoc._id,
+                    },
+                },
+                checkpoint: checkpointDoc.checkpoint as Checkpoint,
+                metadata: checkpointDoc.metadata as CheckpointMetadata,
+                parentConfig: checkpointDoc.parentConfig as RunnableConfig | undefined,
+                pendingWrites: checkpointDoc.pendingWrites as any[],
+            };
+        } catch (error) {
+            console.warn('[Checkpointer] Failed to get checkpoint, continuing without:', error);
             return undefined;
         }
-
-        return {
-            config: {
-                configurable: {
-                    thread_id: threadId,
-                    checkpoint_id: checkpointDoc.checkpointId || checkpointDoc._id,
-                },
-            },
-            checkpoint: checkpointDoc.checkpoint as Checkpoint,
-            metadata: checkpointDoc.metadata as CheckpointMetadata,
-            parentConfig: checkpointDoc.parentConfig as RunnableConfig | undefined,
-            pendingWrites: checkpointDoc.pendingWrites as any[],
-        };
     }
 
     /**
@@ -74,9 +146,15 @@ export class ConvexCheckpointSaver extends BaseCheckpointSaver {
             return;
         }
 
-        const checkpoints = await this.client.query(api.checkpoints.listCheckpoints, {
-            threadId,
-        });
+        let checkpoints;
+        try {
+            checkpoints = await this.client.query(api.checkpoints.listCheckpoints, {
+                threadId,
+            });
+        } catch (error) {
+            console.warn('[Checkpointer] Failed to list checkpoints:', error);
+            return;
+        }
 
         // Simple limit implementation if needed, but Convex collect() usually handles reasonable amounts
         const limit = options?.limit || checkpoints.length;
@@ -98,6 +176,10 @@ export class ConvexCheckpointSaver extends BaseCheckpointSaver {
 
     /**
      * Save a checkpoint.
+     *
+     * Errors are caught and logged as warnings to prevent checkpoint failures
+     * from crashing workflow execution. Large state data is automatically
+     * truncated to fit within Convex document size limits.
      */
     async put(
         config: RunnableConfig,
@@ -111,12 +193,25 @@ export class ConvexCheckpointSaver extends BaseCheckpointSaver {
             throw new Error("thread_id is required to save a checkpoint");
         }
 
-        await this.client.mutation(api.checkpoints.saveCheckpoint, {
-            threadId,
-            checkpoint,
-            metadata,
-            parentConfig: config.configurable?.parent_config,
-        });
+        try {
+            // Truncate checkpoint data if it exceeds Convex size limits
+            const safeCheckpoint = fitCheckpointToSizeLimit(checkpoint);
+            const safeMetadata = fitCheckpointToSizeLimit(metadata);
+
+            await this.client.mutation(api.checkpoints.saveCheckpoint, {
+                threadId,
+                checkpoint: safeCheckpoint,
+                metadata: safeMetadata,
+                parentConfig: config.configurable?.parent_config,
+            });
+        } catch (error) {
+            // Log but don't throw — checkpoint save failures should not crash the workflow.
+            // The workflow can still complete successfully; only resume capability is affected.
+            console.warn(
+                `[Checkpointer] Failed to save checkpoint for thread ${threadId}:`,
+                error instanceof Error ? error.message : error
+            );
+        }
 
         return {
             configurable: {
@@ -128,6 +223,9 @@ export class ConvexCheckpointSaver extends BaseCheckpointSaver {
 
     /**
      * Store intermediate writes linked to a checkpoint.
+     *
+     * Errors are caught and logged as warnings to prevent write failures
+     * from crashing workflow execution.
      */
     async putWrites(
         config: RunnableConfig,
@@ -141,20 +239,40 @@ export class ConvexCheckpointSaver extends BaseCheckpointSaver {
             throw new Error("thread_id and checkpoint_id are required to save writes");
         }
 
-        await this.client.mutation(api.checkpoints.saveWrites, {
-            threadId,
-            checkpointId,
-            taskId,
-            writes,
-        });
+        try {
+            // Truncate writes if they contain large data
+            const safeWrites = writes.map(([channel, value]) => [
+                channel,
+                fitCheckpointToSizeLimit(value),
+            ]) as PendingWrite[];
+
+            await this.client.mutation(api.checkpoints.saveWrites, {
+                threadId,
+                checkpointId,
+                taskId,
+                writes: safeWrites,
+            });
+        } catch (error) {
+            console.warn(
+                `[Checkpointer] Failed to save writes for thread ${threadId}:`,
+                error instanceof Error ? error.message : error
+            );
+        }
     }
 
     /**
      * Delete a thread and its checkpoints.
      */
     async deleteThread(threadId: string): Promise<void> {
-        await this.client.mutation(api.checkpoints.deleteThread, {
-            threadId,
-        });
+        try {
+            await this.client.mutation(api.checkpoints.deleteThread, {
+                threadId,
+            });
+        } catch (error) {
+            console.warn(
+                `[Checkpointer] Failed to delete thread ${threadId}:`,
+                error instanceof Error ? error.message : error
+            );
+        }
     }
 }

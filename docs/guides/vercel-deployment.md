@@ -25,7 +25,7 @@ You must configure the following in Vercel Project Settings:
 *   **Convex:** `CONVEX_DEPLOYMENT`, `NEXT_PUBLIC_CONVEX_URL` (Get these from your Convex dashboard)
 *   **LLM Keys:** `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, etc.
 *   **Tool Keys:** `TAVILY_API_KEY`, `BROWSERLESS_API_KEY`, etc.
-*   **Auth:** `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+*   **Auth:** `AUTH_MICROSOFT_ID`, `AUTH_MICROSOFT_SECRET`, `AUTH_MICROSOFT_TENANT_ID`, `AUTH_SECRET`
 
 ### 📦 External Packages
 The `next.config.js` is already configured to handle external packages like `@langchain/langgraph` and `redis`.

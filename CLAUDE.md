@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-**Last Updated:** February 13, 2026
+**Last Updated:** February 27, 2026
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -140,6 +140,11 @@ npm run test:all:comprehensive
 npm run test:regression           # Run regression suite
 npm run test:regression:headed    # Run with visible browser
 npm run test:regression:report    # Run and open HTML report
+
+# Run security hardening tests
+npm run test:security             # Auth, ownership, fail-closed tests
+npm run test:execution-persistence  # Execution lifecycle persistence
+npm run test:rate-limiter         # Rate limiter hardening tests
 
 # Run file upload/download tests
 npm run test:files                # All file-related tests
@@ -1234,16 +1239,38 @@ The Open Agent Builder implements comprehensive security measures to protect aga
 - ✅ **Attribute Filter** - Script handlers and dangerous attributes removed
 
 **4. Authorization & Access Control**
-- ✅ **Ownership Checks** - Users can only modify their own workflows/MCP servers
+- ✅ **Ownership Checks** - `checkWorkflowAccess()` in `convex/workflows.ts` verifies owner, assignee, admin, or template
+- ✅ **Execution Ownership** - `checkExecutionAccess()` in `convex/executions.ts` enforces user-scoped execution data
 - ✅ **JWT Authentication** - Azure AD authentication via NextAuth.js for all protected routes
 - ✅ **API Key Authentication** - Optional API key auth for programmatic access
+- ✅ **CRUD Route Auth** - All `/api/workflows` CRUD endpoints require authentication (no public access)
+- ✅ **Fail-Closed Auth Client** - `getAuthenticatedConvexClient()` throws when no token available (never falls back to unauthenticated)
 
 **5. CORS Configuration**
 - ✅ **Origin Whitelist** - Environment-specific allowed origins
 - ✅ **No Wildcards** - Explicit origin validation
 - ✅ **Convex Subdomain Support** - *.convex.cloud and *.convex.site allowed
 
-**6. Dependency Security**
+**6. Rate Limiter Hardening**
+- ✅ **Fail-Closed for Execution** - Rate limiter returns 503 when Convex backend is unavailable (prevents bypass)
+- ✅ **Fail-Open for Non-Critical** - Config and template endpoints still work if rate limiter is down
+- ✅ **Location:** `src/lib/api/distributed-rate-limiter.ts`
+
+**7. Error Response Sanitization**
+- ✅ **Generic Client Errors** - Error SSE events and API responses return sanitized messages only
+- ✅ **Server-Side Detail Logging** - Full stack traces and internal details logged server-side only
+- ✅ **No Session Logging** - `lib/api/auth.ts` logs email only, not full session/token data
+
+**8. Execution Persistence**
+- ✅ **Full Lifecycle** - `createExecution` → `updateExecution` → `completeExecution` in `convex/executions.ts`
+- ✅ **User Tracking** - Executions record `userId` for ownership-based access control
+- ✅ **Shared Service Layer** - `lib/api/execution-service.ts` consolidates API key resolution and LangSmith config
+
+**9. LangSmith Config Isolation**
+- ✅ **No process.env Mutation** - `LangSmithRuntimeConfig` interface passed through functions instead of mutating globals
+- ✅ **Per-Request Config** - Each execution resolves its own LangSmith config via `resolveLangSmithConfig()`
+
+**10. Dependency Security**
 - ✅ **Regular Audits** - Automated npm audit checks
 - ✅ **Secure Libraries** - Vulnerable packages replaced (expr-eval → mathjs)
 - ✅ **Up-to-date Dependencies** - Critical security patches applied
@@ -1255,9 +1282,13 @@ When working on this codebase:
 1. **Never use `eval()` or `Function()` constructor** - Use `safeEvaluate()` from `lib/workflow/safe-expression-evaluator.ts`
 2. **Always validate user input** - Use Zod schemas from `lib/api/validation-schemas.ts`
 3. **Sanitize HTML output** - Use DOMPurify before rendering user-generated content
-4. **Check ownership** - Always verify user owns resource before modification
+4. **Check ownership** - Use `checkWorkflowAccess()` / `checkExecutionAccess()` helpers in Convex functions
 5. **Use parameterized queries** - Convex queries are safe by default
 6. **Add rate limiting** - Critical endpoints have rate limits via `distributed-rate-limiter.ts`
+7. **Auth on all API routes** - Use `validateApiKey()` from `lib/api/auth.ts` at the start of every route handler
+8. **Sanitize error responses** - Never expose stack traces or internal paths to clients
+9. **Use shared execution service** - Use `resolveApiKeys()` and `resolveLangSmithConfig()` from `lib/api/execution-service.ts`
+10. **Never mutate process.env per-request** - Pass config objects through function parameters instead
 
 #### Security Documentation
 

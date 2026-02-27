@@ -715,9 +715,9 @@ If you discover a security vulnerability, please report it via GitHub Security A
 | **Install and configure** | [docs/ADMIN-GUIDE.md](./docs/ADMIN-GUIDE.md) 🔧 |
 | **Understand the architecture** | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) ⭐ |
 | **Develop or contribute** | [CLAUDE.md](./CLAUDE.md) 💻 |
-| **Deploy to production** | [DEPLOYMENT.md](./DEPLOYMENT.md) 🚀 |
-| **Add new tools** | [ADDING-NEW-TOOLS.md](./ADDING-NEW-TOOLS.md) 🔧 |
-| **Understand security** | [SECURITY.md](./SECURITY.md) 🔐 |
+| **Deploy to production** | [Deployment Guide](./docs/guides/deployment.md) 🚀 |
+| **Add new tools** | [Adding New Tools](./docs/development/adding-tools.md) 🔧 |
+| **Understand security** | [Security Guide](./docs/security/README.md) 🔐 |
 
 ### Core Documentation
 
@@ -727,17 +727,17 @@ If you discover a security vulnerability, please report it via GitHub Security A
 
 **For Administrators:**
 - **[Admin Guide](./docs/ADMIN-GUIDE.md)** 🔧 - Installation, configuration, deployment (900+ lines)
-- **[Deployment Guide](./DEPLOYMENT.md)** 🚀 - Production deployment instructions
-- **[Environment Switching](./ENVIRONMENT-SWITCHING.md)** 🔄 - Switch between dev/prod
+- **[Deployment Guide](./docs/guides/deployment.md)** 🚀 - Production deployment instructions
+- **[Environment Switching](./docs/guides/environment-switching.md)** 🔄 - Switch between dev/prod
 
 **For Developers:**
 - **[Developer Guide (CLAUDE.md)](./CLAUDE.md)** 💻 - Development setup and patterns (500+ lines)
 - **[Architecture Guide](./docs/ARCHITECTURE.md)** ⭐ - System architecture deep dive (1200+ lines)
-- **[Adding New Tools](./ADDING-NEW-TOOLS.md)** 🔧 - Tool integration guide
+- **[Adding New Tools](./docs/development/adding-tools.md)** 🔧 - Tool integration guide
 - **[Contributing Guide](./CONTRIBUTING.md)** 🤝 - How to contribute
 
 **Security & Operations:**
-- **[Security Guide](./SECURITY.md)** 🔐 - Security features and best practices
+- **[Security Guide](./docs/security/README.md)** 🔐 - Security features and best practices
 - **[Security Audit Report](./docs/security/security-fixes.md)** 🛡️ - Security audit results
 
 ### Specialized Guides

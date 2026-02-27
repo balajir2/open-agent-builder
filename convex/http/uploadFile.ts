@@ -65,27 +65,30 @@ export default httpAction(async (ctx, req: any) => {
       if ((fileField as any).size) size = (fileField as any).size;
       if ((fileField as any).type) contentTypeOut = (fileField as any).type;
     } else {
-      if (typeof (req as any).arrayBuffer === "function") {
-        const arr = await (req as any).arrayBuffer();
-        blobLike = new Uint8Array(arr);
-        size = arr.byteLength;
-        const qFilename = (req as any).url ? (() => {
-          try {
-            return new URL((req as any).url).searchParams.get("filename");
-          } catch { return null; }
-        })() : null;
-        if (qFilename) filename = qFilename;
-        contentTypeOut = getHeader("content-type") || contentTypeOut;
-      } else if (typeof (req as any).blob === "function") {
+      // Raw body upload — ctx.storage.store() requires a Blob, not Uint8Array
+      if (typeof (req as any).blob === "function") {
         blobLike = await (req as any).blob();
         if ((blobLike as any).size) size = (blobLike as any).size;
         if ((blobLike as any).type) contentTypeOut = (blobLike as any).type;
+      } else if (typeof (req as any).arrayBuffer === "function") {
+        const arr = await (req as any).arrayBuffer();
+        const ct = getHeader("content-type") || contentTypeOut;
+        blobLike = new Blob([new Uint8Array(arr)], { type: ct });
+        size = arr.byteLength;
+        contentTypeOut = ct;
       } else {
         return new Response(JSON.stringify({ error: "Unsupported request body type; cannot read file" }), {
           status: 400,
           headers: { ...corsHeaders(origin), "Content-Type": "application/json" }
         });
       }
+      // Extract filename from query string if provided
+      const qFilename = (req as any).url ? (() => {
+        try {
+          return new URL((req as any).url).searchParams.get("filename");
+        } catch { return null; }
+      })() : null;
+      if (qFilename) filename = qFilename;
     }
 
     if (!blobLike) {

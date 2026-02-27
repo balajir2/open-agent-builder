@@ -4,17 +4,16 @@ Complete API documentation for Open Agent Builder.
 
 ## Authentication
 
-### Method 1: Clerk JWT (User-Facing)
+All API endpoints require authentication. Two methods are supported:
+
+### Method 1: Azure AD Session (UI Users)
+
+Authenticated automatically via NextAuth.js when using the browser UI. Session cookies are sent with each request.
+
+### Method 2: API Key (Programmatic Access)
 
 ```bash
-curl -H "Authorization: Bearer <clerk-jwt>" \
-  https://your-domain.com/api/workflows
-```
-
-### Method 2: API Key (Programmatic)
-
-```bash
-curl -H "X-API-Key: <your-api-key>" \
+curl -H "Authorization: Bearer <your-api-key>" \
   https://your-domain.com/api/workflows/{id}/execute
 ```
 
@@ -22,6 +21,8 @@ curl -H "X-API-Key: <your-api-key>" \
 1. Settings → API Keys
 2. Click "Generate New Key"
 3. Copy key (shown once)
+
+> **Note:** All CRUD endpoints (`GET /api/workflows`, `POST /api/workflows`, etc.) now require authentication. Unauthenticated requests return 401.
 
 ## Endpoints
 
@@ -34,7 +35,7 @@ GET /api/workflows
 ```
 
 **Headers:**
-- `Authorization: Bearer <clerk-jwt>`
+- `Authorization: Bearer <api-key-or-session>`
 
 **Response:**
 ```json
@@ -58,7 +59,7 @@ POST /api/workflows
 ```
 
 **Headers:**
-- `Authorization: Bearer <clerk-jwt>`
+- `Authorization: Bearer <api-key-or-session>`
 - `Content-Type: application/json`
 
 **Body:**
@@ -87,7 +88,7 @@ POST /api/workflows/{id}/execute
 ```
 
 **Headers:**
-- `Authorization: Bearer <clerk-jwt>` OR `X-API-Key: <api-key>`
+- `Authorization: Bearer <api-key-or-session>` OR `X-API-Key: <api-key>`
 - `Content-Type: application/json`
 
 **Body:**
@@ -119,7 +120,7 @@ POST /api/workflows/{id}/execute-stream
 ```
 
 **Headers:**
-- `Authorization: Bearer <clerk-jwt>` OR `X-API-Key: <api-key>`
+- `Authorization: Bearer <api-key-or-session>` OR `X-API-Key: <api-key>`
 - `Content-Type: application/json`
 
 **Body:**

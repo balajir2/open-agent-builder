@@ -32,7 +32,7 @@ We are committed to providing a welcoming and inclusive environment. Please be r
 
 ## Development Setup
 
-See the [Installation Guide](./docs/getting-started/installation.md) for complete setup instructions.
+See the [Admin Guide](./docs/ADMIN-GUIDE.md) for complete setup instructions.
 
 **Quick Start:**
 

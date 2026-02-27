@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getConvexClient, getAuthenticatedConvexClient, api, isConvexConfigured } from '@/lib/convex/client';
+import { validateApiKey, createUnauthorizedResponse } from '@/lib/api/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,6 +11,12 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ workflowId: string }> }
 ) {
+  // Authenticate request
+  const authResult = await validateApiKey(request);
+  if (!authResult.authenticated) {
+    return createUnauthorizedResponse(authResult.error || 'Authentication required');
+  }
+
   try {
     const { workflowId } = await params;
 
@@ -73,6 +80,12 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ workflowId: string }> }
 ) {
+  // Authenticate request
+  const authResult = await validateApiKey(request);
+  if (!authResult.authenticated) {
+    return createUnauthorizedResponse(authResult.error || 'Authentication required');
+  }
+
   try {
     const { workflowId } = await params;
 

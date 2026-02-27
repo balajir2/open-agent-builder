@@ -56,7 +56,7 @@ Users create workflows in the visual builder ([WorkflowBuilder.tsx](../../compon
 ```bash
 POST /api/workflows/wf_123/execute-stream
 Content-Type: application/json
-Authorization: Bearer <clerk-jwt>
+Authorization: Bearer <api-key-or-session>
 
 {
   "input": {

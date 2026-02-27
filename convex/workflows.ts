@@ -47,8 +47,42 @@ function sanitizeNodesAndEdges(nodes: any[], edges: any[]) {
   return { cleanNodes, cleanEdges };
 }
 
+/**
+ * Check if the caller has access to a workflow.
+ * Returns true if: owner, assignee, admin, template/public, or test environment.
+ */
+async function checkWorkflowAccess(
+  ctx: any,
+  workflow: any
+): Promise<boolean> {
+  // Templates and public workflows are accessible to everyone
+  if (workflow.isTemplate || workflow.isPublic) return true;
+
+  const identity = await ctx.auth.getUserIdentity();
+
+  // Test environment with test secret — allow access
+  if (!identity && (process.env.NODE_ENV === "test" || process.env.CONVEX_TEST_SECRET)) {
+    return true;
+  }
+
+  if (!identity) return false;
+
+  // Owner or assignee
+  if (workflow.userId === identity.subject) return true;
+  if (workflow.assignedTo === identity.subject) return true;
+
+  // Admin
+  const user = await ctx.db
+    .query("users")
+    .withIndex("by_clerkId", (q: any) => q.eq("clerkId", identity.subject))
+    .first();
+  if (user?.role === "admin") return true;
+
+  return false;
+}
+
 /* --------------------------------------------------------
-   WORKFLOW CRUD (DEV MODE — NO OWNERSHIP PERMISSIONS)
+   WORKFLOW CRUD (WITH OWNERSHIP CHECKS)
 --------------------------------------------------------- */
 
 // Get all workflows for logged-in user
@@ -57,13 +91,10 @@ export const list = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
 
-    // If no identity (admin auth), return all non-template workflows
+    // If no identity, return empty list (require authentication)
+    // Test environments bypass via test secret in getUserId()
     if (!identity) {
-      return await ctx.db
-        .query("workflows")
-        .filter((q) => q.neq(q.field("isTemplate"), true))
-        .order("desc")
-        .collect();
+      return [];
     }
 
     return await ctx.db
@@ -124,24 +155,39 @@ export const listAll = query({
 // Alias
 export const listWorkflows = list;
 
-// Get workflow by Convex ID
+// Get workflow by Convex ID (with ownership check)
 export const getWorkflow = query({
   args: { id: v.id("workflows") },
-  handler: async ({ db }, { id }) => db.get(id),
-});
+  handler: async (ctx, { id }) => {
+    const workflow = await ctx.db.get(id);
+    if (!workflow) return null;
 
-// Get workflow by custom ID
-export const getWorkflowByCustomId = query({
-  args: { customId: v.string() },
-  handler: async ({ db }, { customId }) => {
-    return await db
-      .query("workflows")
-      .withIndex("by_customId", (q) => q.eq("customId", customId))
-      .first();
+    const hasAccess = await checkWorkflowAccess(ctx, workflow);
+    if (!hasAccess) return null;
+
+    return workflow;
   },
 });
 
-// Create or update workflow — NO ownership check
+// Get workflow by custom ID (with ownership check)
+export const getWorkflowByCustomId = query({
+  args: { customId: v.string() },
+  handler: async (ctx, { customId }) => {
+    const workflow = await ctx.db
+      .query("workflows")
+      .withIndex("by_customId", (q) => q.eq("customId", customId))
+      .first();
+
+    if (!workflow) return null;
+
+    const hasAccess = await checkWorkflowAccess(ctx, workflow);
+    if (!hasAccess) return null;
+
+    return workflow;
+  },
+});
+
+// Create or update workflow (with ownership check on updates)
 export const saveWorkflow = mutation({
   args: {
     customId: v.optional(v.string()),
@@ -176,6 +222,12 @@ export const saveWorkflow = mutation({
     }
 
     if (existing) {
+      // Ownership check: only owner, assignee, or admin can update
+      const hasAccess = await checkWorkflowAccess(ctx, existing);
+      if (!hasAccess) {
+        throw new Error("Unauthorized: You can only update your own workflows");
+      }
+
       await ctx.db.patch(existing._id, {
         name: safeName,
         description: args.description,
@@ -271,11 +323,23 @@ export const assignWorkflow = mutation({
   },
 });
 
-// Workflows by category
+// Workflows by category (with ownership filtering)
 export const getWorkflowsByCategory = query({
   args: { category: v.string() },
-  handler: async ({ db }, { category }) => {
-    return await db.query("workflows").withIndex("by_category", (q) => q.eq("category", category)).collect();
+  handler: async (ctx, { category }) => {
+    const all = await ctx.db
+      .query("workflows")
+      .withIndex("by_category", (q) => q.eq("category", category))
+      .collect();
+
+    // Filter by access (templates visible to all, user workflows by ownership)
+    const accessible = [];
+    for (const workflow of all) {
+      if (await checkWorkflowAccess(ctx, workflow)) {
+        accessible.push(workflow);
+      }
+    }
+    return accessible;
   },
 });
 
@@ -412,16 +476,19 @@ export const resetTemplateToDefault = mutation({
   },
 });
 
-// Workflow details + extracted input variables
+// Workflow details + extracted input variables (with ownership check)
 export const getWorkflowDetails = query({
   args: { customId: v.string() },
-  handler: async ({ db }, { customId }) => {
-    const workflow = await db
+  handler: async (ctx, { customId }) => {
+    const workflow = await ctx.db
       .query("workflows")
       .withIndex("by_customId", (q) => q.eq("customId", customId))
       .first();
 
     if (!workflow) return null;
+
+    const hasAccess = await checkWorkflowAccess(ctx, workflow);
+    if (!hasAccess) return null;
 
     const requiredInputs: any[] = [];
 
@@ -544,6 +611,12 @@ export const update = mutation({
   },
   handler: async (ctx, args) => {
     const { id, ...updates } = args;
+
+    // Ownership check
+    const workflow = await ctx.db.get(id);
+    if (!workflow) throw new Error("Workflow not found");
+    const hasAccess = await checkWorkflowAccess(ctx, workflow);
+    if (!hasAccess) throw new Error("Unauthorized: You can only update your own workflows");
 
     // Clean nodes and edges if provided
     if (updates.nodes || updates.edges) {

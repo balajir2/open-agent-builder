@@ -10,14 +10,15 @@ Complete security checklist for Open Agent Builder deployment.
   ```bash
   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
   ```
-- [ ] `CLERK_SECRET_KEY` - Never commit to Git
+- [ ] `AUTH_MICROSOFT_SECRET` - Never commit to Git
+- [ ] `AUTH_SECRET` - NextAuth.js session encryption key
 - [ ] `FIRECRAWL_API_KEY` - Kept secure
 - [ ] All API keys rotated from default values
 
 ### Authentication
 
-- [ ] Clerk JWT template configured correctly
-- [ ] `CLERK_JWT_ISSUER_DOMAIN` matches your Clerk domain
+- [ ] Azure AD app registration configured correctly
+- [ ] `AUTH_MICROSOFT_ID` matches your Azure app registration client ID
 - [ ] API key authentication working
 - [ ] Rate limiting enabled
 

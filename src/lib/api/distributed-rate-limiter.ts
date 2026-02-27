@@ -92,8 +92,25 @@ export async function checkRateLimit(
   } catch (error) {
     console.error("[Rate Limiter] Error checking rate limit:", error);
 
-    // On error, allow the request (fail open)
-    // This prevents rate limiter failures from blocking all requests
+    // Fail-closed for execution endpoints: return 503 so that resource-intensive
+    // operations cannot bypass rate limiting when the backend is down.
+    if (identifier.includes('workflow-execution')) {
+      return new Response(
+        JSON.stringify({
+          error: "Service temporarily unavailable",
+          message: "Rate limiting service is unavailable. Please try again shortly.",
+        }),
+        {
+          status: 503,
+          headers: {
+            "Content-Type": "application/json",
+            "Retry-After": "10",
+          },
+        }
+      );
+    }
+
+    // For non-critical endpoints, fail open to avoid blocking the whole app
     return null;
   }
 }

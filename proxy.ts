@@ -17,8 +17,6 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/api/templates") ||
     pathname.startsWith("/api/mcp") ||
     pathname.startsWith("/api/test-mcp-connection") ||
-    pathname.startsWith("/api/workflows") || // Allow workflows API - auth handled by getAuthenticatedConvexClient
-    pathname.startsWith("/api/team-workflows") || // Allow team workflows API
     pathname.startsWith("/api/upload") || // Allow file upload - proxies to Convex HTTP action with CORS
     pathname.startsWith("/api/auth");
 

@@ -4,6 +4,7 @@ import { validateApiKey, createUnauthorizedResponse } from '@/lib/api/auth';
 import { checkRateLimit, getRateLimitKey, RATE_LIMITS } from '@/src/lib/api/distributed-rate-limiter';
 import { WorkflowExecutionSchema, WorkflowIdSchema, safeValidate, createValidationErrorResponse } from '@/lib/api/validation-schemas';
 import { getAuthenticatedConvexClient, api } from '@/lib/convex/client';
+import { resolveApiKeys, resolveLangSmithConfig } from '@/lib/api/execution-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,42 +81,15 @@ export async function POST(
       difficulty: workflow.difficulty,
     };
 
-    // Get API keys - check user keys first, then fall back to system keys from Convex
-    const { getLLMApiKey, getToolApiKey } = await import('@/lib/api/llm-keys') as any;
+    // Get API keys using shared two-tier resolution
     const userId = authResult.userId;
-
-    // Get system API keys from Convex environment
     const convex = await getAuthenticatedConvexClient();
     const systemKeys = await convex.action(api.systemApiKeys.getAllSystemApiKeys);
 
-    // Set LangSmith environment variables from Convex (for tracing)
-    if (systemKeys.langchainApiKey) {
-      process.env.LANGCHAIN_API_KEY = systemKeys.langchainApiKey;
-    }
-    if (systemKeys.langchainProject) {
-      process.env.LANGCHAIN_PROJECT = systemKeys.langchainProject;
-    }
-    if (systemKeys.langchainEndpoint) {
-      process.env.LANGCHAIN_ENDPOINT = systemKeys.langchainEndpoint;
-    }
-    if (systemKeys.langchainTracingV2) {
-      process.env.LANGCHAIN_TRACING_V2 = systemKeys.langchainTracingV2;
-    }
+    // Resolve LangSmith config without mutating process.env per-request
+    const langSmithConfig = resolveLangSmithConfig(systemKeys);
 
-    const apiKeys = {
-      anthropic: (userId ? await getLLMApiKey('anthropic', userId) : undefined) ?? systemKeys.anthropic,
-      groq: (userId ? await getLLMApiKey('groq', userId) : undefined) ?? systemKeys.groq,
-      openai: (userId ? await getLLMApiKey('openai', userId) : undefined) ?? systemKeys.openai,
-      google: (userId ? await getLLMApiKey('google', userId) : undefined) ?? systemKeys.google,
-      firecrawl: (userId ? await getToolApiKey('firecrawl', userId) : undefined) ?? systemKeys.firecrawl,
-      arcade: (userId ? await getToolApiKey('arcade', userId) : undefined) ?? systemKeys.arcade,
-      e2b: (userId ? await getToolApiKey('e2b', userId) : undefined) ?? systemKeys.e2b,
-      tavily: (userId ? await getToolApiKey('tavily-search', userId) : undefined) ?? systemKeys.tavily,
-      serper: (userId ? await getToolApiKey('serper-search', userId) : undefined) ?? systemKeys.serper,
-      serpapi: (userId ? await getToolApiKey('serpapi-search', userId) : undefined) ?? systemKeys.serpapi,
-      scraperapi: (userId ? await getToolApiKey('scraperapi', userId) : undefined) ?? systemKeys.scraperapi,
-      browserless: (userId ? await getToolApiKey('browserless', userId) : undefined) ?? systemKeys.browserless,
-    };
+    const apiKeys = await resolveApiKeys(userId, systemKeys);
 
     // Execute workflow using LangGraph
     const executor = new LangGraphExecutor(workflowWithTimestamps, undefined, apiKeys);
@@ -123,10 +97,9 @@ export async function POST(
 
     console.log('API: Execution complete:', execution.status);
 
-    // LANGSMITH FIX: Wait for LangSmith to finalize trace
-    // This ensures traces are properly marked as complete in LangSmith
+    // Wait for LangSmith to finalize trace
     const { waitForTraceFinalization } = await import('@/lib/langsmith/config');
-    await waitForTraceFinalization();
+    await waitForTraceFinalization(1000, langSmithConfig);
 
     return NextResponse.json({
       success: execution.status === 'completed',
@@ -135,11 +108,12 @@ export async function POST(
       workflowName: workflowWithTimestamps.name,
     });
   } catch (error) {
-    console.error('Workflow execution error:', error);
+    // Log detailed error server-side, return sanitized message to client
+    console.error('[Execution] Workflow execution error:', error);
     return NextResponse.json(
       {
         error: 'Workflow execution failed',
-        message: error instanceof Error ? error.message : 'Unknown error',
+        message: 'An internal error occurred during workflow execution.',
       },
       { status: 500 }
     );

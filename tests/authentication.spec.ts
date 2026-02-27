@@ -414,17 +414,24 @@ test.describe('Authentication & Authorization', () => {
     });
 
     test('should isolate user workflows', async () => {
-      // List workflows - with admin auth, list returns all workflows.
-      // Verify that each user's workflow exists and has correct ownership.
-      const allWorkflows = await convexClient.query(api.workflows.list, {});
-
-      const user1Workflow = allWorkflows.find(w => w._id === user1WorkflowId);
-      const user2Workflow = allWorkflows.find(w => w._id === user2WorkflowId);
+      // Verify each workflow has correct ownership metadata.
+      // NOTE: We use getWorkflow (not list) because the list query
+      // filters by identity.subject, which is null under admin auth.
+      // getWorkflow uses checkWorkflowAccess which allows test-env access.
+      const user1Workflow = await convexClient.query(api.workflows.get, {
+        id: user1WorkflowId,
+      });
+      const user2Workflow = await convexClient.query(api.workflows.get, {
+        id: user2WorkflowId,
+      });
 
       expect(user1Workflow).toBeTruthy();
       expect(user1Workflow?.userId).toBe(TEST_USER_ID_1);
       expect(user2Workflow).toBeTruthy();
       expect(user2Workflow?.userId).toBe(TEST_USER_ID_2);
+
+      // Verify they are different users — ownership isolation metadata is in place
+      expect(user1Workflow?.userId).not.toBe(user2Workflow?.userId);
     });
 
     test('should prevent unauthorized workflow modification', async () => {

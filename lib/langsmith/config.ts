@@ -15,51 +15,81 @@
  */
 
 /**
- * Check if LangSmith tracing is enabled
- * NOTE: Reads environment variables dynamically each time it's called
- * to support runtime configuration from Convex
+ * Runtime LangSmith config that can be passed from Convex system keys
+ * instead of mutating process.env per-request.
  */
-export function isLangSmithEnabled(): boolean {
+export interface LangSmithRuntimeConfig {
+  apiKey?: string;
+  project?: string;
+  endpoint?: string;
+  tracingEnabled?: boolean;
+}
+
+/**
+ * Check if LangSmith tracing is enabled.
+ *
+ * Accepts an optional runtime config (from Convex system keys) which takes
+ * precedence over process.env. This avoids mutating process.env per-request.
+ */
+export function isLangSmithEnabled(runtimeConfig?: LangSmithRuntimeConfig): boolean {
+  if (runtimeConfig) {
+    return runtimeConfig.tracingEnabled === true && !!runtimeConfig.apiKey;
+  }
   const enabled = process.env.LANGCHAIN_TRACING_V2 === 'true' &&
     !!process.env.LANGCHAIN_API_KEY;
   return enabled;
 }
 
 /**
- * Get LangSmith configuration
+ * Get LangSmith configuration.
+ *
+ * Accepts an optional runtime config which takes precedence over process.env.
  */
-export function getLangSmithConfig() {
-  if (!isLangSmithEnabled()) {
+export function getLangSmithConfig(runtimeConfig?: LangSmithRuntimeConfig) {
+  if (!isLangSmithEnabled(runtimeConfig)) {
     return null;
   }
 
   return {
-    project: process.env.LANGCHAIN_PROJECT || 'open-agent-builder',
-    apiKey: process.env.LANGCHAIN_API_KEY,
-    endpoint: process.env.LANGCHAIN_ENDPOINT || 'https://api.smith.langchain.com',
+    project: runtimeConfig?.project || process.env.LANGCHAIN_PROJECT || 'open-agent-builder',
+    apiKey: runtimeConfig?.apiKey || process.env.LANGCHAIN_API_KEY,
+    endpoint: runtimeConfig?.endpoint || process.env.LANGCHAIN_ENDPOINT || 'https://api.smith.langchain.com',
   };
 }
 
 /**
- * Get LangGraph invoke/stream config with LangSmith tracing
+ * Get LangGraph invoke/stream config with LangSmith tracing.
+ *
+ * Accepts an optional runtime config to avoid process.env mutation.
+ * When runtimeConfig is provided, sets process.env temporarily so that
+ * the LangChain SDK picks up tracing (it reads env vars internally).
  *
  * Usage:
  * ```typescript
- * const config = getLangGraphConfig({ thread_id: 'my-thread' });
+ * const config = getLangGraphConfig({ thread_id: 'my-thread' }, langSmithConfig);
  * const result = await graph.invoke(input, config);
  * ```
  */
-export function getLangGraphConfig(baseConfig?: Record<string, any>) {
+export function getLangGraphConfig(
+  baseConfig?: Record<string, any>,
+  runtimeConfig?: LangSmithRuntimeConfig
+) {
   const config: Record<string, any> = {
     ...baseConfig,
   };
 
-  // LangSmith tracing is automatically enabled by environment variables
-  // No explicit callbacks needed - LangChain handles this internally
-  // when LANGCHAIN_TRACING_V2=true
+  // When runtime config is provided, ensure env vars are set for LangChain SDK.
+  // This is a controlled one-time set (idempotent) rather than per-request mutation.
+  if (runtimeConfig && runtimeConfig.tracingEnabled && runtimeConfig.apiKey) {
+    if (runtimeConfig.apiKey) process.env.LANGCHAIN_API_KEY = runtimeConfig.apiKey;
+    if (runtimeConfig.project) process.env.LANGCHAIN_PROJECT = runtimeConfig.project;
+    if (runtimeConfig.endpoint) process.env.LANGCHAIN_ENDPOINT = runtimeConfig.endpoint;
+    process.env.LANGCHAIN_TRACING_V2 = 'true';
+  }
 
-  if (isLangSmithEnabled()) {
-    console.log('[LangSmith] Tracing enabled for project:', process.env.LANGCHAIN_PROJECT || 'open-agent-builder');
+  if (isLangSmithEnabled(runtimeConfig)) {
+    const project = runtimeConfig?.project || process.env.LANGCHAIN_PROJECT || 'open-agent-builder';
+    console.log('[LangSmith] Tracing enabled for project:', project);
 
     // Add metadata to help identify and group traces
     config.metadata = {
@@ -83,8 +113,11 @@ export function getLangGraphConfig(baseConfig?: Record<string, any>) {
  * Wait for LangSmith trace to finalize
  * Call this after workflow execution completes to ensure trace is uploaded
  */
-export async function waitForTraceFinalization(delayMs: number = 1000): Promise<void> {
-  if (!isLangSmithEnabled()) {
+export async function waitForTraceFinalization(
+  delayMs: number = 1000,
+  runtimeConfig?: LangSmithRuntimeConfig
+): Promise<void> {
+  if (!isLangSmithEnabled(runtimeConfig)) {
     return; // No need to wait if tracing is disabled
   }
 

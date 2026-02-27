@@ -115,21 +115,21 @@ See [schema.ts](./schema.ts) for complete schema definitions.
 
 Authentication is handled via NextAuth.js with Azure AD (Microsoft Entra ID). The configuration is in [auth.config.ts](./auth.config.ts).
 
-**JWT Validation:**
+**Azure AD Configuration:**
 ```typescript
 export default {
   providers: [
     {
-      domain: process.env.CLERK_JWT_ISSUER_DOMAIN!,
-      applicationID: "convex",
+      domain: "https://login.microsoftonline.com/<tenant-id>/v2.0",
+      applicationID: process.env.AUTH_MICROSOFT_ID!,
     },
   ],
 };
 ```
 
-**Important:** Set `CLERK_JWT_ISSUER_DOMAIN` in Convex environment:
+**Important:** Set `AUTH_MICROSOFT_ID` in Convex environment:
 ```bash
-npx convex env set CLERK_JWT_ISSUER_DOMAIN "https://login.microsoftonline.com/<tenant-id>/v2.0"
+npx convex env set AUTH_MICROSOFT_ID "your-azure-app-registration-client-id"
 ```
 
 ## Environment Variables
@@ -139,11 +139,11 @@ Set environment variables using the Convex CLI:
 ```bash
 # Development
 npx convex env set ENCRYPTION_KEY "<32-byte-base64-key>"
-npx convex env set CLERK_JWT_ISSUER_DOMAIN "https://login.microsoftonline.com/<tenant-id>/v2.0"
+npx convex env set AUTH_MICROSOFT_ID "your-azure-app-registration-client-id"
 
 # Production
 npx convex env set --prod ENCRYPTION_KEY "<32-byte-base64-key>"
-npx convex env set --prod CLERK_JWT_ISSUER_DOMAIN "https://login.microsoftonline.com/<tenant-id>/v2.0"
+npx convex env set --prod AUTH_MICROSOFT_ID "your-azure-app-registration-client-id"
 
 # Optional: System-level API keys (fallback for all users)
 npx convex env set ANTHROPIC_API_KEY "sk-ant-..."
@@ -273,7 +273,7 @@ export const saveApiKey = mutation({
 - Check that the function is exported and has correct signature
 
 ### "Invalid authentication" error
-- Verify `CLERK_JWT_ISSUER_DOMAIN` is set correctly
+- Verify `AUTH_MICROSOFT_ID` is set correctly in Convex environment
 - Check that JWT token is being passed from Next.js
 
 ### "Cannot read environment variable" error

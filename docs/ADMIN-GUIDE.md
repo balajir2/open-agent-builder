@@ -247,14 +247,14 @@ npx convex deploy --prod
 # Required: Encryption key for user API keys
 npx convex env set ENCRYPTION_KEY "<32-byte-base64-key>"
 
-# Required: JWT issuer domain
-npx convex env set CLERK_JWT_ISSUER_DOMAIN "https://login.microsoftonline.com/<tenant-id>/v2.0"
+# Required: Azure AD app registration client ID
+npx convex env set AUTH_MICROSOFT_ID "your-azure-app-registration-client-id"
 ```
 
 **Production**:
 ```bash
 npx convex env set --prod ENCRYPTION_KEY "<32-byte-base64-key>"
-npx convex env set --prod CLERK_JWT_ISSUER_DOMAIN "https://login.microsoftonline.com/<tenant-id>/v2.0"
+npx convex env set --prod AUTH_MICROSOFT_ID "your-azure-app-registration-client-id"
 ```
 
 **Generate Encryption Key**:
@@ -563,7 +563,7 @@ npx convex deploy --prod
 
 # Set production environment variables
 npx convex env set --prod ENCRYPTION_KEY "<production-key>"
-npx convex env set --prod CLERK_JWT_ISSUER_DOMAIN "https://login.microsoftonline.com/<tenant-id>/v2.0"
+npx convex env set --prod AUTH_MICROSOFT_ID "your-azure-app-registration-client-id"
 
 # Set production system API keys
 npx convex env set --prod ANTHROPIC_API_KEY "sk-ant-xxx"
@@ -1028,7 +1028,7 @@ cat convex/auth.config.ts
 **Solutions**:
 - Verify `AUTH_MICROSOFT_ID`, `AUTH_MICROSOFT_SECRET`, `AUTH_MICROSOFT_TENANT_ID` are correct
 - Check Azure AD redirect URI matches your domain exactly
-- Ensure `CLERK_JWT_ISSUER_DOMAIN` is set in both `.env.local` AND Convex environment
+- Ensure `AUTH_MICROSOFT_ID` is set in Convex environment
 - Clear browser cookies and try again
 - Check middleware.ts for route protection issues
 
@@ -1460,7 +1460,7 @@ for (const execution of oldExecutions) {
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `ENCRYPTION_KEY` | Yes | 32-byte base64 key for encrypting user API keys |
-| `CLERK_JWT_ISSUER_DOMAIN` | Yes | Azure AD JWT issuer URL |
+| `AUTH_MICROSOFT_ID` | Yes | Azure AD app registration client ID |
 | `ANTHROPIC_API_KEY` | No | System Anthropic API key (fallback) |
 | `OPENAI_API_KEY` | No | System OpenAI API key (fallback) |
 | `GROQ_API_KEY` | No | System Groq API key (fallback) |

@@ -10,7 +10,7 @@ Open Agent Builder uses [Convex](https://convex.dev) as its real-time database. 
 
 ### 1. users
 
-Stores user profile information synced from Clerk authentication.
+Stores user profile information synced from Azure AD (Microsoft Entra ID) authentication.
 
 ```typescript
 users: defineTable({
@@ -26,7 +26,7 @@ users: defineTable({
 ```
 
 **Indexes:**
-- `by_clerk_id` - Fast lookup by Clerk user ID
+- `by_clerk_id` - Fast lookup by user identity ID
 - `by_email` - Fast lookup by email address
 
 ---

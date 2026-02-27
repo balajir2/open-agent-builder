@@ -15,7 +15,6 @@ import { api } from '@/convex/_generated/api';
 import { setTestAuth } from './test-auth-helper';
 import { prefetchFileContents } from '@/lib/workflow/file-utils';
 import { WorkflowState } from '@/lib/workflow/types';
-import FormData from 'form-data';
 
 // --- Test Configuration ---
 const CONVEX_URL = process.env.CONVEX_URL || process.env.NEXT_PUBLIC_CONVEX_URL!;
@@ -23,6 +22,16 @@ const UPLOAD_URL = process.env.NEXT_PUBLIC_CONVEX_UPLOAD_ACTION_URL!;
 const TEST_USER_ID = 'test-user-file-workflow';
 
 // Environment checks moved to beforeAll for graceful skip
+
+// --- Helpers ---
+
+/** Upload a file using native FormData (compatible with Node.js fetch) */
+async function uploadFile(content: Buffer, filename: string, contentType: string) {
+  const fd = new FormData();
+  fd.append('file', new Blob([new Uint8Array(content)], { type: contentType }), filename);
+  const response = await fetch(UPLOAD_URL, { method: 'POST', body: fd });
+  return { response, result: await response.json() };
+}
 
 // --- Test Fixtures ---
 
@@ -94,9 +103,9 @@ test.describe('File and Workflow Integration Tests', () => {
     }
     // Verify upload endpoint works with a test upload
     try {
-      const testFormData = new FormData();
-      testFormData.append('file', Buffer.from('test'), { filename: 'test.txt', contentType: 'text/plain' });
-      const testResponse = await fetch(UPLOAD_URL, { method: 'POST', body: testFormData as any, headers: testFormData.getHeaders() });
+      const testFd = new FormData();
+      testFd.append('file', new Blob([new Uint8Array(Buffer.from('test'))], { type: 'text/plain' }), 'test.txt');
+      const testResponse = await fetch(UPLOAD_URL, { method: 'POST', body: testFd });
       if (!testResponse.ok) {
         console.warn('[file-workflow-integration] Skipping - upload endpoint returned error: ' + testResponse.status);
         test.skip();
@@ -115,22 +124,9 @@ test.describe('File and Workflow Integration Tests', () => {
     test('should upload file and inject into workflow state', async () => {
       // Upload a test file
       const textContent = 'This is a test document for workflow processing.';
-      const textBuffer = Buffer.from(textContent, 'utf-8');
-      const formData = new FormData();
-
-      formData.append('file', textBuffer, {
-        filename: 'workflow-test.txt',
-        contentType: 'text/plain',
-      });
-
-      const uploadResponse = await fetch(UPLOAD_URL, {
-        method: 'POST',
-        body: formData as any,
-        headers: formData.getHeaders(),
-      });
-
-      expect(uploadResponse.ok).toBeTruthy();
-      const uploadResult = await uploadResponse.json();
+      const { result: uploadResult } = await uploadFile(
+        Buffer.from(textContent, 'utf-8'), 'workflow-test.txt', 'text/plain'
+      );
 
       // Create workflow state with file reference
       const state: WorkflowState = {
@@ -157,21 +153,9 @@ test.describe('File and Workflow Integration Tests', () => {
     test('should prefetch file contents for workflow execution', async () => {
       // Upload test file
       const textContent = 'Document content for prefetch testing.';
-      const textBuffer = Buffer.from(textContent, 'utf-8');
-      const formData = new FormData();
-
-      formData.append('file', textBuffer, {
-        filename: 'prefetch-test.txt',
-        contentType: 'text/plain',
-      });
-
-      const uploadResponse = await fetch(UPLOAD_URL, {
-        method: 'POST',
-        body: formData as any,
-        headers: formData.getHeaders(),
-      });
-
-      const uploadResult = await uploadResponse.json();
+      const { result: uploadResult } = await uploadFile(
+        Buffer.from(textContent, 'utf-8'), 'prefetch-test.txt', 'text/plain'
+      );
 
       // Create state with file reference (no content initially)
       const state: WorkflowState = {
@@ -204,22 +188,8 @@ test.describe('File and Workflow Integration Tests', () => {
     });
 
     test('should handle PDF file extraction in workflow state', async () => {
-      // Upload PDF
       const pdfBuffer = createTestPdfBuffer();
-      const formData = new FormData();
-
-      formData.append('file', pdfBuffer, {
-        filename: 'workflow-pdf.pdf',
-        contentType: 'application/pdf',
-      });
-
-      const uploadResponse = await fetch(UPLOAD_URL, {
-        method: 'POST',
-        body: formData as any,
-        headers: formData.getHeaders(),
-      });
-
-      const uploadResult = await uploadResponse.json();
+      const { result: uploadResult } = await uploadFile(pdfBuffer, 'workflow-pdf.pdf', 'application/pdf');
 
       // Create state
       const state: WorkflowState = {
@@ -248,22 +218,8 @@ test.describe('File and Workflow Integration Tests', () => {
     });
 
     test('should handle Markdown file in workflow state', async () => {
-      // Upload Markdown
       const mdBuffer = createTestMarkdownBuffer();
-      const formData = new FormData();
-
-      formData.append('file', mdBuffer, {
-        filename: 'requirements.md',
-        contentType: 'text/markdown',
-      });
-
-      const uploadResponse = await fetch(UPLOAD_URL, {
-        method: 'POST',
-        body: formData as any,
-        headers: formData.getHeaders(),
-      });
-
-      const uploadResult = await uploadResponse.json();
+      const { result: uploadResult } = await uploadFile(mdBuffer, 'requirements.md', 'text/markdown');
 
       // Create state
       const state: WorkflowState = {
@@ -295,27 +251,16 @@ test.describe('File and Workflow Integration Tests', () => {
     test('should handle multiple file inputs in workflow state', async () => {
       // Upload multiple files
       const files = [
-        { buffer: Buffer.from('File 1 content'), filename: 'doc1.txt' },
-        { buffer: Buffer.from('File 2 content'), filename: 'doc2.txt' },
-        { buffer: Buffer.from('File 3 content'), filename: 'doc3.txt' },
+        { content: 'File 1 content', filename: 'doc1.txt' },
+        { content: 'File 2 content', filename: 'doc2.txt' },
+        { content: 'File 3 content', filename: 'doc3.txt' },
       ];
 
       const uploadResults = [];
 
       for (const file of files) {
-        const formData = new FormData();
-        formData.append('file', file.buffer, {
-          filename: file.filename,
-          contentType: 'text/plain',
-        });
-
-        const response = await fetch(UPLOAD_URL, {
-          method: 'POST',
-          body: formData as any,
-          headers: formData.getHeaders(),
-        });
-
-        uploadResults.push(await response.json());
+        const { result } = await uploadFile(Buffer.from(file.content), file.filename, 'text/plain');
+        uploadResults.push(result);
       }
 
       // Create state with multiple files
@@ -351,7 +296,6 @@ test.describe('File and Workflow Integration Tests', () => {
     });
 
     test('should handle mixed file types in workflow', async () => {
-      // Upload different file types
       const pdfBuffer = createTestPdfBuffer();
       const mdBuffer = createTestMarkdownBuffer();
       const textBuffer = Buffer.from('Plain text content');
@@ -365,19 +309,8 @@ test.describe('File and Workflow Integration Tests', () => {
       const uploadResults = [];
 
       for (const upload of uploads) {
-        const formData = new FormData();
-        formData.append('file', upload.buffer, {
-          filename: upload.filename,
-          contentType: upload.contentType,
-        });
-
-        const response = await fetch(UPLOAD_URL, {
-          method: 'POST',
-          body: formData as any,
-          headers: formData.getHeaders(),
-        });
-
-        uploadResults.push(await response.json());
+        const { result } = await uploadFile(upload.buffer, upload.filename, upload.contentType);
+        uploadResults.push(result);
       }
 
       // Create state
@@ -479,22 +412,7 @@ test.describe('File and Workflow Integration Tests', () => {
     });
 
     test('should handle files with existing content (no re-fetch)', async () => {
-      // Upload file
-      const textBuffer = Buffer.from('Original content');
-      const formData = new FormData();
-
-      formData.append('file', textBuffer, {
-        filename: 'existing-content.txt',
-        contentType: 'text/plain',
-      });
-
-      const uploadResponse = await fetch(UPLOAD_URL, {
-        method: 'POST',
-        body: formData as any,
-        headers: formData.getHeaders(),
-      });
-
-      const uploadResult = await uploadResponse.json();
+      const { result: uploadResult } = await uploadFile(Buffer.from('Original content'), 'existing-content.txt', 'text/plain');
 
       // Create state with content already present
       const state: WorkflowState = {
@@ -523,23 +441,8 @@ test.describe('File and Workflow Integration Tests', () => {
 
   test.describe('Variable Substitution with Files', () => {
     test('should substitute file content in agent instructions', async () => {
-      // Upload file
       const content = 'Analyze this business proposal carefully.';
-      const textBuffer = Buffer.from(content, 'utf-8');
-      const formData = new FormData();
-
-      formData.append('file', textBuffer, {
-        filename: 'proposal.txt',
-        contentType: 'text/plain',
-      });
-
-      const uploadResponse = await fetch(UPLOAD_URL, {
-        method: 'POST',
-        body: formData as any,
-        headers: formData.getHeaders(),
-      });
-
-      const uploadResult = await uploadResponse.json();
+      const { result: uploadResult } = await uploadFile(Buffer.from(content, 'utf-8'), 'proposal.txt', 'text/plain');
 
       // Create state
       const state: WorkflowState = {
@@ -564,7 +467,6 @@ test.describe('File and Workflow Integration Tests', () => {
     });
 
     test('should handle file references in complex expressions', async () => {
-      // Upload multiple files
       const uploads = [
         { content: 'Document A content', filename: 'docA.txt' },
         { content: 'Document B content', filename: 'docB.txt' },
@@ -573,19 +475,8 @@ test.describe('File and Workflow Integration Tests', () => {
       const uploadResults = [];
 
       for (const upload of uploads) {
-        const formData = new FormData();
-        formData.append('file', Buffer.from(upload.content), {
-          filename: upload.filename,
-          contentType: 'text/plain',
-        });
-
-        const response = await fetch(UPLOAD_URL, {
-          method: 'POST',
-          body: formData as any,
-          headers: formData.getHeaders(),
-        });
-
-        uploadResults.push(await response.json());
+        const { result } = await uploadFile(Buffer.from(upload.content), upload.filename, 'text/plain');
+        uploadResults.push(result);
       }
 
       // Create state

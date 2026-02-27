@@ -1,8 +1,44 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
+/** Max approximate size (in bytes) for a checkpoint document to avoid Convex 1MB limit */
+const MAX_DOC_SIZE = 900_000;
+
+/**
+ * Recursively truncate large string values in an object to reduce document size.
+ * File objects (with storageId) have content/text replaced with placeholders.
+ */
+function truncateLargeValues(obj: any, maxStringLen = 500): any {
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj === 'string') {
+        if (obj.length > maxStringLen) {
+            return obj.slice(0, maxStringLen) + `...[truncated, ${obj.length} chars]`;
+        }
+        return obj;
+    }
+    if (Array.isArray(obj)) {
+        return obj.map(item => truncateLargeValues(item, maxStringLen));
+    }
+    if (typeof obj === 'object') {
+        if (obj.storageId && (obj.content || obj.text)) {
+            return {
+                ...obj,
+                content: `[truncated for storage, ${(obj.content || '').length} chars]`,
+                text: `[truncated for storage, ${(obj.text || '').length} chars]`,
+            };
+        }
+        const result: Record<string, any> = {};
+        for (const [key, value] of Object.entries(obj)) {
+            result[key] = truncateLargeValues(value, maxStringLen);
+        }
+        return result;
+    }
+    return obj;
+}
+
 /**
  * Save a checkpoint to the database.
+ * Automatically truncates large values if the document would exceed Convex size limits.
  */
 export const saveCheckpoint = mutation({
     args: {
@@ -12,20 +48,37 @@ export const saveCheckpoint = mutation({
         parentConfig: v.optional(v.any()),
     },
     handler: async (ctx, args) => {
-        const { threadId, checkpoint, metadata, parentConfig } = args;
+        let { threadId, checkpoint, metadata, parentConfig } = args;
 
         const checkpointId = checkpoint.id;
 
-        // Store the checkpoint
-        const id = await ctx.db.insert("checkpoints", {
+        // Build the document and check its approximate size
+        let doc = {
             threadId,
             checkpointId,
             checkpoint,
             metadata,
             parentConfig,
             createdAt: new Date().toISOString(),
-        });
+        };
 
+        const approxSize = JSON.stringify(doc).length;
+        if (approxSize > MAX_DOC_SIZE) {
+            console.warn(
+                `[Checkpoints] Document too large (${(approxSize / 1024).toFixed(0)}KB), ` +
+                `truncating to fit within ${(MAX_DOC_SIZE / 1024).toFixed(0)}KB limit`
+            );
+            doc = {
+                threadId,
+                checkpointId,
+                checkpoint: truncateLargeValues(checkpoint),
+                metadata: truncateLargeValues(metadata),
+                parentConfig: truncateLargeValues(parentConfig),
+                createdAt: doc.createdAt,
+            };
+        }
+
+        const id = await ctx.db.insert("checkpoints", doc);
         return id;
     },
 });

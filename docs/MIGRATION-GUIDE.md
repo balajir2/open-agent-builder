@@ -119,7 +119,7 @@ GROQ_API_KEY=gsk_...
 FIRECRAWL_API_KEY=fc-...
 E2B_API_KEY=e2b_...
 TAVILY_API_KEY=tvly-...
-CLERK_JWT_ISSUER_DOMAIN=https://...
+AUTH_MICROSOFT_ID=your-azure-app-client-id
 LANGCHAIN_API_KEY=lsv2_pt_...
 LANGCHAIN_TRACING_V2=true
 LANGCHAIN_PROJECT=open-agent-builder
@@ -136,10 +136,11 @@ NEXT_PUBLIC_CONVEX_URL=https://your-deployment.convex.cloud
 CONVEX_DEPLOYMENT=dev:your-deployment
 NEXT_PUBLIC_CONVEX_UPLOAD_ACTION_URL=https://your-deployment.convex.site/http/uploadFile
 
-# Clerk Authentication (REQUIRED)
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
-CLERK_JWT_ISSUER_DOMAIN=https://your-domain.clerk.accounts.dev
+# Azure AD Authentication (REQUIRED)
+AUTH_MICROSOFT_ID=your-azure-app-registration-client-id
+AUTH_MICROSOFT_SECRET=your-azure-app-secret
+AUTH_MICROSOFT_TENANT_ID=your-azure-tenant-id
+AUTH_SECRET=your-nextauth-secret
 
 # Optional: LangSmith (only if you want Next.js-level tracing)
 # LANGCHAIN_TRACING_V2=true
@@ -160,8 +161,9 @@ CLERK_JWT_ISSUER_DOMAIN=https://your-domain.clerk.accounts.dev
 
 **What to Keep:**
 - ✅ `NEXT_PUBLIC_*` - Client-side config (can't be in Convex)
-- ✅ `CLERK_SECRET_KEY` - Needed by Next.js proxy.ts
-- ✅ `CLERK_JWT_ISSUER_DOMAIN` - Needed by both Next.js and Convex
+- ✅ `AUTH_MICROSOFT_ID` - Needed by Next.js and Convex
+- ✅ `AUTH_MICROSOFT_SECRET` - Needed by Next.js auth
+- ✅ `AUTH_SECRET` - Needed by NextAuth.js session encryption
 - ✅ `CONVEX_DEPLOYMENT` - Development config
 
 ### Step 5: Test Your Application
@@ -207,7 +209,7 @@ npx convex env set FIRECRAWL_API_KEY "fc-..."
 npx convex env set E2B_API_KEY "e2b_..."
 npx convex env set TAVILY_API_KEY "tvly-..."
 npx convex env set ENCRYPTION_KEY "$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))")"
-npx convex env set CLERK_JWT_ISSUER_DOMAIN "https://your-domain.clerk.accounts.dev"
+npx convex env set AUTH_MICROSOFT_ID "your-azure-app-registration-client-id"
 
 # Production (add --prod flag)
 npx convex env set --prod ANTHROPIC_API_KEY "sk-ant-..."
@@ -289,7 +291,7 @@ New developers joining the project should:
 
 1. Clone the repository
 2. Copy `.env.local.example` to `.env.local`
-3. Fill in Clerk and Convex connection details
+3. Fill in Azure AD and Convex connection details
 4. **Do NOT add API keys** - they're already in Convex!
 5. Run `npm run dev:all`
 

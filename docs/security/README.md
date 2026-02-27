@@ -1,6 +1,6 @@
 # Security Documentation
 
-**Last Updated:** November 19, 2025
+**Last Updated:** February 27, 2026
 
 This document outlines the security measures implemented in Open Agent Builder and guidelines for secure deployment.
 
@@ -116,15 +116,33 @@ If set, HTTP nodes can ONLY make requests to whitelisted domains.
 
 #### Workflow Operations
 - **Location:** `convex/workflows.ts`
+- **Helper:** `checkWorkflowAccess(ctx, workflow)` — verifies caller is owner, assignee, or admin
 - **Protected Operations:**
-  - `deleteWorkflow`: Must own workflow or be admin
+  - `getWorkflow`: Ownership check (owner, assignee, admin, or template)
+  - `getWorkflowByCustomId`: Ownership check
+  - `getWorkflowsByCategory`: Filtered by userId
+  - `getWorkflowDetails`: Ownership check
   - `saveWorkflow`: Ownership verified on update
-  - Public templates cannot be deleted
+  - `deleteWorkflow`: Must own workflow or be admin
+  - Public templates accessible to all authenticated users
+
+#### Execution Operations
+- **Location:** `convex/executions.ts`
+- **Helper:** `checkExecutionAccess(ctx, execution)` — verifies caller owns execution or is admin
+- **Protected Operations:**
+  - `getExecution`: Returns null if user lacks access
+  - `getWorkflowExecutions`: Filtered through ownership check
+  - `createExecution`: Records userId for ownership tracking
+
+#### API Route Authentication
+- **Location:** `app/api/workflows/route.ts`, `app/api/workflows/[workflowId]/route.ts`
+- **All CRUD endpoints require authentication** (GET, POST, DELETE)
+- Uses `validateApiKey()` for dual session + API key auth
 
 #### Mutations
 All Convex mutations now verify:
 1. User authentication (`ctx.auth.getUserIdentity()`)
-2. Resource ownership (userId match)
+2. Resource ownership (userId match via `checkWorkflowAccess` / `checkExecutionAccess`)
 3. Prevent cross-user data access
 
 ---
@@ -150,8 +168,8 @@ All Convex mutations now verify:
 ### ✅ 6. Rate Limiting
 
 #### Implementation
-- **Location:** `lib/api/rate-limiter.ts`
-- **Type:** In-memory (use Redis in production for multi-server)
+- **Location:** `src/lib/api/distributed-rate-limiter.ts`
+- **Type:** Distributed via Convex (replaces in-memory rate limiting)
 - **Cleanup:** Automatic expired entry removal every 5 minutes
 
 #### Rate Limit Tiers
@@ -208,8 +226,10 @@ ALLOWED_HTTP_DOMAINS=api.example.com,*.trusted.com
 
 # Database & Auth (required)
 NEXT_PUBLIC_CONVEX_URL=https://your-project.convex.cloud
-CLERK_SECRET_KEY=<clerk-secret>
-CLERK_JWT_ISSUER_DOMAIN=https://your-domain.clerk.accounts.dev
+AUTH_MICROSOFT_ID=<azure-app-client-id>
+AUTH_MICROSOFT_SECRET=<azure-app-client-secret>
+AUTH_MICROSOFT_TENANT_ID=<azure-tenant-id>
+AUTH_SECRET=<nextauth-secret>
 ```
 
 ### 🚨 Security Headers
@@ -272,24 +292,10 @@ module.exports = {
 
 ## Known Limitations
 
-### 1. In-Memory Rate Limiting
-**Current:** Uses in-memory Map (single server only)
-**Production:** Replace with Redis-backed rate limiting for multi-server deployments
-
-**Implementation:**
-```bash
-npm install @upstash/ratelimit @upstash/redis
-```
-
-```typescript
-import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
-
-const ratelimit = new Ratelimit({
-  redis: Redis.fromEnv(),
-  limiter: Ratelimit.slidingWindow(10, "1 m"),
-});
-```
+### 1. Distributed Rate Limiting
+**Current:** Uses Convex-backed distributed rate limiting (works across serverless instances)
+**Behavior:** Fail-closed for workflow execution endpoints (returns 503 on backend failure), fail-open for non-critical endpoints
+**Location:** `src/lib/api/distributed-rate-limiter.ts`
 
 ### 2. Expression Evaluator Limitations
 **Current:** `expr-eval` supports mathematical and logical operations
@@ -359,6 +365,7 @@ If you discover a security vulnerability, please email:
 | 2025-11-19 | SSRF Testing | No protection | ✅ Implemented validation |
 | 2025-11-19 | Authorization Audit | Missing ownership checks | ✅ Added to all mutations |
 | 2025-11-19 | Rate Limiting | No limits | ✅ Implemented for all routes |
+| 2026-02-27 | Codex Security Review | P0-P3 findings | ✅ Fixed (ownership, auth, rate limiter, error sanitization) |
 
 ---
 
@@ -385,7 +392,7 @@ If you discover a security vulnerability, please email:
 | A04: Insecure Design | ✅ SSRF protection, rate limiting |
 | A05: Security Misconfiguration | ✅ Security headers, proper CORS |
 | A06: Vulnerable Components | ⚠️ Run `npm audit` regularly |
-| A07: Authentication Failures | ✅ Clerk authentication, rate limiting |
+| A07: Authentication Failures | ✅ Azure AD authentication, rate limiting |
 | A08: Software and Data Integrity | ✅ Immutable state, validation |
 | A09: Security Logging Failures | ⚠️ Implement structured logging |
 | A10: Server-Side Request Forgery | ✅ SSRF protection in HTTP nodes |

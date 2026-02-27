@@ -24,7 +24,7 @@ export async function validateApiKey(request: NextRequest): Promise<ApiAuthResul
   try {
     // First, check for NextAuth session (UI users)
     const session = await getServerSession(authOptions);
-    console.log('[Auth] validateApiKey session:', JSON.stringify(session, null, 2));
+    console.log('[Auth] Session validated for user:', session?.user?.email || 'unknown');
     if (session?.user?.id) {
       return {
         authenticated: true,

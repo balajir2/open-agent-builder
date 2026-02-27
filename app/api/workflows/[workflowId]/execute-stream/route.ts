@@ -4,6 +4,7 @@ import { LangGraphExecutor } from '@/lib/workflow/langgraph';
 import { validateApiKey, createUnauthorizedResponse } from '@/lib/api/auth';
 import { checkRateLimit, getRateLimitKey, RATE_LIMITS } from '@/src/lib/api/distributed-rate-limiter';
 import { WorkflowIdSchema, WorkflowInputSchema, safeValidate } from '@/lib/api/validation-schemas';
+import { resolveApiKeys, resolveLangSmithConfig } from '@/lib/api/execution-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,6 +82,10 @@ export async function POST(
         }
       };
 
+      // Hoist variables needed in both try and catch blocks
+      let convex: any = null;
+      let convexExecutionId: any = null;
+
       try {
         // Get inputs from request body
         const body = await request.json();
@@ -108,7 +113,7 @@ export async function POST(
           return;
         }
 
-        const convex = await getAuthenticatedConvexClient();
+        convex = await getAuthenticatedConvexClient();
 
         // Look up workflow - try customId first, then try as Convex ID
         let workflowDoc = await convex.query(api.workflows.getWorkflowByCustomId, {
@@ -182,60 +187,35 @@ export async function POST(
           timestamp: new Date().toISOString(),
         });
 
-        // Create a custom execution with progress callbacks
+        // Create execution record in Convex for persistence
         const executionId = `exec_${Date.now()}`;
+        try {
+          convexExecutionId = await convex.mutation(api.executions.createExecution, {
+            workflowId: workflowDoc._id,
+            userId: authResult.userId,
+            input: inputs,
+            threadId: `thread_${workflowId}_${Date.now()}`,
+          });
+        } catch (err) {
+          // Non-fatal: workflow can still execute without persistence
+          console.warn('[Execution] Failed to create execution record:', err);
+        }
         const nodeResults: Record<string, any> = {};
 
-        // Get API keys - check user keys first, then fall back to system keys from Convex
-        const { getLLMApiKey, getToolApiKey } = await import('@/lib/api/llm-keys') as any;
+        // Get API keys using shared two-tier resolution
         const userId = authResult.userId;
 
-        // Get system API keys from Convex environment
         let systemKeys: any = {};
+        let langSmithConfig;
         try {
           systemKeys = await convex.action(api.systemApiKeys.getAllSystemApiKeys);
-
-          // Set LangSmith environment variables from Convex (for tracing)
-          if (systemKeys.langchainApiKey) {
-            process.env.LANGCHAIN_API_KEY = systemKeys.langchainApiKey;
-          }
-          if (systemKeys.langchainProject) {
-            process.env.LANGCHAIN_PROJECT = systemKeys.langchainProject;
-          }
-          if (systemKeys.langchainEndpoint) {
-            process.env.LANGCHAIN_ENDPOINT = systemKeys.langchainEndpoint;
-          }
-          if (systemKeys.langchainTracingV2) {
-            process.env.LANGCHAIN_TRACING_V2 = systemKeys.langchainTracingV2;
-          }
+          // Resolve LangSmith config without mutating process.env per-request
+          langSmithConfig = resolveLangSmithConfig(systemKeys);
         } catch (err) {
           console.warn('Failed to fetch system API keys:', err);
         }
 
-        const apiKeys = {
-          anthropic: (userId ? await getLLMApiKey('anthropic', userId) : undefined) ?? systemKeys.anthropic,
-          groq: (userId ? await getLLMApiKey('groq', userId) : undefined) ?? systemKeys.groq,
-          openai: (userId ? await getLLMApiKey('openai', userId) : undefined) ?? systemKeys.openai,
-          google: (userId ? await getLLMApiKey('google', userId) : undefined) ?? systemKeys.google,
-          firecrawl: (userId ? await getToolApiKey('firecrawl', userId) : undefined) ?? systemKeys.firecrawl,
-          arcade: (userId ? await getToolApiKey('arcade', userId) : undefined) ?? systemKeys.arcade,
-          e2b: (userId ? await getToolApiKey('e2b', userId) : undefined) ?? systemKeys.e2b,
-          tavily: (userId ? await getToolApiKey('tavily-search', userId) : undefined) ?? systemKeys.tavily,
-          serper: (userId ? await getToolApiKey('serper-search', userId) : undefined) ?? systemKeys.serper,
-          serpapi: (userId ? await getToolApiKey('serpapi-search', userId) : undefined) ?? systemKeys.serpapi,
-          scraperapi: (userId ? await getToolApiKey('scraperapi', userId) : undefined) ?? systemKeys.scraperapi,
-          browserless: (userId ? await getToolApiKey('browserless', userId) : undefined) ?? systemKeys.browserless,
-          gamma: (userId ? await getToolApiKey('gamma-api', userId) : undefined) ?? systemKeys.gamma,
-        };
-
-        console.log('[Route] Debug API Keys:', {
-          userId,
-          hasTavilyKey: !!apiKeys.tavily,
-          hasSerperKey: !!apiKeys.serper,
-          hasFirecrawlKey: !!apiKeys.firecrawl,
-          hasBrowserlessKey: !!apiKeys.browserless,
-          hasAnthropicKey: !!apiKeys.anthropic,
-        });
+        const apiKeys = await resolveApiKeys(userId, systemKeys);
 
         // Prepare initial input - pass as object if it's an object, otherwise as string
         let initialInput: any = '';
@@ -349,8 +329,14 @@ export async function POST(
                 timestamp: new Date().toISOString(),
               });
 
-              // TODO: Save execution state to Convex for resume capability
-              // await convex.mutation(api.executions.createExecution, {...})
+              // Persist paused state for resume capability
+              if (convexExecutionId) {
+                convex.mutation(api.executions.updateExecution, {
+                  id: convexExecutionId,
+                  status: 'paused',
+                  nodeResults: mergedState.nodeResults,
+                }).catch((err: any) => console.warn('[Execution] Failed to persist paused state:', err));
+              }
 
               closeStream();
               return;
@@ -394,20 +380,36 @@ export async function POST(
           }
         });
 
-        // TODO: Save execution results to Convex
-        // await convex.mutation(api.executions.completeExecution, {...})
+        // Persist completed execution to Convex
+        if (convexExecutionId) {
+          try {
+            await convex.mutation(api.executions.completeExecution, {
+              id: convexExecutionId,
+              output: finalState?.nodeResults || {},
+            });
+          } catch (err) {
+            console.warn('[Execution] Failed to persist completion:', err);
+          }
+        }
 
-        // LANGSMITH FIX: Wait for LangSmith to finalize trace before closing stream
-        // LangSmith needs time to upload trace data to servers asynchronously
-        // Without this delay, traces remain in "in progress" state
-        // See: https://docs.langchain.com/langsmith/trace-with-langgraph
+        // Wait for LangSmith to finalize trace before closing stream
         const { waitForTraceFinalization } = await import('@/lib/langsmith/config');
-        await waitForTraceFinalization();
+        await waitForTraceFinalization(1000, langSmithConfig);
 
         closeStream();
       } catch (error) {
+        // Persist failure to Convex
+        if (convexExecutionId) {
+          convex.mutation(api.executions.completeExecution, {
+            id: convexExecutionId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          }).catch((err: any) => console.warn('[Execution] Failed to persist error:', err));
+        }
+
+        // Log detailed error server-side, send sanitized message to client
+        console.error('[Execution] Workflow execution error:', error);
         sendEvent('error', {
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: 'Workflow execution failed',
           timestamp: new Date().toISOString(),
         });
         closeStream();
