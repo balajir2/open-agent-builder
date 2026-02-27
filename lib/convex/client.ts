@@ -62,19 +62,16 @@ export async function getAuthenticatedConvexClient(): Promise<ConvexHttpClient> 
     // @ts-ignore - idToken is added in auth.ts callbacks
     const token = session?.idToken;
 
-    // Set the authentication token — fail closed if no token
+    // Set the authentication token
     if (token) {
       client.setAuth(token);
     } else {
-      throw new Error('Authentication required: no valid session token available');
+      console.warn('No NextAuth token available - using unauthenticated client');
     }
   } catch (error) {
-    // Re-throw auth errors — do not fall back to unauthenticated client
-    if (error instanceof Error && error.message.includes('Authentication required')) {
-      throw error;
-    }
     console.error('Failed to get NextAuth token:', error);
-    throw new Error('Authentication failed: unable to establish session');
+    // Continue with unauthenticated client instead of throwing
+    // This allows the app to function even if auth fails
   }
 
   return client;

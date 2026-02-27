@@ -82,13 +82,15 @@ export const authOptions: NextAuthOptions = {
                 };
             }
 
-            // Return previous token if the access token has not expired yet
-            if (Date.now() < (token.accessTokenExpires as number)) {
-                return token;
+            // Proactive refresh: refresh 5 minutes BEFORE expiry to ensure
+            // the idToken passed to Convex is always valid
+            const REFRESH_BUFFER_MS = 5 * 60 * 1000; // 5 minutes
+            if (Date.now() < (token.accessTokenExpires as number) - REFRESH_BUFFER_MS) {
+                return token; // Still fresh, no refresh needed
             }
 
-            // Access token has expired, try to refresh it
-            console.log('[Auth] Access token expired, refreshing...');
+            // Token is expired or within 5 minutes of expiry — refresh it
+            console.log('[Auth] Access token expiring soon or expired, refreshing...');
             return refreshAccessToken(token);
         },
         async session({ session, token }) {

@@ -17,15 +17,22 @@ type PendingWrite<Channel = string> = [Channel, PendingWriteValue];
 /** Maximum JSON size (in bytes) for a single Convex document. Convex limit is 1MB. */
 const MAX_CHECKPOINT_BYTES = 900_000; // 900KB, leave headroom
 
-/** When truncating a string value, keep this many characters */
-const TRUNCATED_STRING_LIMIT = 500;
+/** Progressive string truncation limits — tried in order until the data fits */
+const TRUNCATION_LEVELS = [500, 200, 100, 50];
+
+/** Max array items to keep at the most aggressive truncation level */
+const MAX_ARRAY_ITEMS_AGGRESSIVE = 20;
 
 /**
  * Deep-clone an object and truncate any string values that exceed `maxLen`.
  * File objects (with storageId) have their `content` and `text` fields replaced
  * with a short placeholder so the checkpoint stays within Convex size limits.
+ *
+ * When `trimArrays` is true, large arrays (>MAX_ARRAY_ITEMS_AGGRESSIVE) are
+ * trimmed to keep only the last N items. This handles chatHistory and messages
+ * that grow unbounded during long-running workflows.
  */
-function truncateStateForCheckpoint(obj: any, maxLen = TRUNCATED_STRING_LIMIT): any {
+function truncateStateForCheckpoint(obj: any, maxLen = 500, trimArrays = false): any {
     if (obj === null || obj === undefined) return obj;
 
     if (typeof obj === 'string') {
@@ -36,7 +43,12 @@ function truncateStateForCheckpoint(obj: any, maxLen = TRUNCATED_STRING_LIMIT): 
     }
 
     if (Array.isArray(obj)) {
-        return obj.map(item => truncateStateForCheckpoint(item, maxLen));
+        let items = obj;
+        // Trim large arrays to last N items when in aggressive mode
+        if (trimArrays && items.length > MAX_ARRAY_ITEMS_AGGRESSIVE) {
+            items = items.slice(-MAX_ARRAY_ITEMS_AGGRESSIVE);
+        }
+        return items.map(item => truncateStateForCheckpoint(item, maxLen, trimArrays));
     }
 
     if (typeof obj === 'object') {
@@ -51,7 +63,7 @@ function truncateStateForCheckpoint(obj: any, maxLen = TRUNCATED_STRING_LIMIT): 
 
         const result: Record<string, any> = {};
         for (const [key, value] of Object.entries(obj)) {
-            result[key] = truncateStateForCheckpoint(value, maxLen);
+            result[key] = truncateStateForCheckpoint(value, maxLen, trimArrays);
         }
         return result;
     }
@@ -61,7 +73,8 @@ function truncateStateForCheckpoint(obj: any, maxLen = TRUNCATED_STRING_LIMIT): 
 
 /**
  * Ensure a checkpoint payload fits within Convex document size limits.
- * First tries the raw checkpoint; if too large, truncates large values.
+ * Uses progressive truncation — tries increasingly aggressive string limits
+ * (500 → 200 → 100 → 50 chars) and finally trims large arrays if needed.
  */
 function fitCheckpointToSizeLimit(checkpoint: any): any {
     const raw = JSON.stringify(checkpoint);
@@ -74,7 +87,31 @@ function fitCheckpointToSizeLimit(checkpoint: any): any {
         `truncating to fit within ${(MAX_CHECKPOINT_BYTES / 1024).toFixed(0)}KB limit`
     );
 
-    return truncateStateForCheckpoint(checkpoint);
+    // Progressive truncation: try increasingly aggressive limits
+    for (let i = 0; i < TRUNCATION_LEVELS.length; i++) {
+        const limit = TRUNCATION_LEVELS[i];
+        const trimArrays = i >= TRUNCATION_LEVELS.length - 1; // trim arrays at most aggressive level
+        const truncated = truncateStateForCheckpoint(checkpoint, limit, trimArrays);
+        const size = JSON.stringify(truncated).length;
+
+        if (size <= MAX_CHECKPOINT_BYTES) {
+            console.warn(
+                `[Checkpointer] Truncated at ${limit}-char limit ` +
+                `(${(size / 1024).toFixed(0)}KB)${trimArrays ? ' with array trimming' : ''}`
+            );
+            return truncated;
+        }
+    }
+
+    // Last resort: most aggressive truncation with array trimming
+    const lastResort = truncateStateForCheckpoint(checkpoint, 30, true);
+    const lastResortSize = JSON.stringify(lastResort).length;
+    console.warn(
+        `[Checkpointer] Last-resort truncation at 30-char limit ` +
+        `(${(lastResortSize / 1024).toFixed(0)}KB). ` +
+        `Checkpoint may be incomplete — workflow resume capability is limited.`
+    );
+    return lastResort;
 }
 
 /**

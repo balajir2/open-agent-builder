@@ -1,48 +1,87 @@
 "use client";
 
 import { useSession, signOut } from "next-auth/react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
+/**
+ * SessionManager — proactive token refresh instead of aggressive logout.
+ *
+ * Monitors the Azure AD id_token expiration embedded in the NextAuth session
+ * and triggers a session refresh (via `update()`) before expiry.
+ *
+ * Sign-out only occurs when:
+ *  1. The server-side JWT callback sets `session.error = 'RefreshAccessTokenError'`
+ *  2. The token has been expired for >2 minutes with no successful refresh
+ */
 export default function SessionManager() {
-    const { data: session } = useSession();
+    const { data: session, update } = useSession();
+    const refreshAttemptedRef = useRef(false);
 
+    // Handle refresh error — sign out gracefully
     useEffect(() => {
-        // @ts-ignore
-        if (!session?.idToken) return;
-
-        try {
-            // 1. Decode the ID token to find the expiration time (exp)
-            // We don't need a heavy library like jwt-decode; basic base64 decoding works for reading claims.
-            // @ts-ignore
-            const parts = session.idToken.split(".");
-            if (parts.length !== 3) return;
-
-            const payload = JSON.parse(atob(parts[1]));
-            const exp = payload.exp * 1000; // Convert to milliseconds
-            const now = Date.now();
-            const timeRemaining = exp - now;
-
-            console.log(`[SessionManager] Token expires in ${Math.round(timeRemaining / 1000 / 60)} minutes (${new Date(exp).toLocaleTimeString()})`);
-
-            // 2. If already expired, sign out immediately
-            if (timeRemaining <= 0) {
-                console.warn("[SessionManager] Token expired. Signing out...");
-                signOut({ callbackUrl: "/" });
-                return;
-            }
-
-            // 3. Set a timer to sign out when the token expires
-            // We subtract a small buffer (e.g., 5 seconds) to be safe
-            const timeout = setTimeout(() => {
-                console.warn("[SessionManager] Token expiration reached. Signing out...");
-                signOut({ callbackUrl: "/" });
-            }, timeRemaining - 5000);
-
-            return () => clearTimeout(timeout);
-        } catch (error) {
-            console.error("[SessionManager] Error checking token expiration:", error);
+        // @ts-ignore — error is set in auth.ts session callback
+        if (session?.error === "RefreshAccessTokenError") {
+            console.warn("[SessionManager] Refresh token failed. Redirecting to sign-in...");
+            signOut({ callbackUrl: "/sign-in" });
         }
     }, [session]);
+
+    // Monitor token expiry and trigger proactive refresh
+    useEffect(() => {
+        // @ts-ignore
+        const idToken = session?.idToken;
+        if (!idToken) return;
+
+        let exp: number;
+        try {
+            const parts = idToken.split(".");
+            if (parts.length !== 3) return;
+            const payload = JSON.parse(atob(parts[1]));
+            exp = payload.exp * 1000; // Convert to milliseconds
+        } catch {
+            console.error("[SessionManager] Failed to decode idToken");
+            return;
+        }
+
+        const now = Date.now();
+        const timeRemaining = exp - now;
+        const minutesRemaining = Math.round(timeRemaining / 1000 / 60);
+
+        console.log(
+            `[SessionManager] Token expires in ${minutesRemaining} minutes (${new Date(exp).toLocaleTimeString()})`
+        );
+
+        // If token expired for more than 2 minutes and no refresh came through, sign out
+        if (timeRemaining < -2 * 60 * 1000) {
+            console.warn("[SessionManager] Token expired >2 min ago with no refresh. Signing out...");
+            signOut({ callbackUrl: "/sign-in" });
+            return;
+        }
+
+        // If already expired (but within 2 min), trigger an immediate refresh
+        if (timeRemaining <= 0) {
+            if (!refreshAttemptedRef.current) {
+                console.log("[SessionManager] Token just expired. Triggering refresh...");
+                refreshAttemptedRef.current = true;
+                update();
+            }
+            return;
+        }
+
+        // Reset the refresh-attempted flag when we get a fresh token
+        refreshAttemptedRef.current = false;
+
+        // Schedule a proactive refresh 10 minutes before expiry
+        const REFRESH_AHEAD_MS = 10 * 60 * 1000; // 10 minutes
+        const refreshIn = Math.max(timeRemaining - REFRESH_AHEAD_MS, 0);
+
+        const refreshTimer = setTimeout(() => {
+            console.log("[SessionManager] Triggering proactive token refresh...");
+            update();
+        }, refreshIn);
+
+        return () => clearTimeout(refreshTimer);
+    }, [session, update]);
 
     return null; // This component renders nothing
 }

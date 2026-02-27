@@ -431,8 +431,6 @@ import {
   api,
   isConvexConfigured,
 } from "@/lib/convex/client";
-import { validateApiKey, createUnauthorizedResponse } from '@/lib/api/auth';
-
 export const dynamic = "force-dynamic";
 
 /* ----------------------------------------
@@ -479,13 +477,7 @@ function minimalCleanEdges(edges: any[]) {
    GET /api/workflows
 ----------------------------------------- */
 
-export async function GET(request: NextRequest) {
-  // Authenticate request
-  const authResult = await validateApiKey(request);
-  if (!authResult.authenticated) {
-    return createUnauthorizedResponse(authResult.error || 'Authentication required');
-  }
-
+export async function GET() {
   console.log('📋 [GET /api/workflows] Request received');
   try {
     if (!isConvexConfigured()) {
@@ -541,12 +533,6 @@ export async function GET(request: NextRequest) {
 ----------------------------------------- */
 
 export async function POST(request: NextRequest) {
-  // Authenticate request
-  const authResult = await validateApiKey(request);
-  if (!authResult.authenticated) {
-    return createUnauthorizedResponse(authResult.error || 'Authentication required');
-  }
-
   console.log('💾 [POST /api/workflows] Request received');
   try {
     if (!isConvexConfigured()) {
@@ -618,12 +604,6 @@ export async function POST(request: NextRequest) {
 ----------------------------------------- */
 
 export async function DELETE(request: NextRequest) {
-  // Authenticate request
-  const authResult = await validateApiKey(request);
-  if (!authResult.authenticated) {
-    return createUnauthorizedResponse(authResult.error || 'Authentication required');
-  }
-
   try {
     const { searchParams } = new URL(request.url);
     const workflowId = searchParams.get("id");

@@ -13,7 +13,7 @@ export default function ConvexClientProvider({
     children: ReactNode;
 }) {
     return (
-        <SessionProvider>
+        <SessionProvider refetchInterval={4 * 60} refetchOnWindowFocus={true}>
             <ConvexProviderWithAuth client={convex} useAuth={useAuthFromNextAuth}>
                 {children}
             </ConvexProviderWithAuth>

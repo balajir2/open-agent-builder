@@ -239,7 +239,7 @@ open-agent-builder/
 ├── hooks/                        # React hooks
 │   ├── useWorkflow.ts            # Workflow state management
 │   └── useWorkflowExecution.ts   # Execution monitoring
-├── proxy.ts                      # Next.js 16 authentication proxy
+├── proxy.ts                      # Next.js 16 proxy/middleware (route protection)
 └── next.config.js                # Next.js configuration
 ```
 

@@ -11,7 +11,7 @@
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
 [![Built with Next.js](https://img.shields.io/badge/Built%20with-Next.js%2016-black)](https://nextjs.org/)
 [![Powered by LangGraph](https://img.shields.io/badge/Powered%20by-LangGraph-blue)](https://github.com/langchain-ai/langgraph)
-[![Built with Love By bounteous](https://img.shields.io/badge/Built%20with%20Love%20by-Bounteous-yellow)](https://www.bounteous.com)
+[![Built with Love By Bounteous](https://img.shields.io/badge/Built%20with%20Love%20by-Bounteous-yellow)](https://www.bounteous.com)
 
 [Documentation](#-documentation) • [Examples](#example-workflows) • [Architecture](#architecture)
 

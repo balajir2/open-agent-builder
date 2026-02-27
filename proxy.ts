@@ -32,8 +32,16 @@ export async function proxy(request: NextRequest) {
   }
 
   // For protected routes, check for session cookie
-  const sessionToken = request.cookies.get('authjs.session-token') ||
-    request.cookies.get('__Secure-authjs.session-token');
+  // NextAuth v4 uses 'next-auth.session-token', Auth.js v5 uses 'authjs.session-token'
+  // Large JWTs are chunked into .0, .1, .2 etc. — check the first chunk too
+  const sessionToken = request.cookies.get('next-auth.session-token') ||
+    request.cookies.get('next-auth.session-token.0') ||       // Chunked session (large JWT)
+    request.cookies.get('__Secure-next-auth.session-token') ||
+    request.cookies.get('__Secure-next-auth.session-token.0') || // Chunked session (HTTPS)
+    request.cookies.get('authjs.session-token') ||
+    request.cookies.get('authjs.session-token.0') ||           // Chunked session (Auth.js v5)
+    request.cookies.get('__Secure-authjs.session-token') ||
+    request.cookies.get('__Secure-authjs.session-token.0');    // Chunked session (Auth.js v5 HTTPS)
 
   if (!sessionToken) {
     // For API routes, return 401 instead of redirecting

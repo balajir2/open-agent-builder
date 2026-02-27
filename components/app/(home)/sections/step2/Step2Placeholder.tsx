@@ -176,9 +176,12 @@ export default function Step2Placeholder({ onReset, onCreateWorkflow, onLoadWork
           // Check if the owner is the current user (using clerkId)
           if (currentUser && workflow.userId === currentUser.clerkId) {
             ownerName = "Me";
+          } else if (allUsers.length === 0) {
+            // Users list still loading or failed to load
+            ownerName = "Loading...";
           } else {
             const owner = allUsers.find((u: any) => u.clerkId === workflow.userId);
-            ownerName = owner?.name || "Unknown User";
+            ownerName = owner?.name || owner?.email || workflow.userId.slice(0, 12) + "...";
           }
         }
 
