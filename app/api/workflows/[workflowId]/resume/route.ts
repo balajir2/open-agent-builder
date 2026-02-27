@@ -4,7 +4,7 @@ import { LangGraphExecutor } from '@/lib/workflow/langgraph';
 import { validateApiKey, createUnauthorizedResponse } from '@/lib/api/auth';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 900;
+export const maxDuration = 800;
 
 /**
  * Resume a paused workflow execution

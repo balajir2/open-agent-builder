@@ -7,7 +7,7 @@ import { WorkflowIdSchema, WorkflowInputSchema, safeValidate } from '@/lib/api/v
 import { resolveApiKeys, resolveLangSmithConfig } from '@/lib/api/execution-service';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 900; // Allow up to 15 minutes for multi-agent workflows (Vercel Enterprise)
+export const maxDuration = 800; // Vercel Enterprise max
 
 /**
  * Streaming workflow execution with real-time updates
