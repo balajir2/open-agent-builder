@@ -7,6 +7,7 @@ import { getAuthenticatedConvexClient, api } from '@/lib/convex/client';
 import { resolveApiKeys, resolveLangSmithConfig } from '@/lib/api/execution-service';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 900;
 
 export async function POST(
   request: NextRequest,

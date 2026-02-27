@@ -5,6 +5,7 @@ import { getServerAPIKeys } from '@/lib/api/config';
 import { validateApiKey } from '@/lib/api/auth';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 900;
 
 /**
  * Execute workflow using LangGraph

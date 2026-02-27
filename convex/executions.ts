@@ -5,6 +5,56 @@ import { query, mutation } from "./_generated/server";
  * Workflow Execution State Management
  */
 
+/** Max approximate size (in bytes) for an execution document to avoid Convex 1MB limit */
+const MAX_DOC_SIZE = 900_000;
+
+/**
+ * Truncate large string values recursively to fit within Convex document size limits.
+ * Preserves structure but shortens strings that exceed maxLen.
+ */
+function truncateLargeStrings(obj: any, maxLen: number): any {
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj === 'string') {
+        if (obj.length > maxLen) {
+            return obj.slice(0, maxLen) + `...[truncated, ${obj.length} chars total]`;
+        }
+        return obj;
+    }
+    if (Array.isArray(obj)) {
+        return obj.map(item => truncateLargeStrings(item, maxLen));
+    }
+    if (typeof obj === 'object') {
+        const result: Record<string, any> = {};
+        for (const [key, value] of Object.entries(obj)) {
+            result[key] = truncateLargeStrings(value, maxLen);
+        }
+        return result;
+    }
+    return obj;
+}
+
+/**
+ * Progressively truncate data to fit within Convex document size limits.
+ * Tries string limits: 2000 → 1000 → 500 → 200 → 100 chars.
+ * Execution outputs use gentler limits than checkpoints since they're user-facing.
+ */
+function fitExecutionToSizeLimit(data: any): any {
+    const raw = JSON.stringify(data);
+    if (raw.length <= MAX_DOC_SIZE) return data;
+
+    const levels = [2000, 1000, 500, 200, 100];
+    for (const limit of levels) {
+        const truncated = truncateLargeStrings(data, limit);
+        if (JSON.stringify(truncated).length <= MAX_DOC_SIZE) {
+            console.warn(`[Executions] Truncated output at ${limit}-char limit to fit within size limit`);
+            return truncated;
+        }
+    }
+
+    console.warn(`[Executions] Last-resort truncation at 50-char limit`);
+    return truncateLargeStrings(data, 50);
+}
+
 /**
  * Helper to get the current user's identity subject (Clerk ID).
  * Returns undefined if no identity is present (e.g. test environment).
@@ -76,6 +126,13 @@ export const updateExecution = mutation({
     error: v.optional(v.string()),
   },
   handler: async ({ db }, { id, ...updates }) => {
+    // Truncate large fields to fit within Convex document size limits
+    if (updates.nodeResults) {
+      updates.nodeResults = fitExecutionToSizeLimit(updates.nodeResults);
+    }
+    if (updates.output) {
+      updates.output = fitExecutionToSizeLimit(updates.output);
+    }
     await db.patch(id, updates);
     return id;
   },
@@ -89,9 +146,11 @@ export const completeExecution = mutation({
     error: v.optional(v.string()),
   },
   handler: async ({ db }, { id, output, error }) => {
+    // Truncate output to fit within Convex document size limits
+    const safeOutput = output ? fitExecutionToSizeLimit(output) : output;
     await db.patch(id, {
       status: error ? "failed" : "completed",
-      output,
+      output: safeOutput,
       error,
       completedAt: new Date().toISOString(),
     });
