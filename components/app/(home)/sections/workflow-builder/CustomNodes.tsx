@@ -403,4 +403,5 @@ export const nodeTypes = {
   'while': CustomNode,
   'user-approval': CustomNode,
   'set-state': CustomNode,
+  'vector-db': CustomNode,
 };

@@ -36,7 +36,10 @@ import {
   Server,
   MousePointer2,
   Layers,
+  Database,
+  Scissors,
 } from "lucide-react";
+
 import NodePanel from "./NodePanel";
 import MCPPanel from "./MCPPanel";
 import PreviewPanel from "./PreviewPanel";
@@ -50,6 +53,7 @@ import HTTPNodePanel from "./HTTPNodePanel";
 import ExtractNodePanel from "./ExtractNodePanel";
 import GammaNodePanel from "./GammaNodePanel";
 import StartNodePanel from "./StartNodePanel";
+import VectorDbPanel from "./VectorDbPanel";
 import WorkflowNameEditor from "./WorkflowNameEditor";
 import SettingsPanel from "./SettingsPanelSimple";
 import ConfirmDialog from "./ConfirmDialog";
@@ -144,6 +148,8 @@ const nodeCategories = [
       { type: "transform", label: "Transform", color: "bg-[#ECE3FF] dark:bg-[#9665FF]", icon: Braces },
       { type: "extract", label: "Extract", color: "bg-[#ECE3FF] dark:bg-[#9665FF]", icon: Search },
       { type: "http", label: "HTTP", color: "bg-[#ECE3FF] dark:bg-[#9665FF]", icon: Server },
+      { type: "vector-db", label: "Vector DB", color: "bg-[#F0F7FF] dark:bg-[#2B4B8F]", icon: Database },
+      { type: "extract", label: "Extract", color: "bg-[#ECE3FF] dark:bg-[#9665FF]", icon: Scissors },
       { type: "set-state", label: "Set state", color: "bg-[#ECE3FF] dark:bg-[#9665FF]", icon: Braces },
     ],
   },
@@ -1946,6 +1952,14 @@ function WorkflowBuilderInner({ onBack, initialWorkflowId, initialTemplateId }: 
           />
         ) : (selectedNode?.data as any)?.nodeType === 'http' ? (
           <HTTPNodePanel
+            node={selectedNode}
+            nodes={nodes}
+            onClose={() => setSelectedNode(null)}
+            onDelete={handleDeleteNode}
+            onUpdate={handleUpdateNodeData}
+          />
+        ) : (selectedNode?.data as any)?.nodeType === 'vector-db' ? (
+          <VectorDbPanel
             node={selectedNode}
             nodes={nodes}
             onClose={() => setSelectedNode(null)}

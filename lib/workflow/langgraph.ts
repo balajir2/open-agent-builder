@@ -21,6 +21,7 @@ import { executeDataNode } from './executors/data';
 import { executeToolsNode } from './executors/tools';
 import { executeHTTPNode } from './executors/http';
 import { executeExtractNode } from './executors/extract';
+import { executeVectorDbNode } from './executors/vector-db';
 import { executeArcadeNode } from './executors/arcade';
 import { createOrUpdateArcadeAuthRecord } from '../arcade/auth-store';
 import { DEFAULT_MODELS } from '@/lib/api/models';
@@ -614,6 +615,10 @@ export class LangGraphExecutor {
 
       case 'http': {
         return await executeHTTPNode(node, state as WorkflowState);
+      }
+
+      case 'vector-db': {
+        return await executeVectorDbNode(node, state as WorkflowState);
       }
 
       case 'if-else': {

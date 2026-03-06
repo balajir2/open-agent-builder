@@ -2,7 +2,7 @@
 
 export interface WorkflowNode {
   id: string;
-  type: 'agent' | 'mcp' | 'if-else' | 'while' | 'user-approval' | 'transform' | 'set-state' | 'end' | 'start' | 'guardrails' | 'arcade' | 'note' | 'extract' | 'http' | 'data-transform' | 'gamma-ai';
+  type: 'agent' | 'mcp' | 'if-else' | 'while' | 'user-approval' | 'transform' | 'set-state' | 'end' | 'start' | 'guardrails' | 'arcade' | 'note' | 'extract' | 'http' | 'data-transform' | 'gamma-ai' | 'vector-db' | 'join-chunks';
   position: { x: number; y: number };
   data: NodeData;
 }
@@ -91,23 +91,34 @@ export interface NodeData {
   maxIterations?: number | string;
   timeoutMinutes?: number | string;
 
-  // HTTP node data
-  httpUrl?: string;
-  httpMethod?: string;
-  httpHeaders?: Array<{ key: string; value: string }>;
-  httpBody?: string;
-  httpAuthType?: string;
-  httpAuthToken?: string;
+  // Vector DB node data
+  vectorDbProvider?: 'pinecone' | 'qdrant' | 'weaviate' | 'chroma' | 'milvus';
+  vectorDbEmbeddingProvider?: 'openai' | 'cohere' | 'pinecone' | 'jina';
+  vectorDbEndpoint?: string;
+  vectorDbApiKey?: string;
+  vectorDbCollection?: string;
+  vectorDbDimension?: number;
+  vectorDbEmbeddingModel?: string;
+  vectorDbQueryPrompt?: string;
+  vectorDbTopK?: number;
+  vectorDbScoreThreshold?: number;
+  vectorDbMetadataFilter?: string;
+  vectorDbNamespace?: string;
+  vectorDbIncludeMetadata?: boolean;
+  vectorDbIncludeVector?: boolean;
+  vectorDbOutputVariable?: string;
+  vectorDbTextField?: string;
+  vectorDbJoinResults?: boolean;
+  vectorDbJoinSeparator?: string;
+  vectorDbJoinPrefix?: string;
+  vectorDbJoinSuffix?: string;
 
-  // Gamma AI node data
-  prompt?: string;
-  format?: string;
-  numCards?: number;
-  textAmount?: string;
-  textMode?: string;
-  imageSource?: string;
-  language?: string;
-  exportAs?: string;
+  // Join Chunks node data
+  joinChunksVariable?: string; // Path to array of chunks
+  joinChunksSeparator?: string; // e.g. "\n\n---\n\n"
+  joinChunksPrefix?: string; // e.g. "Content: "
+  joinChunksSuffix?: string;
+  joinChunksIncludeMetadata?: boolean;
 }
 
 export interface MCPServer {
