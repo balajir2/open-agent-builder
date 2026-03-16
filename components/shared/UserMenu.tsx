@@ -12,22 +12,25 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, LogOut, User, Server } from "lucide-react";
-import { useMutation } from "convex/react";
+import { useMutation, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useEffect } from "react";
 
 export function UserMenu() {
     const { data: session } = useSession();
+    const { isAuthenticated: isConvexAuthenticated } = useConvexAuth();
     const storeUser = useMutation(api.users.store);
 
     useEffect(() => {
-        if (session?.user) {
+        if (session?.user && isConvexAuthenticated) {
             storeUser({
                 email: session.user.email || undefined,
                 name: session.user.name || undefined,
+            }).catch(() => {
+                // Ignore — Convex auth may not be fully ready yet
             });
         }
-    }, [session, storeUser]);
+    }, [session, isConvexAuthenticated, storeUser]);
 
     if (!session?.user) return null;
 

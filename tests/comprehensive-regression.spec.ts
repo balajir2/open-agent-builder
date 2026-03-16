@@ -590,7 +590,6 @@ test.describe('Comprehensive Regression Suite', () => {
           description: 'Test workflow for regression suite',
           nodes: [],
           edges: [],
-          userId: TEST_USER_ID,
         });
 
         expect(testWorkflowId).toBeTruthy();
@@ -731,7 +730,6 @@ test.describe('Comprehensive Regression Suite', () => {
             description: 'Performance test',
             nodes: [],
             edges: [],
-            userId: TEST_USER_ID,
           })
         );
 
@@ -761,7 +759,6 @@ test.describe('Comprehensive Regression Suite', () => {
             { id: 'end', type: 'end', position: { x: 200, y: 0 }, data: { label: 'End' } }
           ],
           edges: [{ id: 'e1', source: 'start', target: 'end' }],
-          userId: TEST_USER_ID,
         });
 
         const duration = Date.now() - testStart;

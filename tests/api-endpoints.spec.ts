@@ -75,7 +75,6 @@ test.describe('API Endpoints', () => {
     ];
 
     testWorkflowId = await convexClient.mutation(api.workflows.create, {
-      userId: TEST_USER_ID,
       name: 'Test API Workflow',
       description: 'Workflow for API testing',
       nodes: nodes,
@@ -256,7 +255,6 @@ test.describe('API Endpoints', () => {
     test('should emit error event on failure', async ({ request }) => {
       // Create workflow that will fail
       const failWorkflow = await convexClient.mutation(api.workflows.create, {
-        userId: TEST_USER_ID,
         name: 'Fail Workflow',
         description: 'Workflow that fails',
         nodes: [
@@ -318,7 +316,6 @@ test.describe('API Endpoints', () => {
     test('should resume workflow after approval', async ({ request }) => {
       // Create workflow with approval node
       const approvalWorkflow = await convexClient.mutation(api.workflows.create, {
-        userId: TEST_USER_ID,
         name: 'Approval Workflow',
         description: 'Workflow with approval',
         nodes: [

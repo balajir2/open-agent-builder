@@ -19,8 +19,9 @@ export default function SessionManager() {
 
     // Handle refresh error — sign out gracefully
     useEffect(() => {
+        // Only act if there's an active session with an error
         // @ts-ignore — error is set in auth.ts session callback
-        if (session?.error === "RefreshAccessTokenError") {
+        if (session?.user && session?.error === "RefreshAccessTokenError") {
             console.warn("[SessionManager] Refresh token failed. Redirecting to sign-in...");
             signOut({ callbackUrl: "/sign-in" });
         }
@@ -28,9 +29,10 @@ export default function SessionManager() {
 
     // Monitor token expiry and trigger proactive refresh
     useEffect(() => {
+        // No session or no token — nothing to monitor
         // @ts-ignore
         const idToken = session?.idToken;
-        if (!idToken) return;
+        if (!session?.user || !idToken) return;
 
         let exp: number;
         try {

@@ -24,7 +24,7 @@ Complete security checklist for Open Agent Builder deployment.
 
 ### Authorization
 
-- [ ] All Convex functions check `getUserId()`
+- [ ] All Convex functions use `requireAuth()` (throws if not authenticated)
 - [ ] Workflows owned by users (userId check)
 - [ ] API keys scoped to users
 - [ ] No public write access

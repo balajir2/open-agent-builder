@@ -29,15 +29,21 @@ export interface VectorDbOutput {
 async function embedText(
     text: string,
     model: string = 'text-embedding-3-small',
-    apiKey: string
+    apiKey: string,
+    dimension?: number
 ): Promise<number[]> {
+    const payload: Record<string, any> = { input: text, model };
+    // Pass dimensions param for models that support it (text-embedding-3-*)
+    if (dimension && model.startsWith('text-embedding-3-')) {
+        payload.dimensions = dimension;
+    }
     const response = await fetch('https://api.openai.com/v1/embeddings', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({ input: text, model }),
+        body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
@@ -84,12 +90,6 @@ async function queryPinecone(
         body.filter = filter;
     }
 
-    // Request logging
-    console.log(`[VectorDB] POST to ${url}`, {
-        headers: { 'Api-Key': apiKey.slice(0, 4) + '...' },
-        body: JSON.stringify(body, null, 2)
-    });
-
     const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -105,9 +105,6 @@ async function queryPinecone(
     }
 
     const data = await response.json();
-
-    // Response logging
-    console.log(`[VectorDB] Raw Match 0:`, JSON.stringify(data.matches?.[0] || 'NONE', null, 2));
 
     const extractText = (metadata: any) => {
         if (!metadata) return '';
@@ -242,12 +239,6 @@ async function queryQdrant(
         return '';
     };
 
-    console.log(`[VectorDB] Qdrant Results Count: ${data.result?.length || 0}`);
-    if (data.result?.length > 0) {
-        console.log(`[VectorDB] Qdrant Match 0 Payload:`, JSON.stringify(data.result[0].payload || 'NONE', null, 2));
-    }
-
-
     return (data.result || []).map((point: any) => ({
         id: String(point.id),
         score: point.score,
@@ -362,6 +353,14 @@ async function queryWeaviate(
         if (f !== textField) fields.push(f);
     }
 
+    // Build the arguments for the Get query
+    // Note: Weaviate where filters require GraphQL input syntax, not JSON.
+    // We only support pre-formatted GraphQL filter objects or skip filtering.
+    const hasFilter = filter && Object.keys(filter).length > 0;
+    if (hasFilter) {
+        console.warn('[VectorDB] Weaviate metadata filters are not yet supported. Filter will be ignored.');
+    }
+
     const query = {
         query: `{
             Get {
@@ -370,7 +369,6 @@ async function queryWeaviate(
                         vector: ${JSON.stringify(embedding)}
                     }
                     limit: ${topK}
-                    ${filter && Object.keys(filter).length > 0 ? `where: ${JSON.stringify(filter)}` : ''}
                 ) {
                     ${fields.join(' ')}
                 }
@@ -471,7 +469,8 @@ async function queryMilvus(
  */
 export async function executeVectorDbNode(
     node: WorkflowNode,
-    state: WorkflowState
+    state: WorkflowState,
+    apiKeys?: Record<string, string>
 ): Promise<any> {
     const data = node.data as any;
 
@@ -505,13 +504,15 @@ export async function executeVectorDbNode(
         if (!endpoint) throw new Error('Vector DB: connection endpoint is required.');
         if (!resolvedPrompt) throw new Error('Vector DB: query prompt is required.');
 
+        console.log(`[VectorDB] Provider: ${provider}, Collection: ${collection}, Embedding: ${embeddingModel}`);
+
         // 1. Embed the prompt based on provider
         let embedding: number[] = [];
 
         if (embeddingProvider === 'openai') {
-            const openaiKey = process.env.OPENAI_API_KEY || (state as any)?.openaiApiKey || '';
-            if (!openaiKey) throw new Error('Vector DB: an OpenAI API key is required to generate embeddings. Please check your environment variables.');
-            embedding = await embedText(resolvedPrompt, embeddingModel, openaiKey);
+            const openaiKey = apiKeys?.openai || process.env.OPENAI_API_KEY || (state as any)?.openaiApiKey || '';
+            if (!openaiKey) throw new Error('Vector DB: an OpenAI API key is required to generate embeddings. Please set your OpenAI key in Settings > API Keys or ensure it is configured as a system key.');
+            embedding = await embedText(resolvedPrompt, embeddingModel, openaiKey, dimension);
         } else if (embeddingProvider === 'pinecone' && provider === 'pinecone') {
             // Pinecone Inference (stub - implementation would go here)
             throw new Error('Vector DB: Pinecone Inference embeddings not yet fully implemented.');
@@ -541,8 +542,23 @@ export async function executeVectorDbNode(
             rawResults = await queryQdrant(
                 embedding, endpoint, apiKey || undefined, collection, topK, metadataFilter, includeMetadata, includeVector, textField
             );
-        } else if (provider === 'chroma' || provider === 'weaviate' || provider === 'milvus') {
-            throw new Error(`Vector DB: provider '${provider}' is temporarily disabled in the backend and will be available soon.`);
+        } else if (provider === 'chroma') {
+            rawResults = await queryChroma(
+                embedding, endpoint, apiKey || undefined, collection, topK, metadataFilter, includeMetadata, includeVector, textField
+            );
+        } else if (provider === 'weaviate') {
+            rawResults = await queryWeaviate(
+                embedding, endpoint, apiKey || undefined, collection, topK, metadataFilter, includeMetadata, includeVector, textField
+            );
+        } else if (provider === 'milvus') {
+            // Milvus expects a boolean expression string (e.g. 'category == "docs"'), not JSON.
+            // We ignore JSON object filters since they can't be safely converted to Milvus DSL.
+            if (metadataFilter && Object.keys(metadataFilter).length > 0) {
+                console.warn('[VectorDB] Milvus metadata filters require DSL expression strings. JSON object filter will be ignored.');
+            }
+            rawResults = await queryMilvus(
+                embedding, endpoint, apiKey || undefined, collection, topK, undefined, includeMetadata, includeVector, textField
+            );
         } else {
             throw new Error(`Vector DB: provider '${provider}' is not yet supported.`);
         }

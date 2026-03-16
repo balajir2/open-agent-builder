@@ -292,7 +292,8 @@ open-agent-builder/
 3. **auth.ts** configures Microsoft provider with tenant-specific authentication
 4. **Automatic Token Refresh** - Tokens refresh automatically before expiration
 5. **Convex** receives authenticated requests with `userId` from session
-6. **API Routes** can use API key authentication for programmatic access
+6. **Convex Backend** - All queries/mutations enforce authentication via `requireAuth()` which throws if `ctx.auth.getUserIdentity()` returns null
+7. **API Routes** can use API key authentication for programmatic access
 
 **Session Management:**
 - **Token Lifetime**: Azure AD tokens expire after 1 hour
@@ -624,6 +625,15 @@ return new Response(stream, {
 - `node_failed` - Node encounters error
 - `workflow_completed` - Workflow finishes
 - `error` - Fatal error
+
+**Frontend Auth Synchronization:**
+Components that call Convex queries must wait for both NextAuth session AND Convex auth to be ready:
+```typescript
+import { useConvexAuth } from "convex/react";
+const { isAuthenticated: isConvexReady } = useConvexAuth();
+const query = useQuery(api.myQuery, user?.id && isConvexReady ? {} : "skip");
+```
+This prevents race conditions where NextAuth session is available but Convex hasn't received the auth token yet.
 
 ### Document Upload and Processing
 
@@ -1239,6 +1249,7 @@ The Open Agent Builder implements comprehensive security measures to protect aga
 - ✅ **Attribute Filter** - Script handlers and dangerous attributes removed
 
 **4. Authorization & Access Control**
+- ✅ **Convex Auth Enforcement** - All Convex queries/mutations use `requireAuth()` which calls `ctx.auth.getUserIdentity()` and throws if null (fail-closed)
 - ✅ **Ownership Checks** - `checkWorkflowAccess()` in `convex/workflows.ts` verifies owner, assignee, admin, or template
 - ✅ **Execution Ownership** - `checkExecutionAccess()` in `convex/executions.ts` enforces user-scoped execution data
 - ✅ **JWT Authentication** - Azure AD authentication via NextAuth.js for all protected routes

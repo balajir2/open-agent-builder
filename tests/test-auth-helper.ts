@@ -61,7 +61,14 @@ export function setTestAuth(client: any, userId: string = 'test-user'): void {
     throw new Error('CONVEX_DEPLOY_KEY or CONVEX_TEST_SECRET required for test authentication');
   }
 
-  client.setAdminAuth(adminSecret);
+  // Pass actingAsIdentity so ctx.auth.getUserIdentity() returns a valid identity
+  // This allows requireAuth() to extract the userId from identity.subject
+  client.setAdminAuth(adminSecret, {
+    subject: userId,
+    issuer: 'https://test.local',
+    email: `${userId}@test.local`,
+    name: `Test User ${userId}`,
+  });
 }
 
 /**

@@ -131,10 +131,7 @@ test.describe('P0: Convex ownership checks', () => {
     // Create a workflow owned by User A
     try {
       const wfA = createMinimalWorkflow(USER_A_ID, 'User A Private Workflow');
-      userAWorkflowId = await clientA.mutation(api.workflows.saveWorkflow, {
-        ...wfA,
-        userId: USER_A_ID,
-      } as any);
+      userAWorkflowId = await clientA.mutation(api.workflows.saveWorkflow, wfA);
     } catch (err) {
       console.warn('[security-auth] Failed to create User A workflow:', err);
     }
@@ -142,10 +139,7 @@ test.describe('P0: Convex ownership checks', () => {
     // Create a workflow owned by User B
     try {
       const wfB = createMinimalWorkflow(USER_B_ID, 'User B Private Workflow');
-      userBWorkflowId = await clientB.mutation(api.workflows.saveWorkflow, {
-        ...wfB,
-        userId: USER_B_ID,
-      } as any);
+      userBWorkflowId = await clientB.mutation(api.workflows.saveWorkflow, wfB);
     } catch (err) {
       console.warn('[security-auth] Failed to create User B workflow:', err);
     }
@@ -276,10 +270,7 @@ test.describe('P0: Execution ownership checks', () => {
     // Create a workflow for execution tests
     try {
       const wf = createMinimalWorkflow(USER_A_ID, 'Execution Test Workflow');
-      testWorkflowId = await clientA.mutation(api.workflows.saveWorkflow, {
-        ...wf,
-        userId: USER_A_ID,
-      } as any);
+      testWorkflowId = await clientA.mutation(api.workflows.saveWorkflow, wf);
 
       // Create an execution record owned by User A
       testExecutionId = await clientA.mutation(api.executions.createExecution, {

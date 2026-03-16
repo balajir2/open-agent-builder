@@ -149,7 +149,6 @@ const nodeCategories = [
       { type: "extract", label: "Extract", color: "bg-[#ECE3FF] dark:bg-[#9665FF]", icon: Search },
       { type: "http", label: "HTTP", color: "bg-[#ECE3FF] dark:bg-[#9665FF]", icon: Server },
       { type: "vector-db", label: "Vector DB", color: "bg-[#F0F7FF] dark:bg-[#2B4B8F]", icon: Database },
-      { type: "extract", label: "Extract", color: "bg-[#ECE3FF] dark:bg-[#9665FF]", icon: Scissors },
       { type: "set-state", label: "Set state", color: "bg-[#ECE3FF] dark:bg-[#9665FF]", icon: Braces },
     ],
   },

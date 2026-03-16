@@ -107,7 +107,7 @@ test.describe.serial('Custom MCP Server Lifecycle', () => {
         setTestAuth(convexClient, TEST_USER_ID);
         // Validate Convex auth works before running tests
         try {
-            const existingServers = await convexClient.query(api.mcpServers.listUserMCPs, { userId: TEST_USER_ID });
+            const existingServers = await convexClient.query(api.mcpServers.listUserMCPs, {});
             for (const server of existingServers) {
                 await convexClient.mutation(api.mcpServers.deleteMCPServerForTest, { id: server._id, secret: process.env.CONVEX_TEST_SECRET! });
             }
@@ -140,7 +140,7 @@ test.describe.serial('Custom MCP Server Lifecycle', () => {
     });
 
     test('Step 2: should retrieve the new custom MCP server', async () => {
-        const servers = await convexClient.query(api.mcpServers.listUserMCPs, { userId: TEST_USER_ID });
+        const servers = await convexClient.query(api.mcpServers.listUserMCPs, {});
         expect(servers.some(s => s._id === newServerId)).toBe(true);
     });
 
@@ -201,7 +201,7 @@ test.describe.serial('Custom MCP Server Lifecycle', () => {
     });
 
     test('Step 5: should verify the custom MCP server is deleted', async () => {
-        const servers = await convexClient.query(api.mcpServers.listUserMCPs, { userId: TEST_USER_ID });
+        const servers = await convexClient.query(api.mcpServers.listUserMCPs, {});
         expect(servers.some(s => s._id === newServerId)).toBe(false);
     });
 });

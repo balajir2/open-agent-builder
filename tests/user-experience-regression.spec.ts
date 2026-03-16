@@ -121,7 +121,7 @@ test.describe('UX: Workflow CRUD through API', () => {
     }
   });
 
-  test('POST /api/workflows creates a workflow and returns success', async ({ request }) => {
+  test('POST /api/workflows without auth returns 401', async ({ request }) => {
     const workflow = createTestWorkflow('create');
 
     const response = await request.post(`${BASE_URL}/api/workflows`, {
@@ -135,14 +135,11 @@ test.describe('UX: Workflow CRUD through API', () => {
       },
     });
 
-    // CRITICAL: Users must be able to save workflows
-    expect(response.status()).toBe(200);
+    // POST requires authentication — unauthenticated requests get 401
+    expect(response.status()).toBe(401);
 
     const data = await response.json();
-    expect(data.success).toBe(true);
-    expect(data.workflowId).toBeTruthy();
-
-    createdWorkflowId = workflow.customId;
+    expect(data.error).toBeTruthy();
   });
 
   test('Created workflow appears in GET /api/workflows', async ({ request }) => {

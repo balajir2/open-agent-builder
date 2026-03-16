@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { ConvexHttpClient } from 'convex/browser';
+import { getAuthenticatedConvexClient } from '@/lib/convex/client';
 import { api } from '@/convex/_generated/api';
 import { extractTrueVariableNames } from '@/lib/workflow/deep-variable-extractor';
 
 /**
  * Workflow inputs endpoint
- * 
+ *
  * Returns the input variables needed for workflow execution
  */
 export async function GET(
@@ -15,8 +15,8 @@ export async function GET(
   const { workflowId } = await params;
 
   try {
-    // Initialize Convex client
-    const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+    // Use authenticated client — will throw if no valid session
+    const convex = await getAuthenticatedConvexClient();
 
     // Get workflow
     let workflow;
@@ -65,6 +65,9 @@ export async function GET(
       ]
     });
   } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Authentication')) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
     console.error('Error fetching workflow inputs:', error);
     return NextResponse.json(
       { error: 'Failed to fetch workflow inputs' },

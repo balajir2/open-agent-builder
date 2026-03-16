@@ -127,7 +127,7 @@ test.describe('Interoperability and E2E Tests', () => {
     standardTools = toolRegistry;
 
     // Clean up any existing servers for TEST_USER_ID to ensure a clean state.
-    const existingServers = await convexClient.query(api.mcpServers.listUserMCPs, { userId: TEST_USER_ID });
+    const existingServers = await convexClient.query(api.mcpServers.listUserMCPs, {});
     for (const server of existingServers) {
         await convexClient.mutation(api.mcpServers.deleteMCPServerForTest, { id: server._id, secret: process.env.CONVEX_TEST_SECRET! });
     }
@@ -140,7 +140,7 @@ test.describe('Interoperability and E2E Tests', () => {
     await convexClient.mutation(api.mcpServers.addMCPServerForTest, { secret: process.env.CONVEX_TEST_SECRET!, serverData: dummyDisabledServer });
 
     try {
-      allMCPs = await convexClient.query(api.mcpServers.listUserMCPs, { userId: TEST_USER_ID });
+      allMCPs = await convexClient.query(api.mcpServers.listUserMCPs, {});
       console.log(`Fetched ${allMCPs.length} MCP servers for user ${TEST_USER_ID}`);
     } catch (error) {
       console.error('Failed to fetch MCP servers from Convex:', error);
@@ -151,7 +151,7 @@ test.describe('Interoperability and E2E Tests', () => {
   // Cleanup after all tests are done
   test.afterAll(async () => {
     if (convexClient) {
-        const existingServers = await convexClient.query(api.mcpServers.listUserMCPs, { userId: TEST_USER_ID });
+        const existingServers = await convexClient.query(api.mcpServers.listUserMCPs, {});
         for (const server of existingServers) {
             await convexClient.mutation(api.mcpServers.deleteMCPServerForTest, { id: server._id, secret: process.env.CONVEX_TEST_SECRET! });
         }

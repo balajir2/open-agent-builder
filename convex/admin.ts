@@ -1,11 +1,12 @@
-import { mutation } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 
 /**
  * Admin functions for database management
+ * All functions are internal-only to prevent public access.
  */
 
-// Clear all workflows (use with caution!)
-export const clearAllWorkflows = mutation({
+// Clear all workflows — internal only, not callable from public clients
+export const clearAllWorkflows = internalMutation({
   args: {},
   handler: async ({ db }) => {
     const workflows = await db.query("workflows").collect();

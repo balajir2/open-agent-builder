@@ -871,7 +871,39 @@ module.exports = {
 
 ---
 
-## 8. Conclusion
+## 8. March 2026 — Authentication Hardening
+
+### Summary
+Comprehensive authentication enforcement across all Convex backend functions, replacing the lenient `getUserId()` pattern with strict `requireAuth()` that throws on unauthenticated access.
+
+### Changes
+
+| File | Change | Impact |
+|------|--------|--------|
+| `convex/workflows.ts` | Replaced `getUserId()` with `requireAuth()`, added `checkWorkflowAccess()` and `checkWorkflowWriteAccess()` | All workflow CRUD enforces ownership |
+| `convex/userLLMKeys.ts` | Added `requireAuth()` to all queries/mutations | User API keys are user-scoped |
+| `convex/userToolKeys.ts` | Added `requireAuth()` to all queries/mutations | Tool keys are user-scoped |
+| `convex/mcpServers.ts` | Added `requireAuth()` with ownership checks | MCP servers are user-scoped |
+| `convex/admin.ts` | Admin functions enforce authentication | Admin endpoints protected |
+| `app/api/workflows/route.ts` | GET gracefully falls back to empty list; POST returns 401 | No 500 errors on auth failure |
+| `proxy.ts` | Added `/api/workflows` and `/api/vector-db` to public routes | Route handlers manage auth internally |
+
+### Frontend Auth Synchronization
+
+The security changes required frontend updates to prevent race conditions:
+
+- **Problem**: NextAuth session becomes available before Convex receives the auth token, causing queries to fire before Convex auth is ready
+- **Solution**: All Convex `useQuery()` calls now check both `user?.id` AND `isConvexReady` (from `useConvexAuth()`) before executing
+- **Files**: `NodePanel.tsx`, `SettingsPanelSimple.tsx`, `MCPPanel.tsx`, `ToolKeysSettings.tsx`, `UserMenu.tsx`
+
+### ConvexProviderWithAuth Loop Fix
+
+- **Problem**: `ConvexProviderWithAuth` called `fetchAccessToken` repeatedly when unauthenticated, causing infinite `/api/auth/session` polling
+- **Solution**: `ConvexClientProvider.tsx` now uses plain `ConvexProvider` when `status === "unauthenticated"`, switching to `ConvexProviderWithAuth` only when authenticated
+
+---
+
+## 9. Conclusion
 
 ### ✅ Security Posture: SIGNIFICANTLY IMPROVED
 

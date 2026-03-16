@@ -490,9 +490,30 @@ export async function GET() {
       });
     }
 
-    const convex = await getAuthenticatedConvexClient();
+    let convex;
+    try {
+      convex = await getAuthenticatedConvexClient();
+    } catch {
+      // No auth available — return empty list instead of 500
+      return NextResponse.json({
+        workflows: [],
+        total: 0,
+        source: "convex",
+      });
+    }
     console.log('📋 [GET /api/workflows] Fetching from Convex...');
-    const workflows = await convex.query(api.workflows.listWorkflows, {});
+    let workflows;
+    try {
+      workflows = await convex.query(api.workflows.listWorkflows, {});
+    } catch (queryError) {
+      // Auth token may be expired/invalid — return empty list gracefully
+      console.warn('[GET /api/workflows] Convex query failed, returning empty list:', queryError);
+      return NextResponse.json({
+        workflows: [],
+        total: 0,
+        source: "convex",
+      });
+    }
     console.log(`📋 [GET /api/workflows] Found ${workflows.length} workflows`);
 
     return NextResponse.json({
@@ -546,6 +567,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let convex;
+    try {
+      convex = await getAuthenticatedConvexClient();
+    } catch {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     const raw = await request.text();
     if (!raw) {
       return NextResponse.json(
@@ -565,8 +596,6 @@ export async function POST(request: NextRequest) {
       JSON.stringify(workflow).length,
       "bytes"
     );
-
-    const convex = await getAuthenticatedConvexClient();
 
     const savedId = await convex.mutation(api.workflows.saveWorkflow, {
       customId: workflow.id,

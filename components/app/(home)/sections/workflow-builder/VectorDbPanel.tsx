@@ -15,16 +15,16 @@ interface VectorDbPanelProps {
 
 type Provider = "pinecone" | "qdrant" | "chroma" | "weaviate" | "milvus";
 
-const EMBEDDING_MODELS: Record<string, { id: string; label: string; dimension: number }[]> = {
+const EMBEDDING_MODELS: Record<string, { id: string; label: string; dimension: number; dimensions?: number[] }[]> = {
     openai: [
-        { id: "text-embedding-3-small", label: "text-embedding-3-small", dimension: 1536 },
-        { id: "text-embedding-3-large", label: "text-embedding-3-large", dimension: 3072 },
+        { id: "text-embedding-3-small", label: "text-embedding-3-small", dimension: 1536, dimensions: [256, 512, 1536] },
+        { id: "text-embedding-3-large", label: "text-embedding-3-large", dimension: 3072, dimensions: [256, 1024, 3072] },
         { id: "text-embedding-ada-002", label: "text-embedding-ada-002", dimension: 1536 },
     ],
     cohere: [
-        { id: "embed-english-v3.0", label: "embed-english-v3.0", dimension: 1024 },
-        { id: "embed-multilingual-v3.0", label: "embed-multilingual-v3.0", dimension: 1024 },
-        { id: "embed-english-light-v3.0", label: "embed-english-light-v3.0", dimension: 384 },
+        { id: "embed-english-v3.0", label: "embed-english-v3.0", dimension: 1024, dimensions: [256, 384, 512, 768, 1024] },
+        { id: "embed-multilingual-v3.0", label: "embed-multilingual-v3.0", dimension: 1024, dimensions: [256, 384, 512, 768, 1024] },
+        { id: "embed-english-light-v3.0", label: "embed-english-light-v3.0", dimension: 384, dimensions: [256, 384] },
     ],
     pinecone: [
         { id: "pinecone-serverless-embed", label: "Pinecone Default", dimension: 1536 },
@@ -35,7 +35,7 @@ const EMBEDDING_MODELS: Record<string, { id: string; label: string; dimension: n
     ],
 };
 
-const DIMENSION_PRESETS = [768, 1024, 1536, 3072];
+const DIMENSION_PRESETS = [256, 384, 512, 768, 1024, 1536, 3072];
 
 export default function VectorDbPanel({
     node,
@@ -133,22 +133,41 @@ export default function VectorDbPanel({
     }, [embeddingProvider]);
 
     // Dynamic embedding providers based on Vector DB provider
+    // Only OpenAI embeddings are currently implemented; others are coming soon.
     const getEmbeddingProviders = () => {
         if (provider === "pinecone") {
             return [
-                { id: "openai", label: "OpenAI" },
-                { id: "cohere", label: "Cohere" },
-                { id: "pinecone", label: "Pinecone Inference" },
+                { id: "openai", label: "OpenAI", enabled: true },
+                { id: "cohere", label: "Cohere (coming soon)", enabled: false },
+                { id: "pinecone", label: "Pinecone Inference (coming soon)", enabled: false },
             ];
         }
         if (provider === "qdrant") {
             return [
-                { id: "openai", label: "OpenAI" },
-                { id: "cohere", label: "Cohere" },
-                { id: "jina", label: "Jina" },
+                { id: "openai", label: "OpenAI", enabled: true },
+                { id: "cohere", label: "Cohere (coming soon)", enabled: false },
+                { id: "jina", label: "Jina (coming soon)", enabled: false },
             ];
         }
-        return [{ id: "openai", label: "OpenAI" }];
+        if (provider === "chroma") {
+            return [
+                { id: "openai", label: "OpenAI", enabled: true },
+                { id: "cohere", label: "Cohere (coming soon)", enabled: false },
+            ];
+        }
+        if (provider === "weaviate") {
+            return [
+                { id: "openai", label: "OpenAI", enabled: true },
+                { id: "cohere", label: "Cohere (coming soon)", enabled: false },
+            ];
+        }
+        if (provider === "milvus") {
+            return [
+                { id: "openai", label: "OpenAI", enabled: true },
+                { id: "cohere", label: "Cohere (coming soon)", enabled: false },
+            ];
+        }
+        return [{ id: "openai", label: "OpenAI", enabled: true }];
     };
 
     const getEmbeddingModels = () => {
@@ -225,8 +244,14 @@ export default function VectorDbPanel({
                 vectorDbJoinSeparator: joinSeparator,
                 vectorDbJoinPrefix: joinPrefix,
                 vectorDbJoinSuffix: joinSuffix,
-                // Persist the full per-provider map so data survives panel re-open
-                vectorDbPerProviderConfigs: { ...perProviderConfig.current },
+                // Persist the full per-provider map so data survives panel re-open,
+                // but strip API keys to avoid saving dormant credentials in workflow JSON
+                vectorDbPerProviderConfigs: Object.fromEntries(
+                    Object.entries(perProviderConfig.current).map(([k, v]) => [
+                        k,
+                        v ? { ...v, apiKey: undefined } : v,
+                    ])
+                ),
             });
         }, 500);
         return () => clearTimeout(id);
@@ -317,7 +342,7 @@ export default function VectorDbPanel({
                         {/* Provider */}
                         <div>
                             <label className={labelCls}>Provider</label>
-                            <div className="flex gap-8">
+                            <div className="flex gap-8 flex-wrap">
                                 {(["pinecone", "qdrant", "chroma", "weaviate", "milvus"] as Provider[]).map((p) => (
                                     <button
                                         key={p}
@@ -413,7 +438,7 @@ export default function VectorDbPanel({
                                 className={inputCls}
                             >
                                 {getEmbeddingProviders().map((ep) => (
-                                    <option key={ep.id} value={ep.id}>
+                                    <option key={ep.id} value={ep.id} disabled={!ep.enabled}>
                                         {ep.label}
                                     </option>
                                 ))}
@@ -463,15 +488,19 @@ export default function VectorDbPanel({
                                     setEmbeddingModel(mId);
                                     const model = getEmbeddingModels().find((m) => m.id === mId);
                                     if (model) {
-                                        setDimension(model.dimension);
-                                        setCustomDimension("");
+                                        // Keep current dimension if it's valid for this model
+                                        const validDims = model.dimensions || [model.dimension];
+                                        if (!validDims.includes(dimension)) {
+                                            setDimension(model.dimension);
+                                            setCustomDimension("");
+                                        }
                                     }
                                 }}
                                 className={inputCls}
                             >
                                 {getEmbeddingModels().map((m) => (
                                     <option key={m.id} value={m.id}>
-                                        {m.label} ({m.dimension})
+                                        {m.label} ({m.dimensions ? m.dimensions.join(", ") : m.dimension})
                                     </option>
                                 ))}
                             </select>
@@ -571,13 +600,19 @@ export default function VectorDbPanel({
                         {/* Metadata Filter */}
                         <div>
                             <label className={labelCls}>Metadata Filter (JSON, optional)</label>
-                            <textarea
-                                value={metadataFilter}
-                                onChange={(e) => setMetadataFilter(e.target.value)}
-                                rows={3}
-                                placeholder={'{\n  "category": "docs",\n  "lang": "en"\n}'}
-                                className="w-full px-12 py-10 bg-gray-900 text-violet-300 border border-border-faint rounded-8 text-body-small font-mono focus:outline-none focus:border-heat-100 transition-colors resize-none"
-                            />
+                            {provider === "weaviate" || provider === "milvus" ? (
+                                <div className="px-12 py-10 bg-background-base border border-border-faint rounded-8 text-body-small text-black-alpha-48">
+                                    Metadata filtering is not yet supported for {provider.charAt(0).toUpperCase() + provider.slice(1)}. This feature requires provider-specific filter syntax and will be added in a future update.
+                                </div>
+                            ) : (
+                                <textarea
+                                    value={metadataFilter}
+                                    onChange={(e) => setMetadataFilter(e.target.value)}
+                                    rows={3}
+                                    placeholder={'{\n  "category": "docs",\n  "lang": "en"\n}'}
+                                    className="w-full px-12 py-10 bg-gray-900 text-violet-300 border border-border-faint rounded-8 text-body-small font-mono focus:outline-none focus:border-heat-100 transition-colors resize-none"
+                                />
+                            )}
                         </div>
 
                         {/* Metadata Text Key */}

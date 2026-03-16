@@ -2,57 +2,45 @@
  * LLM API Key Management
  *
  * Provides API keys for LLM providers with fallback logic:
- * 1. Check user-specific keys from database
+ * 1. Check user-specific keys from database (via authenticated Convex client)
  * 2. Fall back to environment variables if no user key exists
+ *
+ * SECURITY: All Convex calls use the authenticated client so userId
+ * is derived server-side from the session token, not from caller args.
  */
 
-import { ConvexClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
-
-// Initialize Convex client for server-side use
-const getConvexClient = () => {
-  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
-  if (!convexUrl) {
-    throw new Error("NEXT_PUBLIC_CONVEX_URL is not configured");
-  }
-  return new ConvexClient(convexUrl);
-};
+import { getAuthenticatedConvexClient } from "@/lib/convex/client";
 
 /**
  * Get the API key for a specific LLM provider
  * Checks user keys first, then falls back to environment variables
  *
  * @param provider - The LLM provider ('anthropic', 'openai', 'groq', 'google')
- * @param userId - Optional user ID to check for user-specific keys
+ * @param userId - Ignored (kept for backwards-compatible call sites). Auth is derived from session.
  * @returns The API key or null if not found
  */
 export async function getLLMApiKey(
   provider: 'anthropic' | 'openai' | 'groq' | 'google',
   userId?: string
 ): Promise<string | null> {
-  // First, try to get user-specific key if userId is provided
-  if (userId) {
-    try {
-      const client = getConvexClient();
-      // FIX: Call as action, not query, and use userLLMKeysActions
-      const userKey = await client.action(api.userLLMKeysActions.getActiveKey, {
-        userId,
+  // Try to get user-specific key via authenticated client
+  try {
+    const client = await getAuthenticatedConvexClient();
+    const userKey = await client.action(api.userLLMKeysActions.getActiveKey, {
+      provider,
+    });
+
+    if (userKey?.apiKey) {
+      // Update usage stats (fire-and-forget)
+      client.mutation(api.userLLMKeys.updateKeyUsage, {
         provider,
-      });
+      }).catch(() => {}); // Don't fail if usage update fails
 
-      if (userKey?.apiKey) {
-        // Update usage stats
-        await client.mutation(api.userLLMKeys.updateKeyUsage, {
-          userId,
-          provider,
-        }).catch(console.error); // Don't fail if usage update fails
-
-        return userKey.apiKey;
-      }
-    } catch (error) {
-      console.error(`Failed to get user key for ${provider}:`, error);
-      // Continue to environment variable fallback
+      return userKey.apiKey;
     }
+  } catch (error) {
+    // If auth fails or no user key, fall through to env vars
   }
 
   // Fall back to environment variables
@@ -81,22 +69,18 @@ export async function getToolApiKey(
   toolId: string,
   userId?: string
 ): Promise<string | null> {
-  // First, try to get user-specific key if userId is provided
-  if (userId) {
-    try {
-      const client = getConvexClient();
-      const userKey = await client.action(api.userToolKeysActions.getActiveKey, {
-        userId,
-        toolId,
-      });
+  // Try to get user-specific key via authenticated client
+  try {
+    const client = await getAuthenticatedConvexClient();
+    const userKey = await client.action(api.userToolKeysActions.getActiveKey, {
+      toolId,
+    });
 
-      if (userKey?.apiKey) {
-        return userKey.apiKey;
-      }
-    } catch (error) {
-      console.error(`Failed to get user key for tool ${toolId}:`, error);
-      // Continue to environment variable fallback
+    if (userKey?.apiKey) {
+      return userKey.apiKey;
     }
+  } catch (error) {
+    // If auth fails or no user key, fall through to env vars
   }
 
   // Fall back to environment variables
@@ -185,23 +169,19 @@ export async function getProvidersStatus(userId?: string): Promise<{
   const status: any = {};
 
   for (const provider of ['anthropic', 'openai', 'groq', 'google'] as const) {
-    // Check user key first
-    if (userId) {
-      try {
-        const client = getConvexClient();
-        // FIX: Call as action, not query, and use userLLMKeysActions
-        const userKey = await client.action(api.userLLMKeysActions.getActiveKey, {
-          userId,
-          provider,
-        });
+    // Check user key first via authenticated client
+    try {
+      const client = await getAuthenticatedConvexClient();
+      const userKey = await client.action(api.userLLMKeysActions.getActiveKey, {
+        provider,
+      });
 
-        if (userKey) {
-          status[provider] = { configured: true, source: 'user' };
-          continue;
-        }
-      } catch (error) {
-        // Continue to env check
+      if (userKey) {
+        status[provider] = { configured: true, source: 'user' };
+        continue;
       }
+    } catch (error) {
+      // Continue to env check
     }
 
     // Check environment variable

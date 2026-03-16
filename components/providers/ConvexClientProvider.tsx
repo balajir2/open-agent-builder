@@ -3,7 +3,7 @@
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { ConvexProviderWithAuth } from "convex/react";
 import { SessionProvider, useSession } from "next-auth/react";
-import { ReactNode, useMemo } from "react";
+import { ReactNode, useMemo, useCallback } from "react";
 
 const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -14,24 +14,42 @@ export default function ConvexClientProvider({
 }) {
     return (
         <SessionProvider refetchInterval={4 * 60} refetchOnWindowFocus={true}>
-            <ConvexProviderWithAuth client={convex} useAuth={useAuthFromNextAuth}>
+            <ConvexAuthBridge>
                 {children}
-            </ConvexProviderWithAuth>
+            </ConvexAuthBridge>
         </SessionProvider>
     );
 }
 
-function useAuthFromNextAuth() {
+function ConvexAuthBridge({ children }: { children: ReactNode }) {
     const { data: session, status } = useSession();
 
-    return useMemo(() => {
-        return {
+    const useAuth = useCallback(() => {
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        return useMemo(() => ({
             isLoading: status === "loading",
             isAuthenticated: status === "authenticated",
             fetchAccessToken: async () => {
                 // @ts-ignore
                 return session?.idToken ?? null;
             },
-        };
+        }), []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [session, status]);
+
+    // When not authenticated and not loading, skip ConvexProviderWithAuth entirely
+    // to prevent it from polling fetchAccessToken in a loop
+    if (status === "unauthenticated") {
+        return (
+            <ConvexProvider client={convex}>
+                {children}
+            </ConvexProvider>
+        );
+    }
+
+    return (
+        <ConvexProviderWithAuth client={convex} useAuth={useAuth}>
+            {children}
+        </ConvexProviderWithAuth>
+    );
 }

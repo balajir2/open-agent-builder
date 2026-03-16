@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import React, { useState, useEffect } from "react";
 import { CheckCircle, XCircle, AlertCircle, Key, Copy, Trash2, Upload, Plug, Plus, ChevronDown, ChevronRight, TestTube, Globe, Brain, Database, Package, Loader2, Shield, Lock, ClipboardPaste, Edit, Eye, EyeOff } from "lucide-react";
-import { useQuery, useMutation, useAction } from "convex/react";
+import { useQuery, useMutation, useAction, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
 import { useSession } from "next-auth/react";
@@ -58,6 +58,7 @@ interface MCPCardProps {
 
 export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const { data: session } = useSession();
+  const { isAuthenticated: isConvexReady } = useConvexAuth();
   const user = session?.user;
   const [serverConfig, setServerConfig] = useState<ServerAPIConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,13 +67,13 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const [showAddLLMKey, setShowAddLLMKey] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<'anthropic' | 'openai' | 'groq' | 'google' | null>(null);
 
-  const apiKeys = useQuery(api.apiKeys.list, {});
+  const apiKeys = useQuery(api.apiKeys.list, isConvexReady ? {} : "skip");
   const generateKey = useAction(api.apiKeysActions.generate);
   const revokeKey = useMutation(api.apiKeys.revoke);
 
   // LLM Keys queries and mutations
   const userLLMKeys = useQuery(api.userLLMKeys.getUserLLMKeys,
-    user?.id ? { userId: user.id } : "skip"
+    user?.id && isConvexReady ? {} : "skip"
   );
   const upsertLLMKey = useAction(api.userLLMKeysActions.upsertLLMKey);
   const deleteLLMKey = useMutation(api.userLLMKeys.deleteLLMKey);
@@ -80,7 +81,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
   // MCP Registry state
   const mcpServers = useQuery(api.mcpServers.listUserMCPs,
-    user?.id ? { userId: user.id } : "skip"
+    user?.id && isConvexReady ? {} : "skip"
   ) as MCPServer[] | undefined;
 
   const addMCPServer = useMutation(api.mcpServers.addMCPServer);
@@ -118,12 +119,12 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
       // Clean up any non-Firecrawl official MCPs and seed only Firecrawl
       if (user?.id && mcpServers) {
         // First clean up any non-Firecrawl official MCPs
-        cleanupOfficialMCPs({ userId: user.id }).catch(console.error);
+        cleanupOfficialMCPs({}).catch(console.error);
 
         // Then seed Firecrawl if no MCPs exist
         const hasFirecrawl = mcpServers.some(mcp => mcp.name === "Firecrawl" && mcp.isOfficial);
         if (!hasFirecrawl) {
-          seedOfficialMCPs({ userId: user.id }).catch(console.error);
+          seedOfficialMCPs({}).catch(console.error);
         }
       }
     }
@@ -233,7 +234,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                                   <button
                                     onClick={async () => {
                                       if (user?.id) {
-                                        await deleteLLMKey({ id: providerKey._id, userId: user.id });
+                                        await deleteLLMKey({ id: providerKey._id });
                                         toast.success(`${provider} key removed`);
                                       }
                                     }}
@@ -577,7 +578,6 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                 // If tools already discovered via Test Connection button, use those
                 if (data.tools && data.tools.length > 0) {
                   await addMCPServer({
-                    userId: user.id,
                     ...data,
                   });
                   toast.success(`${data.name} added with ${data.tools.length} tools`);
@@ -607,7 +607,6 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
                   // Save with discovered tools
                   await addMCPServer({
-                    userId: user.id,
                     ...data,
                     tools: testResult.tools || [],
                   });
@@ -638,7 +637,6 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
           onSave={async (provider, apiKey, label) => {
             if (user?.id) {
               await upsertLLMKey({
-                userId: user.id,
                 provider,
                 apiKey,
                 label
@@ -682,7 +680,6 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                 } else {
                   // Add new server
                   const newServerId = await addMCPServer({
-                    userId: user.id,
                     ...serverData,
                   });
                   serverId = newServerId;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useAction, useMutation } from "convex/react";
+import { useQuery, useAction, useMutation, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
@@ -10,6 +10,7 @@ import { Loader2, Key, Trash2, Check, AlertCircle } from "lucide-react";
 
 export default function ToolKeysSettings() {
     const { data: session } = useSession();
+    const { isAuthenticated: isConvexReady } = useConvexAuth();
     const user = session?.user;
     const [editingToolId, setEditingToolId] = useState<string | null>(null);
     const [tempKey, setTempKey] = useState("");
@@ -17,7 +18,7 @@ export default function ToolKeysSettings() {
 
     // Fetch configured keys
     const configuredKeys = useQuery(api.userToolKeys.getUserToolKeys,
-        user?.id ? { userId: user.id } : "skip"
+        user?.id && isConvexReady ? {} : "skip"
     );
 
     const upsertKey = useAction(api.userToolKeysActions.upsertToolKey);
@@ -29,7 +30,6 @@ export default function ToolKeysSettings() {
         setIsSaving(true);
         try {
             await upsertKey({
-                userId: user.id,
                 toolId,
                 apiKey: tempKey.trim(),
             });
@@ -48,7 +48,7 @@ export default function ToolKeysSettings() {
         if (!user?.id) return;
 
         try {
-            await deleteKey({ id, userId: user.id });
+            await deleteKey({ id });
             toast.success("API Key removed");
         } catch (error) {
             toast.error("Failed to remove API Key");

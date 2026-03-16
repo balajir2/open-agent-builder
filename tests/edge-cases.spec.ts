@@ -81,7 +81,6 @@ test.describe('Edge Cases & Error Handling', () => {
   test.describe('Empty Workflows', () => {
     test('should handle workflow with no nodes', async () => {
       const workflowId = await convexClient.mutation(api.workflows.create, {
-        userId: TEST_USER_ID,
         name: 'Empty Workflow',
         description: 'Workflow with no nodes',
         nodes: [],
@@ -105,7 +104,6 @@ test.describe('Edge Cases & Error Handling', () => {
       ];
 
       const workflowId = await convexClient.mutation(api.workflows.create, {
-        userId: TEST_USER_ID,
         name: 'Start Only Workflow',
         description: 'Only start node',
         nodes: nodes,
@@ -128,7 +126,6 @@ test.describe('Edge Cases & Error Handling', () => {
       ];
 
       const workflowId = await convexClient.mutation(api.workflows.create, {
-        userId: TEST_USER_ID,
         name: 'End Only Workflow',
         description: 'Only end node',
         nodes: nodes,
@@ -158,7 +155,6 @@ test.describe('Edge Cases & Error Handling', () => {
 
       // No edges connecting them
       const workflowId = await convexClient.mutation(api.workflows.create, {
-        userId: TEST_USER_ID,
         name: 'Disconnected Workflow',
         description: 'Start and end not connected',
         nodes: nodes,
@@ -260,7 +256,6 @@ test.describe('Edge Cases & Error Handling', () => {
 
       // Create workflow - should be allowed to save but flagged
       const workflowId = await convexClient.mutation(api.workflows.create, {
-        userId: TEST_USER_ID,
         name: 'Circular Workflow',
         description: 'Contains circular dependency',
         nodes: nodes,
@@ -289,7 +284,6 @@ test.describe('Edge Cases & Error Handling', () => {
       ];
 
       const workflowId = await convexClient.mutation(api.workflows.create, {
-        userId: TEST_USER_ID,
         name: 'Complex Circular Workflow',
         description: 'Multi-node circular dependency',
         nodes: nodes,
@@ -314,7 +308,6 @@ test.describe('Edge Cases & Error Handling', () => {
       ];
 
       const workflowId = await convexClient.mutation(api.workflows.create, {
-        userId: TEST_USER_ID,
         name: 'Self-Loop Workflow',
         description: 'Node pointing to itself',
         nodes: nodes,
@@ -333,7 +326,6 @@ test.describe('Edge Cases & Error Handling', () => {
     test('should reject invalid JSON in nodes', async () => {
       try {
         await convexClient.mutation(api.workflows.create, {
-          userId: TEST_USER_ID,
           name: 'Invalid JSON Workflow',
           description: 'Malformed nodes JSON',
           nodes: 'invalid-json{not-json}' as any,
@@ -350,7 +342,6 @@ test.describe('Edge Cases & Error Handling', () => {
     test('should reject invalid JSON in edges', async () => {
       try {
         await convexClient.mutation(api.workflows.create, {
-          userId: TEST_USER_ID,
           name: 'Invalid Edges JSON',
           description: 'Malformed edges JSON',
           nodes: [],
@@ -370,7 +361,6 @@ test.describe('Edge Cases & Error Handling', () => {
 
       // Should be allowed to save, but may fail on execution
       const workflowId = await convexClient.mutation(api.workflows.create, {
-        userId: TEST_USER_ID,
         name: 'Incomplete Node Workflow',
         description: 'Node missing required fields',
         nodes: invalidNodes,
@@ -397,7 +387,6 @@ test.describe('Edge Cases & Error Handling', () => {
       ];
 
       const workflowId = await convexClient.mutation(api.workflows.create, {
-        userId: TEST_USER_ID,
         name: 'Null Values Workflow',
         description: 'Nodes with null/undefined',
         nodes: nodes,
@@ -417,7 +406,6 @@ test.describe('Edge Cases & Error Handling', () => {
       const longName = 'A'.repeat(1000);
 
       const workflowId = await convexClient.mutation(api.workflows.create, {
-        userId: TEST_USER_ID,
         name: longName,
         description: 'Test',
         nodes: [],
@@ -433,7 +421,6 @@ test.describe('Edge Cases & Error Handling', () => {
       const longDescription = 'B'.repeat(10000);
 
       const workflowId = await convexClient.mutation(api.workflows.create, {
-        userId: TEST_USER_ID,
         name: 'Long Description Test',
         description: longDescription,
         nodes: [],
@@ -449,7 +436,6 @@ test.describe('Edge Cases & Error Handling', () => {
       const specialChars = '🚀 Test <script>alert("xss")</script> & " \' \\n \\t';
 
       const workflowId = await convexClient.mutation(api.workflows.create, {
-        userId: TEST_USER_ID,
         name: specialChars,
         description: 'Special characters test',
         nodes: [],
@@ -465,7 +451,6 @@ test.describe('Edge Cases & Error Handling', () => {
       const unicode = '测试 テスト 🔥 ñ é ü';
 
       const workflowId = await convexClient.mutation(api.workflows.create, {
-        userId: TEST_USER_ID,
         name: unicode,
         description: unicode,
         nodes: [],
@@ -500,7 +485,6 @@ test.describe('Edge Cases & Error Handling', () => {
       }
 
       const workflowId = await convexClient.mutation(api.workflows.create, {
-        userId: TEST_USER_ID,
         name: 'Large Workflow',
         description: '100 nodes',
         nodes: nodes,
@@ -514,7 +498,6 @@ test.describe('Edge Cases & Error Handling', () => {
 
     test('should handle empty strings', async () => {
       const workflowId = await convexClient.mutation(api.workflows.create, {
-        userId: TEST_USER_ID,
         name: '',
         description: '',
         nodes: [],
@@ -593,7 +576,6 @@ test.describe('Edge Cases & Error Handling', () => {
     test('should handle concurrent workflow creations', async () => {
       const createWorkflow = (index: number) => {
         return convexClient.mutation(api.workflows.create, {
-          userId: TEST_USER_ID,
           name: `Concurrent Workflow ${index}`,
           description: 'Concurrent test',
           nodes: [],
@@ -617,7 +599,6 @@ test.describe('Edge Cases & Error Handling', () => {
     test('should handle concurrent workflow updates', async () => {
       // Create a workflow
       const workflowId = await convexClient.mutation(api.workflows.create, {
-        userId: TEST_USER_ID,
         name: 'Race Condition Test',
         description: 'Test',
         nodes: [],

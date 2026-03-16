@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 
 interface TestQueryBody {
-    provider: 'pinecone' | 'qdrant';
+    provider: 'pinecone' | 'qdrant' | 'chroma';
     endpoint: string;
     apiKey: string;
     collection: string;
@@ -19,11 +19,15 @@ interface TestQueryBody {
     textField?: string;
 }
 
-async function embedText(text: string, model: string, apiKey: string): Promise<number[]> {
+async function embedText(text: string, model: string, apiKey: string, dimension?: number): Promise<number[]> {
+    const payload: Record<string, any> = { input: text, model };
+    if (dimension && model.startsWith('text-embedding-3-')) {
+        payload.dimensions = dimension;
+    }
     const res = await fetch('https://api.openai.com/v1/embeddings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ input: text, model }),
+        body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error(`OpenAI embedding failed: ${await res.text()}`);
     const data = await res.json();
@@ -51,7 +55,7 @@ export async function POST(req: NextRequest) {
             if (!openaiKey) {
                 return NextResponse.json({ error: 'An OpenAI API key is required for embeddings. Please ensure OPENAI_API_KEY is set in your environment.' }, { status: 400 });
             }
-            embedding = await embedText(prompt, embeddingModel || 'text-embedding-3-small', openaiKey);
+            embedding = await embedText(prompt, embeddingModel || 'text-embedding-3-small', openaiKey, dimension);
         } else {
             return NextResponse.json({ error: `Embedding provider '${embeddingProvider}' not yet supported in test query` }, { status: 400 });
         }
@@ -156,6 +160,43 @@ export async function POST(req: NextRequest) {
                 id: String(p.id), score: p.score,
                 text: extractText(p.payload),
                 metadata: p.payload,
+            }));
+        } else if (provider === 'chroma') {
+            const baseUrl = endpoint.replace(/\/$/, '');
+            const chromaHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (apiKey) chromaHeaders['Authorization'] = `Bearer ${apiKey}`;
+
+            // Get collection by name
+            const colRes = await fetch(`${baseUrl}/api/v1/collections/${collection}`, { headers: chromaHeaders });
+            if (!colRes.ok) throw new Error(`Chroma: Could not find collection '${collection}' (${colRes.status})`);
+            const col = await colRes.json();
+
+            // Query
+            const include = ['metadatas', 'documents', 'distances'];
+            if (includeVector) include.push('embeddings');
+            const queryBody: Record<string, any> = {
+                query_embeddings: [embedding],
+                n_results: topK,
+                include,
+            };
+            if (filter && Object.keys(filter).length > 0) queryBody.where = filter;
+
+            const qRes = await fetch(`${baseUrl}/api/v1/collections/${col.id}/query`, {
+                method: 'POST', headers: chromaHeaders, body: JSON.stringify(queryBody),
+            });
+            if (!qRes.ok) throw new Error(`Chroma query error: ${await qRes.text()}`);
+            const qData = await qRes.json();
+
+            const ids = qData.ids?.[0] || [];
+            const distances = qData.distances?.[0] || [];
+            const metadatas = qData.metadatas?.[0] || [];
+            const documents = qData.documents?.[0] || [];
+
+            results = ids.map((id: string, i: number) => ({
+                id,
+                score: 1 - (distances[i] || 0),
+                text: documents[i] || metadatas[i]?.[textField || 'text'] || metadatas[i]?.['content'] || '',
+                metadata: metadatas[i],
             }));
         } else {
             return NextResponse.json({ error: `Provider '${provider}' not supported` }, { status: 400 });

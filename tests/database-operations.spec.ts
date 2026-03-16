@@ -29,7 +29,8 @@ const TEST_USER_ID_2 = 'test-user-db-operations-2';
 /**
  * Create a mock workflow for testing
  */
-function createMockWorkflow(userId: string, name: string = 'Test Workflow') {
+function createMockWorkflow(_userId: string, name: string = 'Test Workflow') {
+  // userId is no longer passed to saveWorkflow — it's derived from auth context
   return {
     name,
     description: 'Test workflow for database operations',
@@ -50,7 +51,6 @@ function createMockWorkflow(userId: string, name: string = 'Test Workflow') {
     edges: [
       { id: 'e1', source: 'start', target: 'end' }
     ],
-    userId,
   };
 }
 
@@ -81,9 +81,7 @@ test.describe('Database Operations Tests', () => {
       }
 
       // Delete all MCP servers
-      const mcpServers = await convex.query(api.mcpServers.listUserMCPs, {
-        userId: TEST_USER_ID,
-      });
+      const mcpServers = await convex.query(api.mcpServers.listUserMCPs, {});
       for (const server of mcpServers) {
         try {
           await convex.mutation(api.mcpServers.deleteMCPServer, { id: server._id });
@@ -91,14 +89,11 @@ test.describe('Database Operations Tests', () => {
       }
 
       // Delete all API keys
-      const apiKeys = await convex.query(api.userLLMKeys.getUserLLMKeys, {
-        userId: TEST_USER_ID,
-      });
+      const apiKeys = await convex.query(api.userLLMKeys.getUserLLMKeys, {});
       for (const key of apiKeys) {
         try {
           await convex.mutation(api.userLLMKeys.deleteLLMKey, {
             id: key._id,
-            userId: TEST_USER_ID,
           });
         } catch (e) {}
       }
@@ -143,9 +138,7 @@ test.describe('Database Operations Tests', () => {
       }
 
       // 2. Delete all MCP servers for TEST_USER_ID
-      const mcpServers = await convex.query(api.mcpServers.listUserMCPs, {
-        userId: TEST_USER_ID,
-      });
+      const mcpServers = await convex.query(api.mcpServers.listUserMCPs, {});
       for (const server of mcpServers) {
         try {
           await convex.mutation(api.mcpServers.deleteMCPServer, {
@@ -157,14 +150,11 @@ test.describe('Database Operations Tests', () => {
       }
 
       // 3. Delete all API keys for TEST_USER_ID
-      const apiKeys = await convex.query(api.userLLMKeys.getUserLLMKeys, {
-        userId: TEST_USER_ID,
-      });
+      const apiKeys = await convex.query(api.userLLMKeys.getUserLLMKeys, {});
       for (const key of apiKeys) {
         try {
           await convex.mutation(api.userLLMKeys.deleteLLMKey, {
             id: key._id,
-            userId: TEST_USER_ID,
           });
         } catch (e) {
           // Ignore errors if already deleted
@@ -388,9 +378,7 @@ test.describe('Database Operations Tests', () => {
       });
 
       // Retrieve keys
-      const keys = await convex.query(api.userLLMKeys.getUserLLMKeys, {
-        userId: TEST_USER_ID,
-      });
+      const keys = await convex.query(api.userLLMKeys.getUserLLMKeys, {});
 
       expect(keys).toBeDefined();
       const anthropicKey = keys.find(k => k.provider === 'anthropic');
@@ -410,9 +398,7 @@ test.describe('Database Operations Tests', () => {
       });
 
       // Retrieve keys
-      const keys = await convex.query(api.userLLMKeys.getUserLLMKeys, {
-        userId: TEST_USER_ID,
-      });
+      const keys = await convex.query(api.userLLMKeys.getUserLLMKeys, {});
 
       expect(keys).toBeDefined();
       expect(Array.isArray(keys)).toBe(true);
@@ -445,9 +431,7 @@ test.describe('Database Operations Tests', () => {
       });
 
       // Verify only one key for provider
-      const keys = await convex.query(api.userLLMKeys.getUserLLMKeys, {
-        userId: TEST_USER_ID,
-      });
+      const keys = await convex.query(api.userLLMKeys.getUserLLMKeys, {});
 
       const googleKeys = keys.filter(k => k.provider === 'google');
       expect(googleKeys).toHaveLength(1);
@@ -465,9 +449,7 @@ test.describe('Database Operations Tests', () => {
       });
 
       // Get the key ID
-      const keys = await convex.query(api.userLLMKeys.getUserLLMKeys, {
-        userId: TEST_USER_ID,
-      });
+      const keys = await convex.query(api.userLLMKeys.getUserLLMKeys, {});
 
       const groqKey = keys.find(k => k.provider === 'groq');
       expect(groqKey).toBeDefined();
@@ -475,13 +457,10 @@ test.describe('Database Operations Tests', () => {
       // Delete it
       await convex.mutation(api.userLLMKeys.deleteLLMKey, {
         id: groqKey!._id,
-        userId: TEST_USER_ID,
       });
 
       // Verify deletion
-      const keysAfter = await convex.query(api.userLLMKeys.getUserLLMKeys, {
-        userId: TEST_USER_ID,
-      });
+      const keysAfter = await convex.query(api.userLLMKeys.getUserLLMKeys, {});
 
       const groqKeyAfter = keysAfter.find(k => k.provider === 'groq');
       expect(groqKeyAfter).toBeUndefined();
@@ -498,9 +477,7 @@ test.describe('Database Operations Tests', () => {
       });
 
       // Get key
-      const keys = await convex.query(api.userLLMKeys.getUserLLMKeys, {
-        userId: TEST_USER_ID,
-      });
+      const keys = await convex.query(api.userLLMKeys.getUserLLMKeys, {});
 
       const testKey = keys.find(k => k.provider === 'test-provider');
       expect(testKey?.isActive).toBe(true);
@@ -508,13 +485,10 @@ test.describe('Database Operations Tests', () => {
       // Toggle to inactive
       await convex.mutation(api.userLLMKeys.toggleKeyActive, {
         id: testKey!._id,
-        userId: TEST_USER_ID,
       });
 
       // Verify toggled
-      const keysAfter = await convex.query(api.userLLMKeys.getUserLLMKeys, {
-        userId: TEST_USER_ID,
-      });
+      const keysAfter = await convex.query(api.userLLMKeys.getUserLLMKeys, {});
 
       const testKeyAfter = keysAfter.find(k => k.provider === 'test-provider');
       expect(testKeyAfter?.isActive).toBe(false);
@@ -526,7 +500,6 @@ test.describe('Database Operations Tests', () => {
       const server = {
         name: 'Test MCP Server',
         url: 'https://test-mcp.example.com',
-        userId: TEST_USER_ID,
         authType: 'none' as const,
       };
 
@@ -535,9 +508,7 @@ test.describe('Database Operations Tests', () => {
       expect(id).toBeDefined();
 
       // Verify it was added
-      const servers = await convex.query(api.mcpServers.listUserMCPs, {
-        userId: TEST_USER_ID,
-      });
+      const servers = await convex.query(api.mcpServers.listUserMCPs, {});
 
       const added = servers.find(s => s._id === id);
       expect(added).toBeDefined();
@@ -549,21 +520,17 @@ test.describe('Database Operations Tests', () => {
       await convex.mutation(api.mcpServers.add, {
         name: 'Server 1',
         url: 'https://server1.com',
-        userId: TEST_USER_ID,
         authType: 'none',
       });
 
       await convex.mutation(api.mcpServers.add, {
         name: 'Server 2',
         url: 'https://server2.com',
-        userId: TEST_USER_ID,
         authType: 'header',
       });
 
       // List servers
-      const servers = await convex.query(api.mcpServers.listUserMCPs, {
-        userId: TEST_USER_ID,
-      });
+      const servers = await convex.query(api.mcpServers.listUserMCPs, {});
 
       expect(servers.length).toBeGreaterThanOrEqual(2);
     });
@@ -573,7 +540,6 @@ test.describe('Database Operations Tests', () => {
       const id = await convex.mutation(api.mcpServers.add, {
         name: 'Temporary Server',
         url: 'https://temp.com',
-        userId: TEST_USER_ID,
         authType: 'none',
       });
 
@@ -583,9 +549,7 @@ test.describe('Database Operations Tests', () => {
       });
 
       // Verify deletion
-      const servers = await convex.query(api.mcpServers.listUserMCPs, {
-        userId: TEST_USER_ID,
-      });
+      const servers = await convex.query(api.mcpServers.listUserMCPs, {});
 
       const deleted = servers.find(s => s._id === id);
       expect(deleted).toBeUndefined();
@@ -598,14 +562,11 @@ test.describe('Database Operations Tests', () => {
         await convex.mutation(api.mcpServers.add, {
           name: `Server with ${authType} auth`,
           url: `https://${authType}.example.com`,
-          userId: TEST_USER_ID,
           authType,
         });
       }
 
-      const servers = await convex.query(api.mcpServers.listUserMCPs, {
-        userId: TEST_USER_ID,
-      });
+      const servers = await convex.query(api.mcpServers.listUserMCPs, {});
 
       expect(servers.some(s => s.authType === 'none')).toBe(true);
       expect(servers.some(s => s.authType === 'header')).toBe(true);
@@ -776,9 +737,7 @@ test.describe('Database Operations Tests', () => {
       });
 
       // User 1 retrieves keys
-      const user1Keys = await convex.query(api.userLLMKeys.getUserLLMKeys, {
-        userId: TEST_USER_ID,
-      });
+      const user1Keys = await convex.query(api.userLLMKeys.getUserLLMKeys, {});
 
       // Should only see their own keys
       expect(user1Keys.every(k => !k.provider.includes('user2'))).toBe(true);
@@ -789,7 +748,6 @@ test.describe('Database Operations Tests', () => {
       const id = await convex.mutation(api.mcpServers.add, {
         name: 'User 1 Server',
         url: 'https://user1.com',
-        userId: TEST_USER_ID,
         authType: 'none',
       });
 
@@ -800,9 +758,7 @@ test.describe('Database Operations Tests', () => {
       });
 
       // Should be deleted now
-      const servers = await convex.query(api.mcpServers.listUserMCPs, {
-        userId: TEST_USER_ID,
-      });
+      const servers = await convex.query(api.mcpServers.listUserMCPs, {});
 
       expect(servers.find(s => s._id === id)).toBeUndefined();
     });

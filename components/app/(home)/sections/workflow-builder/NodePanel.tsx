@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { ChevronDown } from "lucide-react";
 import VariableReferencePicker from "./VariableReferencePicker";
 import { toast } from "sonner";
-import { useQuery } from "convex/react";
+import { useQuery, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useSession } from "next-auth/react";
 import { Id } from "@/convex/_generated/dataModel";
@@ -39,6 +39,7 @@ export default function NodePanel({
   onOpenSettings,
 }: NodePanelProps) {
   const { data: session } = useSession();
+  const { isAuthenticated: isConvexReady } = useConvexAuth();
   const user = session?.user;
 
   // MCP states - now store only server IDs, not full configs
@@ -49,17 +50,17 @@ export default function NodePanel({
 
   // Fetch enabled MCP servers from central registry
   const mcpServers = useQuery(api.mcpServers.getEnabledMCPs,
-    user?.id ? { userId: user.id } : "skip"
+    user?.id && isConvexReady ? {} : "skip"
   );
 
   // Fetch user's LLM API keys to determine available models
   const userLLMKeys = useQuery(api.userLLMKeys.getUserLLMKeys,
-    user?.id ? { userId: user.id } : "skip"
+    user?.id && isConvexReady ? {} : "skip"
   );
 
   // Fetch configured tool keys (user-level)
   const configuredToolKeys = useQuery(api.userToolKeys.getUserToolKeys,
-    user?.id ? { userId: user.id } : "skip"
+    user?.id && isConvexReady ? {} : "skip"
   );
 
   // Fetch system-level configuration

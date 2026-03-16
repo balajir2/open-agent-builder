@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { Globe, Brain, Database, Package, Loader2, ChevronDown } from "lucide-react";
 import type { Node } from "@xyflow/react";
 import { toast } from "sonner";
-import { useQuery } from "convex/react";
+import { useQuery, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useSession } from "next-auth/react";
 
@@ -27,12 +27,13 @@ export default function MCPPanel({
   onOpenSettings
 }: MCPPanelProps) {
   const { data: session } = useSession();
+  const { isAuthenticated: isConvexReady } = useConvexAuth();
   const user = session?.user;
   const nodeData = node?.data as any;
 
   // Fetch enabled MCP servers from central registry
   const mcpServers = useQuery(api.mcpServers.getEnabledMCPs,
-    user?.id ? { userId: user.id } : "skip"
+    user?.id && isConvexReady ? {} : "skip"
   );
 
   // Store only the selected server ID

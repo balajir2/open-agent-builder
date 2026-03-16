@@ -618,7 +618,7 @@ export class LangGraphExecutor {
       }
 
       case 'vector-db': {
-        return await executeVectorDbNode(node, state as WorkflowState);
+        return await executeVectorDbNode(node, state as WorkflowState, this.apiKeys);
       }
 
       case 'if-else': {

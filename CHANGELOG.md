@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security & Auth Hardening - March 16, 2026
+
+#### Security (from prior agent)
+- **Convex Authentication Enforcement** - All Convex queries/mutations now use `requireAuth()` instead of lenient `getUserId()`
+  - `convex/workflows.ts` - Complete rewrite with `requireAuth()`, `checkWorkflowAccess()`, `checkWorkflowWriteAccess()`
+  - `convex/userLLMKeys.ts` - All queries/mutations enforce authentication
+  - `convex/userToolKeys.ts` - All queries/mutations enforce authentication
+  - `convex/mcpServers.ts` - All queries/mutations enforce authentication with ownership checks
+  - `convex/userLLMKeysActions.ts` - Actions enforce authentication
+  - `convex/userToolKeysActions.ts` - Actions enforce authentication
+  - `convex/admin.ts` - Admin functions enforce authentication
+- **Workflow Ownership Model** - `checkWorkflowAccess()` grants read to owner, assignee, admin, or template; `checkWorkflowWriteAccess()` grants write to owner or admin only
+- **Internal Queries** - Added `getWorkflowInternal` and `getWorkflowByCustomIdInternal` for server-side execution engine (not publicly callable)
+
+#### Fixed
+- **Convex Auth Race Condition** - Frontend components called Convex queries before auth token was delivered
+  - Added `useConvexAuth()` guard to `NodePanel.tsx`, `SettingsPanelSimple.tsx`, `MCPPanel.tsx`, `ToolKeysSettings.tsx`
+  - Queries now skip (`"skip"`) until both NextAuth session AND Convex auth are ready
+  - `UserMenu.tsx` - `storeUser` mutation waits for `isConvexAuthenticated` before firing
+- **ConvexProviderWithAuth Session Loop** - Unauthenticated users caused infinite `/api/auth/session` polling
+  - `ConvexClientProvider.tsx` - Uses `ConvexProvider` (no auth) when unauthenticated, `ConvexProviderWithAuth` only when authenticated
+  - `SessionManager.tsx` - Guards against acting on empty sessions (no user)
+- **GET /api/workflows Auth Fallback** - Returns empty list (200) instead of 500 when unauthenticated
+  - Catches both missing auth tokens and expired/invalid Convex tokens
+  - `proxy.ts` - Added `/api/workflows` and `/api/vector-db` as public routes (route handler manages auth gracefully)
+- **POST /api/workflows Auth Gate** - Returns 401 when unauthenticated (instead of 500)
+- **Test Auth Helper** - `setTestAuth()` now passes `actingAsIdentity` to `setAdminAuth()` so `ctx.auth.getUserIdentity()` returns valid identity in tests
+- **TypeScript NodeData Type** - Added missing fields: `httpUrl`, `httpMethod`, `httpHeaders`, `httpBody`, `prompt`, `format`, `textMode`, `numCards`, `textAmount`, `imageSource`, `language`, `exportAs`
+- **Authentication Tests** - Fixed ownership isolation tests to switch identity between user1/user2 workflow creation
+- **Rate Limiter Tests** - Updated to test POST (requires auth) instead of GET (now returns 200 gracefully)
+- **UX Regression Tests** - Updated POST test to expect 401 (auth required) instead of 200
+
+#### Added
+- **Vector DB Node** - New node type for querying vector databases (Pinecone, Qdrant, Weaviate, Chroma, Milvus)
+  - `lib/workflow/executors/vector-db.ts` - Executor supporting 5 providers
+  - `components/app/(home)/sections/workflow-builder/VectorDbPanel.tsx` - Configuration UI
+  - `app/api/vector-db/test/route.ts` - Test query endpoint
+  - `tests/vector-db.spec.ts` - Unit tests
+  - `tests/vector-db-e2e.spec.ts` - End-to-end tests
+
 ### Fixed - February 15, 2026
 
 - **Safe Expression Evaluator Production Bug** - Fixed `Object.create(null)` causing "Cannot read properties of null (reading 'isComplex')" error

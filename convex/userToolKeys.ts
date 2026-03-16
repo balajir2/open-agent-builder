@@ -3,16 +3,27 @@ import { mutation, query, internalQuery, internalMutation, action } from "./_gen
 import { internal } from "./_generated/api";
 
 /**
- * Get all Tool keys for a user (metadata only, no decryption)
+ * Get the authenticated user's ID or throw.
+ */
+async function requireAuth(ctx: any): Promise<string> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity?.subject) {
+    throw new Error("Authentication required");
+  }
+  return identity.subject;
+}
+
+/**
+ * Get all Tool keys for the authenticated user (metadata only, no decryption)
  */
 export const getUserToolKeys = query({
-    args: {
-        userId: v.string(),
-    },
-    handler: async (ctx, args) => {
+    args: {},
+    handler: async (ctx) => {
+        const userId = await requireAuth(ctx);
+
         const keys = await ctx.db
             .query("userToolKeys")
-            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+            .withIndex("by_userId", (q: any) => q.eq("userId", userId))
             .collect();
 
         // Don't return the actual encrypted keys, just metadata
@@ -28,17 +39,17 @@ export const getUserToolKeys = query({
 });
 
 /**
- * Delete a user's Tool API key
+ * Delete a user's Tool API key — ownership enforced via auth
  */
 export const deleteToolKey = mutation({
     args: {
         id: v.id("userToolKeys"),
-        userId: v.string(), // For authorization
     },
     handler: async (ctx, args) => {
+        const userId = await requireAuth(ctx);
         const key = await ctx.db.get(args.id);
 
-        if (!key || key.userId !== args.userId) {
+        if (!key || key.userId !== userId) {
             throw new Error("Key not found or unauthorized");
         }
 
@@ -46,7 +57,7 @@ export const deleteToolKey = mutation({
     },
 });
 
-// Internal query to get encrypted key (called from action)
+// Internal query to get encrypted key (called from action — not publicly callable)
 export const getEncryptedKey = internalQuery({
     args: {
         userId: v.string(),
@@ -55,14 +66,14 @@ export const getEncryptedKey = internalQuery({
     handler: async (ctx, args) => {
         return await ctx.db
             .query("userToolKeys")
-            .withIndex("by_userTool", (q) =>
+            .withIndex("by_userTool", (q: any) =>
                 q.eq("userId", args.userId).eq("toolId", args.toolId)
             )
             .first();
     },
 });
 
-// Internal mutation to upsert Tool key (called from action)
+// Internal mutation to upsert Tool key (called from action — not publicly callable)
 export const upsertKey = internalMutation({
     args: {
         userId: v.string(),
@@ -76,7 +87,7 @@ export const upsertKey = internalMutation({
         // Check if user already has a key for this tool
         const existingKey = await ctx.db
             .query("userToolKeys")
-            .withIndex("by_userTool", (q) =>
+            .withIndex("by_userTool", (q: any) =>
                 q.eq("userId", args.userId).eq("toolId", args.toolId)
             )
             .first();
@@ -114,30 +125,34 @@ export const getAllUserKeys = internalQuery({
     handler: async (ctx, args) => {
         return await ctx.db
             .query("userToolKeys")
-            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+            .withIndex("by_userId", (q: any) => q.eq("userId", args.userId))
             .collect();
     },
 });
 
 /**
  * Get configured tools status (system + user keys combined)
- * Returns list of tool IDs that are configured (either system or user level)
+ * SECURITY: userId derived from auth
  */
 export const getConfiguredToolsStatus = action({
-    args: {
-        userId: v.string(),
-    },
-    handler: async (ctx, args) => {
+    args: {},
+    handler: async (ctx) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity?.subject) {
+            throw new Error("Authentication required");
+        }
+        const userId = identity.subject;
+
         // Get all user keys via internal query
         const allUserKeys = await ctx.runQuery(internal.userToolKeys.getAllUserKeys, {
-            userId: args.userId,
+            userId,
         });
 
         const configuredToolIds = new Set<string>();
         const toolSources: Record<string, 'system' | 'user'> = {};
 
         // Add user-configured tools
-        allUserKeys.forEach((key) => {
+        allUserKeys.forEach((key: any) => {
             if (key.isActive) {
                 configuredToolIds.add(key.toolId);
                 toolSources[key.toolId] = 'user';

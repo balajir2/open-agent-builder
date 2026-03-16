@@ -1,6 +1,9 @@
 /**
  * Convex functions for managing user LLM API keys
  * Keys are encrypted and stored per-user
+ *
+ * SECURITY: All public functions derive userId from ctx.auth.
+ * Internal functions accept userId as args (not callable from clients).
  */
 
 import { v } from "convex/values";
@@ -8,16 +11,27 @@ import { mutation, query, internalQuery, internalMutation } from "./_generated/s
 import { Id } from "./_generated/dataModel";
 
 /**
- * Get all LLM keys for a user (metadata only, no decryption)
+ * Get the authenticated user's ID or throw.
+ */
+async function requireAuth(ctx: any): Promise<string> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity?.subject) {
+    throw new Error("Authentication required");
+  }
+  return identity.subject;
+}
+
+/**
+ * Get all LLM keys for the authenticated user (metadata only, no decryption)
  */
 export const getUserLLMKeys = query({
-  args: {
-    userId: v.string(),
-  },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireAuth(ctx);
+
     const keys = await ctx.db
       .query("userLLMKeys")
-      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .withIndex("by_userId", (q: any) => q.eq("userId", userId))
       .collect();
 
     // Don't return the actual encrypted keys, just metadata
@@ -36,17 +50,17 @@ export const getUserLLMKeys = query({
 });
 
 /**
- * Delete a user's LLM API key
+ * Delete a user's LLM API key — ownership enforced via auth
  */
 export const deleteLLMKey = mutation({
   args: {
     id: v.id("userLLMKeys"),
-    userId: v.string(), // For authorization
   },
   handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
     const key = await ctx.db.get(args.id);
 
-    if (!key || key.userId !== args.userId) {
+    if (!key || key.userId !== userId) {
       throw new Error("Key not found or unauthorized");
     }
 
@@ -55,17 +69,17 @@ export const deleteLLMKey = mutation({
 });
 
 /**
- * Toggle active state of a key
+ * Toggle active state of a key — ownership enforced via auth
  */
 export const toggleKeyActive = mutation({
   args: {
     id: v.id("userLLMKeys"),
-    userId: v.string(),
   },
   handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
     const key = await ctx.db.get(args.id);
 
-    if (!key || key.userId !== args.userId) {
+    if (!key || key.userId !== userId) {
       throw new Error("Key not found or unauthorized");
     }
 
@@ -75,8 +89,8 @@ export const toggleKeyActive = mutation({
     if (!key.isActive) {
       const otherKeys = await ctx.db
         .query("userLLMKeys")
-        .withIndex("by_userProvider", (q) =>
-          q.eq("userId", args.userId).eq("provider", key.provider)
+        .withIndex("by_userProvider", (q: any) =>
+          q.eq("userId", userId).eq("provider", key.provider)
         )
         .collect();
 
@@ -98,20 +112,21 @@ export const toggleKeyActive = mutation({
 });
 
 /**
- * Update usage stats for a key
+ * Update usage stats for a key — ownership enforced via auth
  */
 export const updateKeyUsage = mutation({
   args: {
-    userId: v.string(),
     provider: v.string(),
   },
   handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+
     const key = await ctx.db
       .query("userLLMKeys")
-      .withIndex("by_userProvider", (q) =>
-        q.eq("userId", args.userId).eq("provider", args.provider)
+      .withIndex("by_userProvider", (q: any) =>
+        q.eq("userId", userId).eq("provider", args.provider)
       )
-      .filter((q) => q.eq(q.field("isActive"), true))
+      .filter((q: any) => q.eq(q.field("isActive"), true))
       .first();
 
     if (key) {
@@ -124,7 +139,7 @@ export const updateKeyUsage = mutation({
   },
 });
 
-// Internal query to get encrypted key (called from action)
+// Internal query to get encrypted key (called from action — not publicly callable)
 export const getEncryptedKey = internalQuery({
   args: {
     userId: v.string(),
@@ -133,15 +148,15 @@ export const getEncryptedKey = internalQuery({
   handler: async (ctx, args) => {
     return await ctx.db
       .query("userLLMKeys")
-      .withIndex("by_userProvider", (q) =>
+      .withIndex("by_userProvider", (q: any) =>
         q.eq("userId", args.userId).eq("provider", args.provider)
       )
-      .filter((q) => q.eq(q.field("isActive"), true))
+      .filter((q: any) => q.eq(q.field("isActive"), true))
       .first();
   },
 });
 
-// Internal mutation to upsert LLM key (called from action)
+// Internal mutation to upsert LLM key (called from action — not publicly callable)
 export const upsertKey = internalMutation({
   args: {
     userId: v.string(),
@@ -156,7 +171,7 @@ export const upsertKey = internalMutation({
     // Check if user already has a key for this provider
     const existingKey = await ctx.db
       .query("userLLMKeys")
-      .withIndex("by_userProvider", (q) =>
+      .withIndex("by_userProvider", (q: any) =>
         q.eq("userId", args.userId).eq("provider", args.provider)
       )
       .first();
@@ -174,7 +189,7 @@ export const upsertKey = internalMutation({
       // Deactivate other keys for this provider
       const otherKeys = await ctx.db
         .query("userLLMKeys")
-        .withIndex("by_userProvider", (q) =>
+        .withIndex("by_userProvider", (q: any) =>
           q.eq("userId", args.userId).eq("provider", args.provider)
         )
         .collect();

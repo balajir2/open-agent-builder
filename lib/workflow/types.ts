@@ -68,6 +68,22 @@ export interface NodeData {
   // Note node data
   noteText?: string;
 
+  // HTTP node data
+  httpUrl?: string;
+  httpMethod?: string;
+  httpHeaders?: Array<{ key: string; value: string }>;
+  httpBody?: string;
+
+  // Gamma AI node data
+  prompt?: string;
+  format?: string;
+  textMode?: string;
+  numCards?: number;
+  textAmount?: string;
+  imageSource?: string;
+  language?: string;
+  exportAs?: string;
+
   // Additional node data properties
   transformType?: string;
   mcpTool?: string;

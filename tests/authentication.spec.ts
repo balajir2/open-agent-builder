@@ -374,33 +374,46 @@ test.describe('Authentication & Authorization', () => {
         ]
       };
 
+      // Create workflow as user 1
+      setTestAuth(convexClient, TEST_USER_ID_1);
       user1WorkflowId = await convexClient.mutation(api.workflows.create, {
-        userId: TEST_USER_ID_1,
         name: 'User 1 Workflow',
         description: 'Private workflow',
         ...basicWorkflow,
       });
 
+      // Switch identity to user 2 and create their workflow
+      setTestAuth(convexClient, TEST_USER_ID_2);
       user2WorkflowId = await convexClient.mutation(api.workflows.create, {
-        userId: TEST_USER_ID_2,
         name: 'User 2 Workflow',
         description: 'Private workflow',
         ...basicWorkflow,
       });
+
+      // Switch back to user 1 for remaining tests
+      setTestAuth(convexClient, TEST_USER_ID_1);
     });
 
     test.afterAll(async () => {
-      // Cleanup
-      if (user1WorkflowId) {
-        await convexClient.mutation(api.workflows.deleteWorkflow, {
-          id: user1WorkflowId
-        });
+      // Cleanup - switch identity to delete each user's workflow
+      try {
+        if (user1WorkflowId) {
+          setTestAuth(convexClient, TEST_USER_ID_1);
+          await convexClient.mutation(api.workflows.deleteWorkflow, {
+            id: user1WorkflowId
+          });
+        }
+        if (user2WorkflowId) {
+          setTestAuth(convexClient, TEST_USER_ID_2);
+          await convexClient.mutation(api.workflows.deleteWorkflow, {
+            id: user2WorkflowId
+          });
+        }
+      } catch (e) {
+        // Ignore cleanup errors
       }
-      if (user2WorkflowId) {
-        await convexClient.mutation(api.workflows.deleteWorkflow, {
-          id: user2WorkflowId
-        });
-      }
+      // Restore to user 1
+      setTestAuth(convexClient, TEST_USER_ID_1);
     });
 
     test('should enforce workflow ownership', async () => {
@@ -414,16 +427,19 @@ test.describe('Authentication & Authorization', () => {
     });
 
     test('should isolate user workflows', async () => {
-      // Verify each workflow has correct ownership metadata.
-      // NOTE: We use getWorkflow (not list) because the list query
-      // filters by identity.subject, which is null under admin auth.
-      // getWorkflow uses checkWorkflowAccess which allows test-env access.
+      // Query each workflow as its owner to verify ownership metadata
+      setTestAuth(convexClient, TEST_USER_ID_1);
       const user1Workflow = await convexClient.query(api.workflows.get, {
         id: user1WorkflowId,
       });
+
+      setTestAuth(convexClient, TEST_USER_ID_2);
       const user2Workflow = await convexClient.query(api.workflows.get, {
         id: user2WorkflowId,
       });
+
+      // Restore to user 1 for subsequent tests
+      setTestAuth(convexClient, TEST_USER_ID_1);
 
       expect(user1Workflow).toBeTruthy();
       expect(user1Workflow?.userId).toBe(TEST_USER_ID_1);
@@ -453,12 +469,15 @@ test.describe('Authentication & Authorization', () => {
     });
 
     test('should prevent unauthorized workflow deletion', async () => {
-      // With admin auth, deleteWorkflow bypasses ownership checks.
       // Verify the workflow exists and has ownership metadata set correctly.
-      // In production, Azure AD identity would enforce ownership.
+      // Query as user2 (the owner) to confirm the workflow exists.
+      setTestAuth(convexClient, TEST_USER_ID_2);
       const workflow = await convexClient.query(api.workflows.get, {
         id: user2WorkflowId,
       });
+
+      // Restore to user 1 for subsequent tests
+      setTestAuth(convexClient, TEST_USER_ID_1);
 
       expect(workflow).toBeTruthy();
       expect(workflow?.userId).toBe(TEST_USER_ID_2);

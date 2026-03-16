@@ -18,7 +18,9 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/api/mcp") ||
     pathname.startsWith("/api/test-mcp-connection") ||
     pathname.startsWith("/api/upload") || // Allow file upload - proxies to Convex HTTP action with CORS
-    pathname.startsWith("/api/auth");
+    pathname.startsWith("/api/auth") ||
+    pathname === "/api/workflows" || // Allow GET listing — route handles auth fallback gracefully
+    pathname.startsWith("/api/vector-db"); // Allow vector-db test queries
 
   // Define API routes that require API key authentication (bypass auth check here)
   const isApiKeyRoute =

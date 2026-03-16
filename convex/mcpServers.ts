@@ -1,72 +1,117 @@
 import { v } from "convex/values";
-import { query, mutation, action, internalMutation } from "./_generated/server";
-import { api } from "./_generated/api";
+import { query, mutation, action, internalMutation, internalQuery } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 /**
  * Centralized MCP Server Registry Operations
  * Single source of truth for all MCP configurations
+ *
+ * SECURITY: All public functions derive userId from ctx.auth.
+ * Secrets (accessToken, headers) are redacted from client-facing responses.
  */
+
+/**
+ * Get the authenticated user's ID or throw.
+ */
+async function requireAuth(ctx: any): Promise<string> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity?.subject) {
+    throw new Error("Authentication required");
+  }
+  return identity.subject;
+}
+
+/**
+ * Redact sensitive fields from a server object before returning to client.
+ */
+function redactServer(server: any) {
+  if (!server) return server;
+  const { accessToken, headers, ...safe } = server;
+  return {
+    ...safe,
+    hasAccessToken: !!accessToken,
+    hasHeaders: !!headers && Object.keys(headers).length > 0,
+  };
+}
 
 // #################################################################
 // # Regular, User-Facing Queries and Mutations
 // #################################################################
 
-// Get all MCP servers for a user
+// Get all MCP servers for the authenticated user — secrets redacted
 export const listUserMCPs = query({
-  args: {
-    userId: v.string(),
-  },
-  handler: async ({ db }, { userId }) => {
-    const servers = await db
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireAuth(ctx);
+
+    const servers = await ctx.db
       .query("mcpServers")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .withIndex("by_userId", (q: any) => q.eq("userId", userId))
       .collect();
-    return servers;
+    return servers.map(redactServer);
   },
 });
 
-// Get enabled MCP servers for a user
+// Get enabled MCP servers for the authenticated user — secrets redacted
 export const getEnabledMCPs = query({
-  args: {
-    userId: v.string(),
-  },
-  handler: async ({ db }, { userId }) => {
-    const servers = await db
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireAuth(ctx);
+
+    const servers = await ctx.db
       .query("mcpServers")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .filter((q) => q.eq(q.field("enabled"), true))
+      .withIndex("by_userId", (q: any) => q.eq("userId", userId))
+      .filter((q: any) => q.eq(q.field("enabled"), true))
       .collect();
-    return servers;
+    return servers.map(redactServer);
   },
 });
 
-// Get a single MCP server by ID
+// Get a single MCP server by ID — ownership enforced, secrets redacted
 export const getMCPServer = query({
   args: {
     id: v.id("mcpServers"),
   },
-  handler: async ({ db }, { id }) => {
-    return await db.get(id);
+  handler: async (ctx, { id }) => {
+    const userId = await requireAuth(ctx);
+    const server = await ctx.db.get(id);
+    if (!server || server.userId !== userId) {
+      return null;
+    }
+    return redactServer(server);
   },
 });
 
-// Get multiple MCP servers by IDs
+// Get multiple MCP servers by IDs — ownership enforced, secrets redacted
 export const getMCPServersByIds = query({
   args: {
     ids: v.array(v.id("mcpServers")),
   },
-  handler: async ({ db }, { ids }) => {
+  handler: async (ctx, { ids }) => {
+    const userId = await requireAuth(ctx);
+
     const servers = await Promise.all(
-      ids.map(id => db.get(id))
+      ids.map(id => ctx.db.get(id))
     );
-    return servers.filter(Boolean);
+    return servers
+      .filter((s): s is NonNullable<typeof s> => !!s && s.userId === userId)
+      .map(redactServer);
   },
 });
 
-// Add a new MCP server
+// Internal query to get server with secrets (for server-side execution only)
+export const getServerInternal = internalQuery({
+  args: {
+    id: v.id("mcpServers"),
+  },
+  handler: async (ctx, { id }) => {
+    return await ctx.db.get(id);
+  },
+});
+
+// Add a new MCP server — ownership enforced via auth
 export const addMCPServer = mutation({
   args: {
-    userId: v.string(),
     name: v.string(),
     url: v.string(),
     description: v.optional(v.string()),
@@ -77,14 +122,11 @@ export const addMCPServer = mutation({
     headers: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const userId = await requireAuth(ctx);
 
-    // If identity exists, verify ownership. If null (admin auth), allow.
-    if (identity && identity.subject !== args.userId) {
-        throw new Error("Unauthorized: You can only add servers for your own user.");
-    }
     const serverId = await ctx.db.insert("mcpServers", {
       ...args,
+      userId,
       connectionStatus: "untested",
       enabled: true,
       isOfficial: false,
@@ -95,7 +137,7 @@ export const addMCPServer = mutation({
   },
 });
 
-// Update MCP server — SECURITY FIX: Added ownership check
+// Update MCP server — ownership enforced
 export const updateMCPServer = mutation({
   args: {
     id: v.id("mcpServers"),
@@ -113,24 +155,17 @@ export const updateMCPServer = mutation({
     headers: v.optional(v.any()),
   },
   handler: async (ctx, { id, ...updates }) => {
-    // Get authenticated user
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Unauthorized: You must be logged in to update MCP servers");
-    }
+    const userId = await requireAuth(ctx);
 
-    // Get the MCP server
     const server = await ctx.db.get(id);
     if (!server) {
       throw new Error("MCP server not found");
     }
 
-    // Check ownership
-    if (server.userId !== identity.subject) {
+    if (server.userId !== userId) {
       throw new Error("Unauthorized: You can only update your own MCP servers");
     }
 
-    // Update the server
     await ctx.db.patch(id, {
       ...updates,
       updatedAt: new Date().toISOString(),
@@ -139,27 +174,23 @@ export const updateMCPServer = mutation({
   },
 });
 
-// Delete MCP server — SECURITY FIX: Added ownership check
+// Delete MCP server — ownership enforced
 export const deleteMCPServer = mutation({
   args: {
     id: v.id("mcpServers"),
   },
   handler: async (ctx, { id }) => {
-    // Get authenticated user
-    const identity = await ctx.auth.getUserIdentity();
+    const userId = await requireAuth(ctx);
 
-    // Get the MCP server
     const server = await ctx.db.get(id);
     if (!server) {
       throw new Error("MCP server not found");
     }
 
-    // Check ownership if identity exists (admin auth bypasses)
-    if (identity && server.userId !== identity.subject) {
+    if (server.userId !== userId) {
       throw new Error("Unauthorized: You can only delete your own MCP servers");
     }
 
-    // Delete the server
     await ctx.db.delete(id);
     return { success: true };
   },
@@ -222,30 +253,38 @@ export const deleteMCPServerForTest = mutation({
 // # Actions and Other Logic
 // #################################################################
 
-// Test MCP connection and discover tools
+// Test MCP connection — ownership enforced, secrets NOT returned to client
 export const testConnection = action({
   args: {
     id: v.id("mcpServers"),
   },
-  handler: async ({ runMutation, runQuery }, { id }): Promise<{ serverId: any; needsTest: boolean; server: any }> => {
-    const server: any = await runQuery(api.mcpServers.getMCPServer, { id });
+  handler: async (ctx, { id }): Promise<{ serverId: any; needsTest: boolean; server: any }> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.subject) {
+      throw new Error("Authentication required");
+    }
+
+    const server: any = await ctx.runQuery(internal.mcpServers.getServerInternal, { id });
 
     if (!server) {
       throw new Error("MCP server not found");
     }
 
+    if (server.userId !== identity.subject) {
+      throw new Error("Unauthorized: You can only test your own MCP servers");
+    }
+
     try {
-      // This will be called from the frontend which will do the actual connection test
-      // The frontend will then update the server with the results
       return {
         serverId: id,
         needsTest: true,
-        server
+        // Redact secrets before returning to client
+        server: redactServer(server),
       };
     } catch (error) {
-      await runMutation(api.mcpServers.updateMCPServer, {
+      await ctx.runMutation(internal.mcpServers.updateConnectionStatusInternal, {
         id,
-        connectionStatus: "error",
+        status: "error",
         lastTested: new Date().toISOString(),
         lastError: error instanceof Error ? error.message : "Unknown error"
       });
@@ -254,17 +293,35 @@ export const testConnection = action({
   }
 });
 
-// Seed official MCP servers (run once on first user setup)
-export const seedOfficialMCPs = mutation({
+// Internal mutation for updating connection status (used by testConnection action)
+export const updateConnectionStatusInternal = internalMutation({
   args: {
-    userId: v.string(),
+    id: v.id("mcpServers"),
+    status: v.string(),
+    lastTested: v.string(),
+    lastError: v.optional(v.string()),
   },
-  handler: async ({ db }, { userId }) => {
+  handler: async (ctx, { id, status, lastTested, lastError }) => {
+    await ctx.db.patch(id, {
+      connectionStatus: status,
+      lastTested,
+      lastError,
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
+// Seed official MCP servers — ownership enforced via auth
+export const seedOfficialMCPs = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireAuth(ctx);
+
     // Check if user already has official MCPs
-    const existing = await db
+    const existing = await ctx.db
       .query("mcpServers")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .filter((q) => q.eq(q.field("isOfficial"), true))
+      .withIndex("by_userId", (q: any) => q.eq("userId", userId))
+      .filter((q: any) => q.eq(q.field("isOfficial"), true))
       .first();
 
     if (existing) {
@@ -294,11 +351,11 @@ export const seedOfficialMCPs = mutation({
     // Insert official MCPs for the user
     const insertedIds = await Promise.all(
       officialMCPs.map(mcp =>
-        db.insert("mcpServers", {
+        ctx.db.insert("mcpServers", {
           userId,
           ...mcp,
           connectionStatus: "untested",
-          enabled: true, // Firecrawl enabled by default
+          enabled: true,
           isOfficial: true,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -310,18 +367,24 @@ export const seedOfficialMCPs = mutation({
   },
 });
 
-// Toggle MCP enabled status
+// Toggle MCP enabled status — ownership enforced
 export const toggleMCPEnabled = mutation({
   args: {
     id: v.id("mcpServers"),
   },
-  handler: async ({ db }, { id }) => {
-    const server = await db.get(id);
+  handler: async (ctx, { id }) => {
+    const userId = await requireAuth(ctx);
+
+    const server = await ctx.db.get(id);
     if (!server) {
       throw new Error("MCP server not found");
     }
 
-    await db.patch(id, {
+    if (server.userId !== userId) {
+      throw new Error("Unauthorized: You can only toggle your own MCP servers");
+    }
+
+    await ctx.db.patch(id, {
       enabled: !server.enabled,
       updatedAt: new Date().toISOString(),
     });
@@ -330,7 +393,7 @@ export const toggleMCPEnabled = mutation({
   },
 });
 
-// Update connection status after testing
+// Update connection status after testing — ownership enforced
 export const updateConnectionStatus = mutation({
   args: {
     id: v.id("mcpServers"),
@@ -338,8 +401,15 @@ export const updateConnectionStatus = mutation({
     tools: v.optional(v.array(v.string())),
     error: v.optional(v.string()),
   },
-  handler: async ({ db }, { id, status, tools, error }) => {
-    await db.patch(id, {
+  handler: async (ctx, { id, status, tools, error }) => {
+    const userId = await requireAuth(ctx);
+
+    const server = await ctx.db.get(id);
+    if (!server || server.userId !== userId) {
+      throw new Error("MCP server not found or unauthorized");
+    }
+
+    await ctx.db.patch(id, {
       connectionStatus: status,
       tools,
       lastTested: new Date().toISOString(),
@@ -350,24 +420,24 @@ export const updateConnectionStatus = mutation({
   },
 });
 
-// Clean up non-Firecrawl official MCPs
+// Clean up non-Firecrawl official MCPs — ownership enforced via auth
 export const cleanupOfficialMCPs = mutation({
-  args: {
-    userId: v.string(),
-  },
-  handler: async ({ db }, { userId }) => {
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireAuth(ctx);
+
     // Find all official MCPs for the user
-    const officialMCPs = await db
+    const officialMCPs = await ctx.db
       .query("mcpServers")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .filter((q) => q.eq(q.field("isOfficial"), true))
+      .withIndex("by_userId", (q: any) => q.eq("userId", userId))
+      .filter((q: any) => q.eq(q.field("isOfficial"), true))
       .collect();
 
     // Delete any that are not Firecrawl
     let deletedCount = 0;
     for (const mcp of officialMCPs) {
       if (mcp.name !== "Firecrawl") {
-        await db.delete(mcp._id);
+        await ctx.db.delete(mcp._id);
         deletedCount++;
       }
     }

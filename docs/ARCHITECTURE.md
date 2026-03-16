@@ -538,6 +538,20 @@ Users can generate API keys for programmatic access:
 - Bypasses NextAuth authentication
 - Useful for integrations and automation
 
+### Backend Authentication Enforcement (March 2026)
+
+All Convex backend functions now use `requireAuth()` which throws `"Authentication required"` if the user is not authenticated. This replaces the previous `getUserId()` pattern which returned `null` for unauthenticated requests.
+
+**Access Control Helpers:**
+- `requireAuth(ctx)` — Returns `identity.subject` (userId) or throws
+- `checkWorkflowAccess(ctx, workflow, userId)` — Read access: owner, assignee, admin, or template
+- `checkWorkflowWriteAccess(ctx, workflow, userId)` — Write access: owner or admin only
+
+**Frontend Synchronization:**
+The `ConvexClientProvider` uses a bridge pattern:
+- When `status === "unauthenticated"`: Uses `ConvexProvider` (no auth polling)
+- When `status === "authenticated"`: Uses `ConvexProviderWithAuth` with NextAuth token
+
 ---
 
 ## Workflow Execution Engine
