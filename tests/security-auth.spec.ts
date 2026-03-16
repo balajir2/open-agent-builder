@@ -63,6 +63,9 @@ function createMinimalWorkflow(userId: string, name: string) {
 // ──────────────────────────────────────────────
 
 test.describe('P0: Legacy endpoint removal', () => {
+  test.beforeAll(async () => {
+    try { await fetch(BASE_URL, { signal: AbortSignal.timeout(3000) }); } catch { test.skip(); return; }
+  });
   test('POST /api/workflow/execute is not accessible', async ({ request }) => {
     const response = await request.post(`${BASE_URL}/api/workflow/execute`, {
       headers: { 'Content-Type': 'application/json' },
@@ -84,6 +87,9 @@ test.describe('P0: Legacy endpoint removal', () => {
 // ──────────────────────────────────────────────
 
 test.describe('P0: Unauthenticated access to protected endpoints', () => {
+  test.beforeAll(async () => {
+    try { await fetch(BASE_URL, { signal: AbortSignal.timeout(3000) }); } catch { test.skip(); return; }
+  });
   test('GET /api/workflows without auth returns 200 (Convex handles filtering)', async ({ request }) => {
     const response = await request.get(`${BASE_URL}/api/workflows`, {
       headers: { 'Content-Type': 'application/json' },
@@ -346,6 +352,9 @@ test.describe('P0: Execution ownership checks', () => {
 // ──────────────────────────────────────────────
 
 test.describe('P0: getAuthenticatedConvexClient resilience', () => {
+  test.beforeAll(async () => {
+    try { await fetch(BASE_URL, { signal: AbortSignal.timeout(3000) }); } catch { test.skip(); return; }
+  });
   test('API does not return 500 when no auth session exists', async ({ request }) => {
     const response = await request.get(`${BASE_URL}/api/workflows`, {
       headers: { 'Content-Type': 'application/json' },
@@ -373,6 +382,9 @@ test.describe('P0: getAuthenticatedConvexClient resilience', () => {
 // ──────────────────────────────────────────────
 
 test.describe('P0: Error responses do not leak internals', () => {
+  test.beforeAll(async () => {
+    try { await fetch(BASE_URL, { signal: AbortSignal.timeout(3000) }); } catch { test.skip(); return; }
+  });
   test('API responses do not contain stack traces or internal paths', async ({ request }) => {
     const response = await request.get(`${BASE_URL}/api/workflows`, {
       headers: { 'Content-Type': 'application/json' },

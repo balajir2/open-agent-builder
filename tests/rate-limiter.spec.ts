@@ -12,6 +12,15 @@ import { test, expect } from '@playwright/test';
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 
+// Skip all tests if dev server is not running
+test.beforeAll(async () => {
+  try {
+    await fetch(BASE_URL, { signal: AbortSignal.timeout(3000) });
+  } catch {
+    test.skip();
+  }
+});
+
 // ──────────────────────────────────────────────
 // Section 1: Rate Limiter Behavior
 // ──────────────────────────────────────────────
