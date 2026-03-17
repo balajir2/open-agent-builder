@@ -68,10 +68,7 @@ test.describe('P1: Execution Persistence', () => {
     // Create test workflow
     try {
       const wf = createMinimalWorkflow(TEST_USER_ID);
-      testWorkflowId = await convexClient.mutation(api.workflows.saveWorkflow, {
-        ...wf,
-        userId: TEST_USER_ID,
-      } as any);
+      testWorkflowId = await convexClient.mutation(api.workflows.saveWorkflow, wf);
     } catch (err) {
       console.warn('[execution-persistence] Failed to create test workflow:', err);
     }

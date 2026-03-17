@@ -73,7 +73,7 @@ export const list = query({
     handler: async (ctx) => {
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) {
-            throw new Error("Unauthorized");
+            return [];
         }
 
         const currentUser = await ctx.db
@@ -82,7 +82,7 @@ export const list = query({
             .first();
 
         if (currentUser?.role !== "admin") {
-            throw new Error("Unauthorized: Admin access required");
+            return [];
         }
 
         return await ctx.db.query("users").order("desc").collect();

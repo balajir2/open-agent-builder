@@ -1755,10 +1755,10 @@ export default function WorkflowRunnerUI() {
           <h3 className="text-lg font-semibold text-gray-800 mb-2">No workflow selected</h3>
           <p className="text-sm text-gray-500 max-w-md mx-auto">
             This page expects a workflow id in the URL. Please open this page with a valid query param like:
-            <div className="mt-3 p-3 bg-gray-50 rounded text-xs text-gray-600">
-              <code>/workflow-runner?workflowid=workflow_1762276839721</code>
-            </div>
           </p>
+          <span className="mt-3 p-3 bg-gray-50 rounded text-xs text-gray-600 block max-w-md mx-auto">
+            <code>/workflow-runner?workflowid=workflow_1762276839721</code>
+          </span>
         </div>
       </div>
     );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useQuery, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
 interface WorkflowSelectorProps {
@@ -12,7 +12,8 @@ export default function WorkflowSelector({
   selectedWorkflowId,
   onSelectWorkflow,
 }: WorkflowSelectorProps) {
-  const workflows = useQuery(api.workflows.listAll);
+  const { isAuthenticated } = useConvexAuth();
+  const workflows = useQuery(api.workflows.listAll, isAuthenticated ? {} : "skip");
 
 
   const filteredWorkflows =

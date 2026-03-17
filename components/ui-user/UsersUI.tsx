@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Play, GripVertical, Search, Save, X, Plus } from "lucide-react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner"; // Assuming sonner is installed/used elsewhere
@@ -152,13 +152,14 @@ function DroppableUserArea({
 // ------------------------------------------------------------------
 
 export default function UsersUI() {
+  const { isAuthenticated } = useConvexAuth();
   const currentUser = useQuery(api.users.currentUser);
 
   // Strict check: Must be loaded (not undefined), logged in (not null), and have admin role
   const isAdmin = currentUser !== undefined && currentUser !== null && currentUser.role === "admin";
 
   // Queries
-  const allWorkflows = useQuery(api.workflows.listAll) || [];
+  const allWorkflows = useQuery(api.workflows.listAll, isAuthenticated ? {} : "skip") || [];
   const allUsers = useQuery(api.users.list, isAdmin ? {} : "skip") || [];
 
   // Mutations

@@ -109,7 +109,9 @@ function sanitizeNodesAndEdges(nodes: any[], edges: any[]) {
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await requireAuth(ctx);
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.subject) return [];
+    const userId = identity.subject;
 
     return await ctx.db
       .query("workflows")
@@ -131,7 +133,9 @@ export const list = query({
 export const listAll = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await requireAuth(ctx);
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.subject) return [];
+    const userId = identity.subject;
 
     const user = await ctx.db
       .query("users")

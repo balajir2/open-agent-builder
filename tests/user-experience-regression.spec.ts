@@ -207,14 +207,11 @@ test.describe('UX: Convex workflow visibility', () => {
     convexClient = new ConvexHttpClient(CONVEX_URL);
     setTestAuth(convexClient, TEST_USER_ID);
 
-    // Create a test workflow
+    // Create a test workflow (userId comes from auth context, not args)
     const wf = createTestWorkflow('convex');
     testCustomId = wf.customId;
     try {
-      testWorkflowId = await convexClient.mutation(api.workflows.saveWorkflow, {
-        ...wf,
-        userId: TEST_USER_ID,
-      } as any);
+      testWorkflowId = await convexClient.mutation(api.workflows.saveWorkflow, wf);
     } catch (err) {
       console.warn('[ux-regression] Failed to create test workflow:', err);
     }
@@ -239,6 +236,7 @@ test.describe('UX: Convex workflow visibility', () => {
     // The workflow we just created must be in the list
     expect(found).toBeTruthy();
     expect(found!.name).toBe('UX Regression Test convex');
+    // userId is set from auth context (identity.subject), not from args
     expect(found!.userId).toBe(TEST_USER_ID);
   });
 
@@ -318,5 +316,79 @@ test.describe('UX: API resilience when auth is unavailable', () => {
     // Must not crash. 200 = saved, 400 = bad request, 401 = auth needed
     // 500 = broken server code
     expect(response.status()).not.toBe(500);
+  });
+});
+
+// ──────────────────────────────────────────────
+// Section 5: HTML Structure Validation
+// Ensures no invalid HTML nesting that causes
+// React hydration errors.
+// ──────────────────────────────────────────────
+
+test.describe('UX: HTML structure validity', () => {
+  test('WorkflowRunnerUI does not nest block elements inside <p> tags', async () => {
+    // Read the WorkflowRunnerUI source and verify no <div> inside <p>
+    const fs = await import('fs');
+    const path = await import('path');
+    const filePath = path.resolve('components/workflow-runner/WorkflowRunnerUI.tsx');
+    const source = fs.readFileSync(filePath, 'utf-8');
+
+    // Find all <p ...> ... </p> blocks and check for block-level elements inside
+    const pTagRegex = /<p\b[^>]*>([\s\S]*?)<\/p>/g;
+    let match;
+    const violations: string[] = [];
+
+    while ((match = pTagRegex.exec(source)) !== null) {
+      const content = match[1];
+      // Block elements that cannot be nested inside <p>
+      if (/<(div|section|article|header|footer|main|aside|nav|ul|ol|table|form|fieldset|blockquote)\b/i.test(content)) {
+        const lineNum = source.substring(0, match.index).split('\n').length;
+        violations.push(`Line ~${lineNum}: <p> contains block-level element`);
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  test('ConvexClientProvider passes auth token to Convex correctly', async () => {
+    // Verify the provider uses ConvexProviderWithAuth (not plain ConvexProvider)
+    // and that useAuthFromNextAuth returns the correct shape
+    const fs = await import('fs');
+    const path = await import('path');
+    const filePath = path.resolve('components/providers/ConvexClientProvider.tsx');
+    const source = fs.readFileSync(filePath, 'utf-8');
+
+    // Must use ConvexProviderWithAuth for authenticated access
+    expect(source).toContain('ConvexProviderWithAuth');
+
+    // Must have fetchAccessToken that returns idToken
+    expect(source).toContain('fetchAccessToken');
+    expect(source).toContain('idToken');
+
+    // Must derive isAuthenticated from session status
+    expect(source).toContain('isAuthenticated');
+    expect(source).toContain('status');
+  });
+
+  test('Components using listAll guard with useConvexAuth', async () => {
+    // UsersUI and WorkflowSelector must guard listAll with isAuthenticated
+    const fs = await import('fs');
+    const path = await import('path');
+
+    const files = [
+      'components/ui-user/UsersUI.tsx',
+      'components/ui-builder/WorkflowSelector.tsx',
+    ];
+
+    for (const file of files) {
+      const filePath = path.resolve(file);
+      const source = fs.readFileSync(filePath, 'utf-8');
+
+      // Must import useConvexAuth
+      expect(source).toContain('useConvexAuth');
+
+      // Must use "skip" pattern to prevent unauthenticated queries
+      expect(source).toContain('"skip"');
+    }
   });
 });
