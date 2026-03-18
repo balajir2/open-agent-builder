@@ -22,14 +22,12 @@ export const exchangeCodeForTokens = action({
     code: v.string(),
     tokenUrl: v.string(),
     clientId: v.string(),
-    encryptedClientSecret: v.optional(v.string()),
+    clientSecret: v.optional(v.string()),
     codeVerifier: v.string(),
     redirectUri: v.string(),
   },
   handler: async (ctx, args) => {
-    const clientSecret = args.encryptedClientSecret
-      ? decrypt(args.encryptedClientSecret)
-      : undefined;
+    const clientSecret = args.clientSecret;
 
     const body = new URLSearchParams({
       grant_type: "authorization_code",
@@ -73,6 +71,12 @@ export const exchangeCodeForTokens = action({
       tokenType: tokenData.token_type || "Bearer",
       scope: tokenData.scope,
     });
+
+    // Encrypt client secret and store it on the MCP server's oauthConfig for future refresh
+    if (clientSecret) {
+      const encryptedClientSecret = encrypt(clientSecret);
+      return { success: true, expiresAt, scope: tokenData.scope, encryptedClientSecret };
+    }
 
     return { success: true, expiresAt, scope: tokenData.scope };
   },

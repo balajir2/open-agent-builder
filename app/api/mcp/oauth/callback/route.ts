@@ -48,11 +48,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const { userId, mcpServerId, encryptedCodeVerifier, oauthConfig } = stateRecord;
-
-    // Decrypt code_verifier for the token exchange
-    const { decrypt } = await import("@/convex/lib/encryption");
-    const codeVerifier = decrypt(encryptedCodeVerifier);
+    const { userId, mcpServerId, codeVerifier, oauthConfig } = stateRecord;
 
     // If no mcpServerId yet (new server), create the MCP server first
     let serverId = mcpServerId;
@@ -70,7 +66,7 @@ export async function GET(request: NextRequest) {
             authUrl: oauthConfig.authUrl,
             tokenUrl: oauthConfig.tokenUrl,
             clientId: oauthConfig.clientId,
-            encryptedClientSecret: oauthConfig.encryptedClientSecret,
+            // encryptedClientSecret will be set after token exchange
             scopes: oauthConfig.scopes,
           },
         });
@@ -91,30 +87,30 @@ export async function GET(request: NextRequest) {
     }
 
     // Exchange code for tokens via Convex action (handles encryption)
-    await (convex as any).action(api.mcpOAuthTokensActions.exchangeCodeForTokens, {
+    const tokenResult: any = await (convex as any).action(api.mcpOAuthTokensActions.exchangeCodeForTokens, {
       userId,
       mcpServerId: serverId,
       code,
       tokenUrl: oauthConfig.tokenUrl,
       clientId: oauthConfig.clientId,
-      encryptedClientSecret: oauthConfig.encryptedClientSecret,
+      clientSecret: oauthConfig.clientSecret,
       codeVerifier,
       redirectUri: oauthConfig.redirectUri,
     });
 
-    // Update MCP server connection status
+    // Update MCP server connection status and store encrypted OAuth config
     try {
       const { getAuthenticatedConvexClient } = await import("@/lib/convex/client");
       const authClient = await getAuthenticatedConvexClient();
       await authClient.mutation(api.mcpServers.updateMCPServer, {
         id: serverId,
         connectionStatus: "connected",
-        // Store OAuth config on the server if not already there
         oauthConfig: {
           authUrl: oauthConfig.authUrl,
           tokenUrl: oauthConfig.tokenUrl,
           clientId: oauthConfig.clientId,
-          encryptedClientSecret: oauthConfig.encryptedClientSecret,
+          // Use the encrypted client secret from the Convex action (encrypted server-side)
+          encryptedClientSecret: tokenResult?.encryptedClientSecret,
           scopes: oauthConfig.scopes,
         },
       });

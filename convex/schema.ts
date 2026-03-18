@@ -305,7 +305,7 @@ export default defineSchema({
     state: v.string(), // Random state parameter
     userId: v.string(),
     mcpServerId: v.optional(v.id("mcpServers")),
-    encryptedCodeVerifier: v.string(), // PKCE code_verifier (encrypted)
+    codeVerifier: v.string(), // PKCE code_verifier (plain text, short-lived single-use state)
     oauthConfig: v.any(), // { authUrl, tokenUrl, clientId, scopes, redirectUri, mcpName, mcpUrl }
     expiresAt: v.number(), // 10 min TTL
     createdAt: v.string(),

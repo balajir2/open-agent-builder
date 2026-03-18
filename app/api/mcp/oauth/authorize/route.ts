@@ -45,30 +45,24 @@ export async function POST(request: NextRequest) {
     // Generate random state for CSRF protection
     const state = crypto.randomBytes(32).toString("base64url");
 
-    // Encrypt code_verifier and client_secret before storing
-    // We need to call a Convex action for encryption since it requires Node.js runtime
-    // But the encryption module is server-side only. Since we're in a Next.js API route,
-    // we can import it directly.
-    const { encrypt } = await import("@/convex/lib/encryption");
-    const encryptedCodeVerifier = encrypt(codeVerifier);
-    const encryptedClientSecret = clientSecret ? encrypt(clientSecret) : undefined;
-
     // Determine redirect URI
     const origin = request.headers.get("origin") || request.headers.get("referer")?.replace(/\/[^/]*$/, "") || "";
     const redirectUri = `${origin}/api/mcp/oauth/callback`;
 
-    // Store state in Convex (10 min TTL)
+    // Store state in Convex (10 min TTL, single-use)
+    // Note: code_verifier and client_secret stored as plain text in the short-lived state.
+    // Encryption happens in the Convex action during token exchange (where ENCRYPTION_KEY is available).
     const convex = getConvexClient();
     await (convex as any).mutation(api.mcpOAuthStates.createState, {
       state,
       userId,
       mcpServerId: mcpServerId || undefined,
-      encryptedCodeVerifier,
+      codeVerifier,
       oauthConfig: {
         authUrl,
         tokenUrl,
         clientId,
-        encryptedClientSecret,
+        clientSecret,
         scopes,
         redirectUri,
         mcpName,
