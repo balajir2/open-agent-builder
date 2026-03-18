@@ -1,7 +1,7 @@
 # Highspot MCP Integration Plan
 
-**Last Updated:** February 12, 2026
-**Status:** Planning
+**Last Updated:** March 17, 2026
+**Status:** In Progress (OAuth infrastructure complete)
 **Author:** AI-Assisted Planning
 
 ## Overview
@@ -24,15 +24,32 @@ Once integrated, agents in Open Agent Builder will be able to autonomously searc
 ### Current State
 
 - **Highspot API**: REST v0.5, OAuth 2.0 authentication, JSON responses
-- **Official MCP Server**: Does not exist
+- **Official MCP Server**: Highspot now provides `https://mcp.highspot.com/mcp` with 7 tools
+- **OAuth Infrastructure**: Open Agent Builder now has native MCP OAuth 2.0 support (Authorization Code with PKCE, Client Credentials, encrypted token storage, auto-refresh)
 - **Community MCP Server**: [dmiyamasu/mcp-highspot.com](https://github.com/dmiyamasu/mcp-highspot.com) - early-stage, 6 commits, minimal documentation, not production-ready
 - **Python SDK (Unofficial)**: [jeffshurtliff/highspot](https://github.com/jeffshurtliff/highspot) - available for reference
+
+### What's Already Built
+
+With the MCP OAuth 2.0 infrastructure now in place, Highspot integration no longer requires a custom MCP wrapper. Users can connect directly to Highspot's official MCP server:
+
+1. **Settings > MCP Servers > Add MCP Server**
+2. Auth Type: **OAuth 2.0**
+3. Server URL: `https://mcp.highspot.com/mcp`
+4. Auth URL: `https://app.highspot.com/oauth2/v1/authorize`
+5. Token URL: `https://app.highspot.com/auth/oauth2/v1/token`
+6. Client ID / Secret from Highspot Developer Settings
+7. Click **Connect** to authorize
+
+Available tools: `search_content`, `get_item_content`, `get_content_answer`, `get_content_recommendations`, `generate_pitch`, `get_deal_answer`, `lookup_deal`
 
 ## Architecture
 
 ### Integration Approach
 
-Build a custom MCP server that wraps Highspot's REST API and deploy it as a standalone service.
+**Update (March 2026):** With native MCP OAuth 2.0 support and Highspot's official MCP server, a custom wrapper is no longer required for the primary integration. Users connect directly to `https://mcp.highspot.com/mcp` using OAuth 2.0 credentials. The custom wrapper approach below remains valid for advanced use cases (custom tools, caching, aggregation).
+
+**Original Plan:** Build a custom MCP server that wraps Highspot's REST API and deploy it as a standalone service.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -237,17 +254,15 @@ Once the MCP server is deployed and accessible, register it via the **Settings U
 
 ### Step 4: API Key Management
 
-**Option A: MCP Server Manages Highspot Auth**
-- Highspot OAuth credentials stored as env vars in the MCP server
-- MCP server handles token refresh internally
-- Open Agent Builder only needs the MCP endpoint URL + optional MCP auth token
+**Native OAuth (Recommended):** Open Agent Builder now handles Highspot OAuth natively:
+- OAuth credentials (Client ID, Client Secret) configured per-user in Settings UI
+- Tokens encrypted (AES-256-GCM) and stored in Convex `mcpOAuthTokens` table
+- Auto-refresh during workflow execution with 5-minute buffer
+- No external token management required
 
-**Option B: Pass-Through from Open Agent Builder** (more flexible)
-- Store Highspot credentials in Convex (system or user-level)
-- Pass credentials to MCP server in request headers
-- MCP server uses provided credentials per-request
-
-**Recommended**: **Option A** for simplicity. The MCP server is a trusted intermediary.
+**Custom Wrapper (Legacy):**
+- Option A: MCP server manages Highspot auth via env vars
+- Option B: Pass-through credentials from Open Agent Builder
 
 ### Step 5: Use in Workflows
 

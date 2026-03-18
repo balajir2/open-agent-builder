@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Play, GripVertical, Search, Save, X, Plus } from "lucide-react";
 import { useQuery, useMutation, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -158,9 +158,11 @@ export default function UsersUI() {
   // Strict check: Must be loaded (not undefined), logged in (not null), and have admin role
   const isAdmin = currentUser !== undefined && currentUser !== null && currentUser.role === "admin";
 
-  // Queries
-  const allWorkflows = useQuery(api.workflows.listAll, isAuthenticated ? {} : "skip") || [];
-  const allUsers = useQuery(api.users.list, isAdmin ? {} : "skip") || [];
+  // Queries — stable arg references prevent unnecessary re-subscriptions
+  const listAllArgs = useMemo(() => isAuthenticated ? {} : "skip" as const, [isAuthenticated]);
+  const listUsersArgs = useMemo(() => isAdmin ? {} : "skip" as const, [isAdmin]);
+  const allWorkflows = useQuery(api.workflows.listAll, listAllArgs) || [];
+  const allUsers = useQuery(api.users.list, listUsersArgs) || [];
 
   // Mutations
   const batchUpdate = useMutation(api.workflows.batchUpdateAssignments);
@@ -182,14 +184,15 @@ export default function UsersUI() {
   // In `users.ts`, `clerkId` is the unique ID used for query.
   // We should pass `selectedUser.clerkId` as the `userId`.
 
-  const dbAssignments = useQuery(api.workflows.getWorkflowsForUser, selectedUserId ? { userId: selectedUserId } : "skip");
+  const assignmentArgs = useMemo(() => selectedUserId ? { userId: selectedUserId } : "skip" as const, [selectedUserId]);
+  const dbAssignments = useQuery(api.workflows.getWorkflowsForUser, assignmentArgs);
 
   // Sync state with DB when user changes or DB updates (unless dirty)
   useEffect(() => {
     if (dbAssignments && !isDirty) {
       setPendingAssignments(dbAssignments);
     }
-  }, [dbAssignments, isDirty, selectedUser]);
+  }, [dbAssignments, isDirty, selectedUserId]);
 
   // Reset dirty state when switching users
   useEffect(() => {

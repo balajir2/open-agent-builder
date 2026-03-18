@@ -80,7 +80,8 @@ Bounteous has transformed the original concept into a production-ready platform 
 
 ### 🤖 Multi-Tool Agent Integration
 - **6 Integrated Tools**: Firecrawl (web scraping), Tavily (AI search), Serper (Google API), E2B (code execution), Arcade (browser automation), Gamma AI (presentations)
-- **MCP Protocol Support** - Extensible Model Context Protocol for custom tool integration
+- **MCP Protocol Support** - Extensible Model Context Protocol for custom tool integration (supports OAuth 2.0, bearer, and API key auth)
+- **MCP OAuth 2.0** - Authorization Code (PKCE) and Client Credentials flows with encrypted token storage and auto-refresh
 - **Tool Auto-Discovery** - Agents automatically receive tool definitions and invocation rights
 - **Two-Tier API Keys** - System-level fallback keys + user-level encrypted keys
 - **Universal Tool Support** - All LLM providers (Claude, GPT-5.2/o3, Gemini 3, Groq) support all tools

@@ -407,13 +407,14 @@ MCP Node Execution
     │   └─> Tool selection
     │
     ├─> Resolve MCP server
-    │   └─> Query Convex for server config
+    │   ├─> Query Convex for server config
+    │   └─> If OAuth: inject fresh access token (auto-refresh if needed)
     │
     ├─> Build tool arguments
     │   └─> Resolve variables in arguments
     │
     ├─> Execute tool call
-    │   ├─> Connect to MCP server
+    │   ├─> Connect to MCP server (with auth header)
     │   ├─> Send tool request
     │   └─> Receive response
     │
@@ -529,6 +530,43 @@ Protected Routes (auth required):
    ↓
 4. Return system key as fallback
 ```
+
+### MCP OAuth 2.0 Authentication
+
+MCP servers can use OAuth 2.0 for authentication, enabling integration with services like Highspot.
+
+**Supported Flows:**
+- **Authorization Code with PKCE** - User-facing authorization via popup
+- **Client Credentials** - Server-to-server authentication
+
+**Token Lifecycle:**
+```
+1. User configures OAuth settings in Settings UI
+   ↓
+2. User clicks "Connect" → popup opens
+   ↓
+3. User authorizes → callback receives auth code
+   ↓
+4. App exchanges code for tokens (via convex/mcpOAuthTokensActions.ts)
+   ↓
+5. Tokens encrypted (AES-256-GCM) and stored in Convex mcpOAuthTokens table
+   ↓
+6. During workflow execution, resolver.ts checks token validity
+   ↓
+7. If expiring within 5 minutes, auto-refresh via refresh token
+   ↓
+8. Fresh access token injected into MCP server request
+```
+
+**Security:**
+- PKCE (S256) enforced on authorization code flows
+- CSRF state parameter (10-minute TTL, single-use)
+- All tokens and client secrets encrypted at rest
+- No tokens exposed to browser — only status metadata
+
+**Key Tables:**
+- `mcpOAuthTokens` - Encrypted access/refresh tokens per user per server
+- `mcpOAuthStates` - CSRF state and PKCE code verifier (ephemeral)
 
 ### Programmatic API Access
 

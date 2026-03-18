@@ -26,11 +26,20 @@ async function requireAuth(ctx: any): Promise<string> {
  */
 function redactServer(server: any) {
   if (!server) return server;
-  const { accessToken, headers, ...safe } = server;
+  const { accessToken, headers, oauthConfig, ...safe } = server;
   return {
     ...safe,
     hasAccessToken: !!accessToken,
     hasHeaders: !!headers && Object.keys(headers).length > 0,
+    // Expose OAuth config metadata (no secrets)
+    oauthConfig: oauthConfig ? {
+      authUrl: oauthConfig.authUrl,
+      tokenUrl: oauthConfig.tokenUrl,
+      clientId: oauthConfig.clientId,
+      hasClientSecret: !!oauthConfig.encryptedClientSecret,
+      scopes: oauthConfig.scopes,
+      discoveryUrl: oauthConfig.discoveryUrl,
+    } : undefined,
   };
 }
 
@@ -42,7 +51,9 @@ function redactServer(server: any) {
 export const listUserMCPs = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await requireAuth(ctx);
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.subject) return [];
+    const userId = identity.subject;
 
     const servers = await ctx.db
       .query("mcpServers")
@@ -56,7 +67,9 @@ export const listUserMCPs = query({
 export const getEnabledMCPs = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await requireAuth(ctx);
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.subject) return [];
+    const userId = identity.subject;
 
     const servers = await ctx.db
       .query("mcpServers")
@@ -88,7 +101,9 @@ export const getMCPServersByIds = query({
     ids: v.array(v.id("mcpServers")),
   },
   handler: async (ctx, { ids }) => {
-    const userId = await requireAuth(ctx);
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.subject) return [];
+    const userId = identity.subject;
 
     const servers = await Promise.all(
       ids.map(id => ctx.db.get(id))
@@ -120,6 +135,14 @@ export const addMCPServer = mutation({
     accessToken: v.optional(v.string()),
     tools: v.optional(v.array(v.string())),
     headers: v.optional(v.any()),
+    oauthConfig: v.optional(v.object({
+      authUrl: v.string(),
+      tokenUrl: v.string(),
+      clientId: v.string(),
+      encryptedClientSecret: v.optional(v.string()),
+      scopes: v.optional(v.string()),
+      discoveryUrl: v.optional(v.string()),
+    })),
   },
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
@@ -153,6 +176,14 @@ export const updateMCPServer = mutation({
     lastError: v.optional(v.string()),
     enabled: v.optional(v.boolean()),
     headers: v.optional(v.any()),
+    oauthConfig: v.optional(v.object({
+      authUrl: v.string(),
+      tokenUrl: v.string(),
+      clientId: v.string(),
+      encryptedClientSecret: v.optional(v.string()),
+      scopes: v.optional(v.string()),
+      discoveryUrl: v.optional(v.string()),
+    })),
   },
   handler: async (ctx, { id, ...updates }) => {
     const userId = await requireAuth(ctx);

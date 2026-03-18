@@ -195,11 +195,26 @@ Users can add MCP servers via Settings > MCP Registry:
 2. Fill in:
    - **Name**: Display name (e.g., "My Custom MCP")
    - **URL**: Full endpoint URL (e.g., `https://api.example.com/mcp`)
-   - **Auth Type**: `bearer`, `api-key`, or `none`
-   - **Access Token**: Authentication token (if required)
+   - **Auth Type**: `bearer`, `api-key`, `none`, or `oauth`
+   - **Access Token**: Authentication token (if bearer/api-key)
    - **Category**: `web`, `ai`, `data`, or `other`
 3. Test connection
 4. Enable the server
+
+**For OAuth 2.0 MCP Servers:**
+
+1. Click "Add MCP Server"
+2. Set Auth Type to **OAuth 2.0**
+3. Fill in:
+   - **Server URL**: MCP server endpoint
+   - **Auth URL**: OAuth authorization endpoint (e.g., `https://app.example.com/oauth2/authorize`)
+   - **Token URL**: OAuth token endpoint (e.g., `https://app.example.com/oauth2/token`)
+   - **Client ID**: OAuth application client ID
+   - **Client Secret**: OAuth application client secret
+4. Click **Connect** to open the OAuth popup and authorize
+5. Status shows "Connected" (green) when tokens are obtained
+
+OAuth tokens are encrypted (AES-256-GCM) and auto-refresh during workflow execution. PKCE (S256) is enforced on authorization code flows.
 
 ### Option B: Official/System MCP Server (Code)
 
@@ -254,8 +269,15 @@ export const seedOfficialMCPs = mutation({
   url: string;              // MCP endpoint URL
   description?: string;     // Human-readable description
   category: string;         // 'web' | 'ai' | 'data' | 'other'
-  authType: string;         // 'bearer' | 'api-key' | 'none'
-  accessToken?: string;     // Authentication token
+  authType: string;         // 'bearer' | 'api-key' | 'none' | 'oauth'
+  accessToken?: string;     // Authentication token (bearer/api-key)
+  oauthConfig?: {           // OAuth 2.0 configuration (when authType is 'oauth')
+    authUrl: string;        // Authorization endpoint
+    tokenUrl: string;       // Token endpoint
+    clientId: string;       // OAuth client ID
+    clientSecret: string;   // Encrypted client secret
+    scopes?: string;        // OAuth scopes (space-separated)
+  };
   tools?: string[];         // Available tool names
   connectionStatus: string; // 'untested' | 'connected' | 'failed'
   enabled: boolean;         // Is server active

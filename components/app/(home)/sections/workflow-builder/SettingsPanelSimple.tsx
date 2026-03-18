@@ -41,6 +41,14 @@ interface MCPServer {
   enabled: boolean;
   isOfficial: boolean;
   headers?: any;
+  oauthConfig?: {
+    authUrl: string;
+    tokenUrl: string;
+    clientId: string;
+    hasClientSecret?: boolean;
+    scopes?: string;
+    discoveryUrl?: string;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -565,11 +573,27 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
           editingServer={editingMCP}
           onSave={async (data) => {
             try {
+              // For OAuth servers, strip clientSecret from the data sent to Convex
+              // (it's already been sent to the authorize endpoint for encryption)
+              const { oauthConfig: rawOauthConfig, ...restData } = data as any;
+              const saveData = {
+                ...restData,
+                ...(rawOauthConfig ? {
+                  oauthConfig: {
+                    authUrl: rawOauthConfig.authUrl,
+                    tokenUrl: rawOauthConfig.tokenUrl,
+                    clientId: rawOauthConfig.clientId,
+                    scopes: rawOauthConfig.scopes,
+                    // Note: encryptedClientSecret is set by the OAuth callback route
+                  },
+                } : {}),
+              };
+
               if (editingMCP) {
                 // Update existing server
                 await updateMCPServer({
                   id: editingMCP._id,
-                  ...data
+                  ...saveData
                 });
                 toast.success(`${data.name} updated`);
                 setShowAddMCPModal(false);
@@ -578,7 +602,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                 // If tools already discovered via Test Connection button, use those
                 if (data.tools && data.tools.length > 0) {
                   await addMCPServer({
-                    ...data,
+                    ...saveData,
                   });
                   toast.success(`${data.name} added with ${data.tools.length} tools`);
                 } else {
@@ -607,7 +631,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
                   // Save with discovered tools
                   await addMCPServer({
-                    ...data,
+                    ...saveData,
                     tools: testResult.tools || [],
                   });
 
@@ -943,6 +967,13 @@ interface AddMCPModalProps {
     accessToken?: string;
     tools?: string[];
     headers?: any;
+    oauthConfig?: {
+      authUrl: string;
+      tokenUrl: string;
+      clientId: string;
+      clientSecret?: string;
+      scopes?: string;
+    };
   }) => Promise<void>;
 }
 
@@ -953,10 +984,82 @@ function AddMCPModal({ isOpen, onClose, onSave, editingServer }: AddMCPModalProp
     description: editingServer?.description || '',
     category: editingServer?.category || 'custom',
     authType: editingServer?.authType || 'none',
-    accessToken: editingServer?.accessToken || ''
+    accessToken: editingServer?.accessToken || '',
+    // OAuth fields
+    oauthAuthUrl: (editingServer as any)?.oauthConfig?.authUrl || '',
+    oauthTokenUrl: (editingServer as any)?.oauthConfig?.tokenUrl || '',
+    oauthClientId: (editingServer as any)?.oauthConfig?.clientId || '',
+    oauthClientSecret: '',
+    oauthScopes: (editingServer as any)?.oauthConfig?.scopes || '',
   });
   const [isTesting, setIsTesting] = useState(false);
   const [discoveredTools, setDiscoveredTools] = useState<string[] | null>(editingServer?.tools || null);
+  const [oauthStatus, setOauthStatus] = useState<'not_connected' | 'connecting' | 'connected' | 'error'>('not_connected');
+  const [oauthError, setOauthError] = useState<string | null>(null);
+
+  // Listen for OAuth callback postMessage
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === 'mcp-oauth-callback') {
+        if (event.data.success) {
+          setOauthStatus('connected');
+          setOauthError(null);
+          toast.success('OAuth connected successfully!');
+        } else {
+          setOauthStatus('error');
+          setOauthError(event.data.error || 'OAuth failed');
+          toast.error('OAuth connection failed', { description: event.data.error });
+        }
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const startOAuthFlow = async () => {
+    if (!formData.oauthAuthUrl || !formData.oauthTokenUrl || !formData.oauthClientId) {
+      toast.error('Please fill in Auth URL, Token URL, and Client ID');
+      return;
+    }
+
+    setOauthStatus('connecting');
+    setOauthError(null);
+
+    try {
+      const response = await fetch('/api/mcp/oauth/authorize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mcpServerId: editingServer?._id,
+          authUrl: formData.oauthAuthUrl,
+          tokenUrl: formData.oauthTokenUrl,
+          clientId: formData.oauthClientId,
+          clientSecret: formData.oauthClientSecret || undefined,
+          scopes: formData.oauthScopes || undefined,
+          mcpName: formData.name,
+          mcpUrl: formData.url,
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to start OAuth');
+      }
+
+      const { authUrl } = await response.json();
+
+      // Open popup for OAuth authorization
+      const popup = window.open(authUrl, 'mcp-oauth', 'width=600,height=700,scrollbars=yes');
+      if (!popup) {
+        toast.error('Popup blocked. Please allow popups for this site.');
+        setOauthStatus('error');
+      }
+    } catch (err) {
+      setOauthStatus('error');
+      setOauthError(err instanceof Error ? err.message : 'Failed to start OAuth');
+      toast.error('OAuth initiation failed');
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -1037,7 +1140,7 @@ function AddMCPModal({ isOpen, onClose, onSave, editingServer }: AddMCPModalProp
               <option value="none">None</option>
               <option value="api-key">API Key</option>
               <option value="bearer">Bearer Token</option>
-              <option value="oauth-coming-soon" disabled>OAuth (Coming Soon)</option>
+              <option value="oauth">OAuth 2.0</option>
             </select>
           </div>
 
@@ -1053,6 +1156,110 @@ function AddMCPModal({ isOpen, onClose, onSave, editingServer }: AddMCPModalProp
                 placeholder={formData.authType === 'api-key' ? 'sk-...' : 'Bearer token'}
                 className="w-full px-12 py-8 bg-background-base border border-border-faint rounded-8 text-body-small text-accent-black font-mono"
               />
+            </div>
+          )}
+
+          {formData.authType === 'oauth' && (
+            <div className="space-y-12 p-12 bg-black-alpha-4 rounded-8 border border-border-faint">
+              <div className="flex items-center gap-6 mb-8">
+                <Shield className="w-14 h-14 text-heat-100" />
+                <span className="text-body-small font-medium text-accent-black">OAuth 2.0 Configuration</span>
+              </div>
+
+              <div>
+                <label className="text-body-small text-black-alpha-64 mb-4 block">Authorization URL</label>
+                <input
+                  type="text"
+                  value={formData.oauthAuthUrl}
+                  onChange={(e) => setFormData({ ...formData, oauthAuthUrl: e.target.value })}
+                  placeholder="https://app.example.com/oauth2/authorize"
+                  className="w-full px-12 py-8 bg-accent-white border border-border-faint rounded-8 text-body-small text-accent-black font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="text-body-small text-black-alpha-64 mb-4 block">Token URL</label>
+                <input
+                  type="text"
+                  value={formData.oauthTokenUrl}
+                  onChange={(e) => setFormData({ ...formData, oauthTokenUrl: e.target.value })}
+                  placeholder="https://app.example.com/oauth2/token"
+                  className="w-full px-12 py-8 bg-accent-white border border-border-faint rounded-8 text-body-small text-accent-black font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="text-body-small text-black-alpha-64 mb-4 block">Client ID</label>
+                <input
+                  type="text"
+                  value={formData.oauthClientId}
+                  onChange={(e) => setFormData({ ...formData, oauthClientId: e.target.value })}
+                  placeholder="your-client-id"
+                  className="w-full px-12 py-8 bg-accent-white border border-border-faint rounded-8 text-body-small text-accent-black font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="text-body-small text-black-alpha-64 mb-4 block">Client Secret (optional)</label>
+                <input
+                  type="password"
+                  value={formData.oauthClientSecret}
+                  onChange={(e) => setFormData({ ...formData, oauthClientSecret: e.target.value })}
+                  placeholder="your-client-secret"
+                  className="w-full px-12 py-8 bg-accent-white border border-border-faint rounded-8 text-body-small text-accent-black font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="text-body-small text-black-alpha-64 mb-4 block">Scopes (optional)</label>
+                <input
+                  type="text"
+                  value={formData.oauthScopes}
+                  onChange={(e) => setFormData({ ...formData, oauthScopes: e.target.value })}
+                  placeholder="read write (space-separated)"
+                  className="w-full px-12 py-8 bg-accent-white border border-border-faint rounded-8 text-body-small text-accent-black"
+                />
+              </div>
+
+              {/* OAuth Connect Button */}
+              <button
+                type="button"
+                onClick={startOAuthFlow}
+                disabled={oauthStatus === 'connecting' || !formData.oauthClientId || !formData.oauthAuthUrl || !formData.oauthTokenUrl}
+                className={`w-full px-16 py-10 rounded-8 text-body-small font-medium transition-all flex items-center justify-center gap-6 ${
+                  oauthStatus === 'connected'
+                    ? 'bg-heat-4 text-heat-100 border border-heat-100'
+                    : oauthStatus === 'error'
+                    ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
+                    : 'bg-heat-100 hover:bg-heat-200 text-white'
+                } disabled:opacity-50`}
+              >
+                {oauthStatus === 'connecting' ? (
+                  <>
+                    <Loader2 className="w-14 h-14 animate-spin" />
+                    Connecting...
+                  </>
+                ) : oauthStatus === 'connected' ? (
+                  <>
+                    <CheckCircle className="w-14 h-14" />
+                    Connected — Click to Reconnect
+                  </>
+                ) : oauthStatus === 'error' ? (
+                  <>
+                    <XCircle className="w-14 h-14" />
+                    Failed — Retry
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-14 h-14" />
+                    Connect with OAuth
+                  </>
+                )}
+              </button>
+
+              {oauthError && (
+                <p className="text-xs text-red-500">{oauthError}</p>
+              )}
             </div>
           )}
 
@@ -1140,9 +1347,23 @@ function AddMCPModal({ isOpen, onClose, onSave, editingServer }: AddMCPModalProp
           </button>
           <button
             onClick={() => onSave({
-              ...formData,
+              name: formData.name,
+              url: formData.url,
+              description: formData.description,
+              category: formData.category,
+              authType: formData.authType,
+              accessToken: formData.accessToken,
               tools: discoveredTools || [],
-              headers: editingServer?.headers
+              headers: editingServer?.headers,
+              ...(formData.authType === 'oauth' ? {
+                oauthConfig: {
+                  authUrl: formData.oauthAuthUrl,
+                  tokenUrl: formData.oauthTokenUrl,
+                  clientId: formData.oauthClientId,
+                  clientSecret: formData.oauthClientSecret || undefined,
+                  scopes: formData.oauthScopes || undefined,
+                },
+              } : {}),
             })}
             className="flex-1 px-20 py-12 bg-heat-100 hover:bg-heat-200 text-white rounded-8 text-body-medium font-medium transition-all"
           >

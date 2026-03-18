@@ -96,8 +96,18 @@ export default defineSchema({
     category: v.optional(v.string()), // "web" | "ai" | "data" | "custom"
 
     // Authentication
-    authType: v.string(), // "none" | "api-key" | "bearer" | "oauth-coming-soon"
-    accessToken: v.optional(v.string()), // Encrypted token
+    authType: v.string(), // "none" | "api-key" | "bearer" | "oauth"
+    accessToken: v.optional(v.string()), // Encrypted token (for api-key/bearer)
+
+    // OAuth configuration (when authType === "oauth")
+    oauthConfig: v.optional(v.object({
+      authUrl: v.string(),
+      tokenUrl: v.string(),
+      clientId: v.string(),
+      encryptedClientSecret: v.optional(v.string()), // AES-256-GCM encrypted
+      scopes: v.optional(v.string()),
+      discoveryUrl: v.optional(v.string()), // well-known URL
+    })),
 
     // Tools & Status
     tools: v.optional(v.array(v.string())), // List of available tool names
@@ -273,4 +283,33 @@ export default defineSchema({
     channel: v.string(),
     value: v.any(),
   }).index("by_thread_checkpoint", ["threadId", "checkpointId"]),
+
+  // MCP OAuth Tokens - Encrypted access/refresh tokens per MCP server per user
+  mcpOAuthTokens: defineTable({
+    userId: v.string(),
+    mcpServerId: v.id("mcpServers"),
+    encryptedAccessToken: v.string(), // AES-256-GCM encrypted
+    encryptedRefreshToken: v.optional(v.string()), // AES-256-GCM encrypted
+    expiresAt: v.number(), // Unix ms when access_token expires
+    tokenType: v.optional(v.string()), // "Bearer"
+    scope: v.optional(v.string()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_mcpServer", ["mcpServerId"])
+    .index("by_userServer", ["userId", "mcpServerId"]),
+
+  // MCP OAuth States - Temporary CSRF/PKCE state during OAuth flow
+  mcpOAuthStates: defineTable({
+    state: v.string(), // Random state parameter
+    userId: v.string(),
+    mcpServerId: v.optional(v.id("mcpServers")),
+    encryptedCodeVerifier: v.string(), // PKCE code_verifier (encrypted)
+    oauthConfig: v.any(), // { authUrl, tokenUrl, clientId, scopes, redirectUri, mcpName, mcpUrl }
+    expiresAt: v.number(), // 10 min TTL
+    createdAt: v.string(),
+  })
+    .index("by_state", ["state"])
+    .index("by_expiration", ["expiresAt"]),
 });

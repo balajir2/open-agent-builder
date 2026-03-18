@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { SignedIn, SignedOut, SignInButton } from '@/components/shared/auth-helpers';
 import { UserMenu } from "@/components/shared/UserMenu";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,15 +18,15 @@ export default function UIUserWorkflowsContent() {
     const searchParams = useSearchParams();
     const [workflow, setWorkflow] = useState<any>(null);
     const router = useRouter();
+    const workflowId = searchParams.get("workflow");
     useEffect(() => {
-        const id = searchParams.get("workflow");
-        if (!id) return;
+        if (!workflowId) return;
 
-        fetch(`/api/workflows/${id}`)
+        fetch(`/api/workflows/${workflowId}`)
             .then((res) => res.json())
             .then(setWorkflow)
             .catch(console.error);
-    }, [searchParams]);
+    }, [workflowId]);
 
 
     return (

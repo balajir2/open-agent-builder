@@ -2,6 +2,9 @@
  * MCP Resolver
  * Fetches MCP configurations from Convex at runtime
  * This ensures executors always use the latest configuration
+ *
+ * Supports OAuth: for servers with authType="oauth", fetches a valid
+ * access token (auto-refreshing if needed) and injects it as the auth token.
  */
 
 import { ConvexHttpClient } from "convex/browser";
@@ -19,9 +22,13 @@ const getConvexClient = () => {
 };
 
 /**
- * Resolve multiple MCP server IDs to their full configurations
+ * Resolve multiple MCP server IDs to their full configurations.
+ * For OAuth servers, injects a fresh access token.
+ *
+ * @param serverIds - Array of Convex mcpServers document IDs
+ * @param userId - Optional user ID for OAuth token resolution
  */
-export async function resolveMCPServers(serverIds: string[]): Promise<any[]> {
+export async function resolveMCPServers(serverIds: string[], userId?: string): Promise<any[]> {
   if (!serverIds || serverIds.length === 0) {
     return [];
   }
@@ -45,15 +52,44 @@ export async function resolveMCPServers(serverIds: string[]): Promise<any[]> {
     });
 
     // Transform to the format expected by executors
-    return servers.filter((s): s is NonNullable<typeof s> => !!s).map(server => ({
-      name: server.name,
-      url: server.url,
-      description: server.description,
-      authType: server.authType,
-      accessToken: server.accessToken,
-      availableTools: server.tools || [],
-      headers: server.headers,
-    }));
+    const resolved = await Promise.all(
+      servers.filter((s): s is NonNullable<typeof s> => !!s).map(async (server) => {
+        let accessToken = server.accessToken;
+
+        // For OAuth servers, get a valid access token (auto-refreshes if needed)
+        if (server.authType === "oauth" && userId) {
+          try {
+            const tokenResult = await convex.action(
+              api.mcpOAuthTokensActions.getValidAccessToken,
+              {
+                userId,
+                mcpServerId: server._id as Id<"mcpServers">,
+              }
+            );
+            if (tokenResult) {
+              accessToken = (tokenResult as any).accessToken;
+            } else {
+              console.warn(`[MCP Resolver] No valid OAuth token for server "${server.name}"`);
+            }
+          } catch (err) {
+            console.error(`[MCP Resolver] OAuth token error for "${server.name}":`, err);
+          }
+        }
+
+        return {
+          _id: server._id,
+          name: server.name,
+          url: server.url,
+          description: server.description,
+          authType: server.authType,
+          accessToken,
+          availableTools: server.tools || [],
+          headers: server.headers,
+        };
+      })
+    );
+
+    return resolved;
   } catch (error) {
     console.error('Error resolving MCP servers:', error);
     return [];

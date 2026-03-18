@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### MCP OAuth 2.0 Support - March 17, 2026
+
+#### Added
+- **MCP OAuth 2.0 Authentication** - New `oauth` auth type for MCP servers supporting OAuth 2.0 Authorization Code (with PKCE) and Client Credentials flows
+  - `convex/mcpOAuthTokens.ts` - Encrypted token storage (AES-256-GCM) with queries/mutations
+  - `convex/mcpOAuthTokensActions.ts` - Token exchange, refresh, and validation actions (Node.js runtime)
+  - `convex/mcpOAuthStates.ts` - CSRF/PKCE state management with 10-minute TTL and single-use enforcement
+  - `app/api/mcp/oauth/authorize/route.ts` - OAuth initiation endpoint
+  - `app/api/mcp/oauth/callback/route.ts` - OAuth callback handler
+- **Highspot MCP Server** - First OAuth-authenticated MCP integration
+  - Server URL: `https://mcp.highspot.com/mcp`
+  - 7 tools: `search_content`, `get_item_content`, `get_content_answer`, `get_content_recommendations`, `generate_pitch`, `get_deal_answer`, `lookup_deal`
+- **OAuth UI Flow** - Settings panel supports OAuth 2.0 configuration with popup-based authorization
+  - Configure Auth URL, Token URL, Client ID, Client Secret
+  - "Connect" button opens popup for user login
+  - Status indicator shows connection state (green = connected)
+
+#### Changed
+- `convex/schema.ts` - Added `mcpOAuthTokens` and `mcpOAuthStates` tables, `oauthConfig` field on `mcpServers`
+- `convex/mcpServers.ts` - Accepts `oauthConfig` in add/update, redacts secrets in responses
+- `lib/mcp/resolver.ts` - Injects fresh OAuth tokens during MCP server resolution
+- `lib/workflow/executors/agent.ts` - Passes `userId` for OAuth token resolution
+- `lib/api/execution-service.ts` - Includes `userId` in resolved API keys
+- `SettingsPanelSimple.tsx` - OAuth UI form with Connect button and popup flow
+
+#### Security
+- PKCE (S256) enforced on all authorization code flows
+- State parameter for CSRF protection (10-minute TTL, single-use)
+- All OAuth tokens encrypted with AES-256-GCM before storage
+- Client secrets encrypted before storage in Convex
+- No tokens exposed to browser — only status metadata returned
+- Token auto-refresh with 5-minute buffer before expiry
+
 ### Security & Auth Hardening - March 16, 2026
 
 #### Security (from prior agent)

@@ -696,6 +696,37 @@ a different dependency.
 
 ---
 
+## 4.1 MCP OAuth 2.0 Security (March 2026)
+
+**Date:** March 17, 2026
+
+OAuth 2.0 support was added for MCP server authentication, with the following security measures:
+
+### Token Storage Security
+- **AES-256-GCM Encryption** - All OAuth tokens (access, refresh) and client secrets encrypted before storage in Convex
+- **Per-Token IV** - Unique initialization vector per encrypted value
+- **Tables:** `mcpOAuthTokens` (tokens), `mcpOAuthStates` (ephemeral CSRF state)
+
+### Authorization Flow Security
+- **PKCE (S256)** - Proof Key for Code Exchange enforced on all authorization code flows, preventing authorization code interception
+- **CSRF State Parameter** - Random state value with 10-minute TTL and single-use enforcement (`convex/mcpOAuthStates.ts`)
+- **Popup-Based Flow** - Authorization happens in a popup window, callback handled server-side
+
+### Token Handling
+- **No Browser Exposure** - Tokens never sent to the client; only connection status metadata returned
+- **Auto-Refresh** - Tokens refreshed automatically with 5-minute buffer before expiry
+- **Server-Side Only** - Token exchange and refresh happen in Convex Node.js actions (`convex/mcpOAuthTokensActions.ts`)
+- **Client Secret Redaction** - `convex/mcpServers.ts` redacts `oauthConfig.clientSecret` in query responses
+
+### Files
+- `convex/mcpOAuthTokens.ts` - Encrypted token CRUD
+- `convex/mcpOAuthTokensActions.ts` - Token exchange, refresh, validation (Node.js runtime)
+- `convex/mcpOAuthStates.ts` - CSRF/PKCE state management
+- `app/api/mcp/oauth/authorize/route.ts` - OAuth initiation
+- `app/api/mcp/oauth/callback/route.ts` - Callback handler
+
+---
+
 ## 5. Security Testing Recommendations
 
 ### 5.1 Immediate Testing

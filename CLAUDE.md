@@ -683,9 +683,30 @@ Workflows auto-save after 1 second debounce using `useWorkflow` hook.
 MCP servers provide tools to agents (e.g., Firecrawl for web scraping):
 
 1. **Registry** - MCP servers stored in `convex/mcpServers`
-2. **Resolution** - `lib/mcp/resolver.ts` fetches available tools
+2. **Resolution** - `lib/mcp/resolver.ts` fetches available tools and injects OAuth tokens
 3. **Execution** - `lib/workflow/executors/mcp.ts` calls MCP tools
 4. **Agent Integration** - Agents can use MCP tools via `tools` property
+5. **OAuth Authentication** - MCP servers can use OAuth 2.0 (Authorization Code with PKCE or Client Credentials)
+
+**MCP Authentication Types:**
+- `none` - No authentication
+- `bearer` - Static bearer token
+- `api-key` - Static API key
+- `oauth` - OAuth 2.0 with automatic token refresh
+
+**OAuth 2.0 Flow:**
+- Users configure OAuth settings (Auth URL, Token URL, Client ID, Client Secret) in Settings UI
+- Click "Connect" to open popup-based authorization flow
+- Tokens stored encrypted (AES-256-GCM) in Convex `mcpOAuthTokens` table
+- Tokens auto-refresh with 5-minute buffer before expiry during workflow execution
+- PKCE (S256) enforced on authorization code flows, CSRF state parameter with 10-min TTL
+
+**Key OAuth Files:**
+- `convex/mcpOAuthTokens.ts` - Token storage queries/mutations
+- `convex/mcpOAuthTokensActions.ts` - Token exchange, refresh, validation (Node.js runtime)
+- `convex/mcpOAuthStates.ts` - CSRF/PKCE state management
+- `app/api/mcp/oauth/authorize/route.ts` - OAuth initiation
+- `app/api/mcp/oauth/callback/route.ts` - OAuth callback handler
 
 **All LLM Providers Support MCP & Tools:**
 - **Anthropic Claude** - Haiku 4.5, Sonnet 4.5, Opus 4.6 (1M context, Feb 2026)

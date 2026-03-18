@@ -32,6 +32,7 @@ export interface ResolvedApiKeys {
   scraperapi?: string;
   browserless?: string;
   gamma?: string;
+  userId?: string; // For OAuth MCP token resolution
 }
 
 export interface LangSmithConfig {
@@ -151,6 +152,8 @@ export async function resolveApiKeys(
     gamma:
       (userId ? await getToolApiKey('gamma-api', userId) : undefined) ??
       systemKeys.gamma,
+    // Pass userId through for OAuth MCP token resolution
+    userId,
   };
 }
 

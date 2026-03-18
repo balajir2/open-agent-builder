@@ -168,6 +168,64 @@ Agent: Here's a comprehensive summary based on my research...
 
 ---
 
+## MCP Authentication
+
+MCP servers support four authentication types:
+
+### Static Auth (Bearer / API Key / None)
+
+For servers that use static credentials. Configure the access token in Settings when adding the server.
+
+### OAuth 2.0
+
+For servers requiring OAuth 2.0 authentication (e.g., Highspot). Supports:
+
+- **Authorization Code with PKCE** - User-facing flows via popup
+- **Client Credentials** - Server-to-server flows
+
+**Setup:**
+1. Settings > MCP Servers > Add MCP Server
+2. Auth Type: **OAuth 2.0**
+3. Provide: Auth URL, Token URL, Client ID, Client Secret
+4. Click **Connect** to authorize via popup
+
+**How it works:**
+- Tokens are encrypted (AES-256-GCM) and stored in Convex `mcpOAuthTokens` table
+- During workflow execution, `lib/mcp/resolver.ts` injects a fresh token into the MCP request
+- Tokens auto-refresh with a 5-minute buffer before expiry
+- PKCE (S256) is enforced on all authorization code flows
+- CSRF state parameter with 10-minute TTL and single-use enforcement
+
+**Key Files:**
+- `convex/mcpOAuthTokens.ts` - Token storage
+- `convex/mcpOAuthTokensActions.ts` - Token exchange, refresh, validation
+- `convex/mcpOAuthStates.ts` - CSRF/PKCE state management
+- `app/api/mcp/oauth/authorize/route.ts` - OAuth initiation
+- `app/api/mcp/oauth/callback/route.ts` - Callback handler
+
+### Available OAuth MCP Servers
+
+#### Highspot
+
+Sales enablement platform with 7 tools:
+
+| Tool | Description |
+|------|-------------|
+| `search_content` | Search Highspot content library |
+| `get_item_content` | Retrieve specific content item |
+| `get_content_answer` | AI-powered content Q&A |
+| `get_content_recommendations` | Content recommendations |
+| `generate_pitch` | Generate sales pitch |
+| `get_deal_answer` | Deal-related Q&A |
+| `lookup_deal` | Look up deal information |
+
+**Connection:**
+- Server URL: `https://mcp.highspot.com/mcp`
+- Auth URL: `https://app.highspot.com/oauth2/v1/authorize`
+- Token URL: `https://app.highspot.com/auth/oauth2/v1/token`
+
+---
+
 ## MCP Server Configuration
 
 ### Global Registry

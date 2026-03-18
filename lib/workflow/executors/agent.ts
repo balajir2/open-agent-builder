@@ -50,7 +50,7 @@ export async function executeAgentNode(
     // 2. Resolve MCP server IDs to full configurations
     let mcpTools = migratedData.mcpTools || [];
     if (migratedData.mcpServerIds && migratedData.mcpServerIds.length > 0) {
-      mcpTools = await resolveMCPServers(migratedData.mcpServerIds);
+      mcpTools = await resolveMCPServers(migratedData.mcpServerIds, (apiKeys as any)?.userId);
     }
 
     // Filter out invalid MCP tool entries
