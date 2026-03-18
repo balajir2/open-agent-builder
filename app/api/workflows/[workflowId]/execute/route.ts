@@ -3,7 +3,7 @@ import { LangGraphExecutor } from '@/lib/workflow/langgraph';
 import { validateApiKey, createUnauthorizedResponse } from '@/lib/api/auth';
 import { checkRateLimit, getRateLimitKey, RATE_LIMITS } from '@/src/lib/api/distributed-rate-limiter';
 import { WorkflowExecutionSchema, WorkflowIdSchema, safeValidate, createValidationErrorResponse } from '@/lib/api/validation-schemas';
-import { getAuthenticatedConvexClient, api } from '@/lib/convex/client';
+import { getAuthenticatedConvexClient, getConvexClient, api } from '@/lib/convex/client';
 import { resolveApiKeys, resolveLangSmithConfig } from '@/lib/api/execution-service';
 
 export const dynamic = 'force-dynamic';
@@ -44,32 +44,64 @@ export async function POST(
     }
 
     const body = await request.json();
-
-    // SECURITY FIX: Validate request body with Zod
-    const validation = safeValidate(WorkflowExecutionSchema, body);
-    if (!validation.success) {
-      return NextResponse.json(
-        createValidationErrorResponse(validation.error || 'Invalid request body'),
-        { status: 400 }
-      );
-    }
-
-    const { input, workflow } = validation.data!;
+    const input = body?.input;
 
     console.log('API: Executing workflow', workflowId, 'with input:', input);
 
+    // Look up workflow by ID — support both session and API key auth
+    const isApiKeyAuth = authResult.authType === 'api-key';
+    let convex: any;
+    let workflowDoc: any = null;
+
+    try {
+      convex = await getAuthenticatedConvexClient();
+    } catch {
+      convex = getConvexClient();
+    }
+
+    if (isApiKeyAuth) {
+      const executionSecret = process.env.CONVEX_TEST_SECRET;
+      if (executionSecret) {
+        workflowDoc = await convex.action(api.workflows.getWorkflowForExecution, {
+          customId: workflowId,
+          secret: executionSecret,
+        });
+        if (!workflowDoc && workflowId.startsWith('j')) {
+          workflowDoc = await convex.action(api.workflows.getWorkflowForExecution, {
+            convexId: workflowId,
+            secret: executionSecret,
+          });
+        }
+      }
+    } else {
+      workflowDoc = await convex.query(api.workflows.getWorkflowByCustomId, {
+        customId: workflowId,
+      });
+      if (!workflowDoc && workflowId.startsWith('j')) {
+        try {
+          workflowDoc = await convex.query(api.workflows.getWorkflow, {
+            id: workflowId as any,
+          });
+        } catch (e) {
+          // Not a valid Convex ID
+        }
+      }
+    }
+
+    // Also accept workflow in request body (legacy support)
+    const workflow = workflowDoc || body?.workflow;
+
     if (!workflow || !workflow.nodes) {
       return NextResponse.json(
-        { error: 'Workflow data is required in request body' },
-        { status: 400 }
+        { error: 'Workflow not found' },
+        { status: 404 }
       );
     }
 
     console.log('API: Loaded workflow:', workflow.name);
 
-    // Add required fields if they're missing (for workflows coming from request body)
     const workflowWithTimestamps: any = {
-      id: workflow.id || workflowId,
+      id: workflow.customId || workflow.id || workflowId,
       name: workflow.name || 'Untitled Workflow',
       nodes: workflow.nodes || [],
       edges: workflow.edges || [],
@@ -84,7 +116,6 @@ export async function POST(
 
     // Get API keys using shared two-tier resolution
     const userId = authResult.userId;
-    const convex = await getAuthenticatedConvexClient();
     const systemKeys = await convex.action(api.systemApiKeys.getAllSystemApiKeys);
 
     // Resolve LangSmith config without mutating process.env per-request
