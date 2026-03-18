@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### API Key Auth & OAuth Fixes - March 18, 2026
+
+#### Fixed
+- **API Key Authentication for Execute Routes** - Both `/api/workflows/[workflowId]/execute` and `/api/workflows/[workflowId]/execute-stream` now fully support API key authentication via `Authorization: Bearer <token>`. Previously, only session-based authentication worked reliably for these routes. The routes now detect auth type and use `getWorkflowForExecution` Convex action for the API key auth path.
+- **OAuth Encryption Fix** - OAuth `authorize` and `callback` routes no longer import `convex/lib/encryption.ts` (which requires `ENCRYPTION_KEY` from Convex env). Code verifier and client secret are now stored as plain text in short-lived OAuth state (10-minute TTL, single-use). Encryption happens server-side in Convex actions during token exchange, where `ENCRYPTION_KEY` is available.
+- **MCP Lifecycle Test CI Fix** - `tests/mcp-lifecycle.spec.ts` Step 3 now skips gracefully when the dev server is not running (CI environment), preventing false failures in automated pipelines.
+
+#### Added
+- **`workflows.getWorkflowForExecution` Convex Action** - New public action that validates requests via `CONVEX_TEST_SECRET` and looks up workflows by `customId` or Convex document ID. Used by execute routes for the API key authentication path.
+
+#### Changed
+- **`CONVEX_TEST_SECRET` Environment Variable** - Must now be set in both Convex environment (`npx convex env set`) AND Vercel environment variables for API key-based workflow execution to work in production.
+
 ### MCP OAuth 2.0 Support - March 17, 2026
 
 #### Added

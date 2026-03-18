@@ -718,12 +718,20 @@ OAuth 2.0 support was added for MCP server authentication, with the following se
 - **Server-Side Only** - Token exchange and refresh happen in Convex Node.js actions (`convex/mcpOAuthTokensActions.ts`)
 - **Client Secret Redaction** - `convex/mcpServers.ts` redacts `oauthConfig.clientSecret` in query responses
 
+### OAuth Encryption Architecture (Updated March 2026)
+
+The OAuth `authorize` and `callback` API routes no longer import `convex/lib/encryption.ts` (which requires `ENCRYPTION_KEY` from Convex environment variables, unavailable in Next.js API routes). Instead:
+
+- **OAuth state** (`mcpOAuthStates` table) stores code verifier and client secret as **plain text** in short-lived records (10-minute TTL, single-use)
+- **Encryption happens server-side** in Convex actions (`mcpOAuthTokensActions.ts`) during token exchange, where `ENCRYPTION_KEY` is available via `process.env`
+- This eliminates the dependency on `ENCRYPTION_KEY` in Next.js API routes while maintaining the same security posture for long-lived token storage
+
 ### Files
 - `convex/mcpOAuthTokens.ts` - Encrypted token CRUD
 - `convex/mcpOAuthTokensActions.ts` - Token exchange, refresh, validation (Node.js runtime)
 - `convex/mcpOAuthStates.ts` - CSRF/PKCE state management
-- `app/api/mcp/oauth/authorize/route.ts` - OAuth initiation
-- `app/api/mcp/oauth/callback/route.ts` - Callback handler
+- `app/api/mcp/oauth/authorize/route.ts` - OAuth initiation (no encryption dependency)
+- `app/api/mcp/oauth/callback/route.ts` - Callback handler (no encryption dependency)
 
 ---
 

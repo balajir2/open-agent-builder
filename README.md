@@ -570,8 +570,9 @@ Add custom MCP servers in **Settings → MCP Registry**:
    - `CONVEX_DEPLOYMENT` (Convex deployment ID)
    - Azure AD authentication keys (`AUTH_MICROSOFT_ID`, `AUTH_MICROSOFT_SECRET`, `AUTH_MICROSOFT_TENANT_ID`)
    - `AUTH_SECRET` (NextAuth session secret)
+   - `CONVEX_TEST_SECRET` (required for API key authentication on execute routes - must match the value set in Convex env)
 
-   > **Note:** All API keys (LLM providers, tools) go in **Convex environment**, not Vercel. See [API Key Architecture](#two-tier-api-key-architecture) in CLAUDE.md.
+   > **Note:** All API keys (LLM providers, tools) go in **Convex environment**, not Vercel. See [API Key Architecture](#two-tier-api-key-architecture) in CLAUDE.md. The exception is `CONVEX_TEST_SECRET`, which must be in **both** Convex env and Vercel env.
 
 4. **Deploy Convex to production:**
    ```bash
@@ -595,6 +596,7 @@ Add custom MCP servers in **Settings → MCP Registry**:
 
 **In Convex Environment (all API keys):**
 - `ENCRYPTION_KEY` - AES-256 encryption for user API keys (32 bytes base64)
+- `CONVEX_TEST_SECRET` - Required for API key authentication on execute routes (must also be set in Vercel env for production)
 - `FIRECRAWL_API_KEY` - Web scraping
 - `E2B_API_KEY` - Secure sandboxed code execution (required for transform nodes)
 - `ANTHROPIC_API_KEY` - Claude provider (Haiku 4.5, Sonnet 4.5, Opus 4.6)
@@ -635,7 +637,7 @@ Open Agent Builder implements enterprise-grade security measures with comprehens
 **Authentication & Authorization:**
 - ✅ **Ownership Checks** - Users can only modify their own workflows/MCP servers
 - ✅ **JWT Authentication** - Azure AD authentication via NextAuth.js for all protected routes
-- ✅ **API Key Authentication** - Optional API key auth for programmatic access
+- ✅ **API Key Authentication** - Bearer token auth for execute and execute-stream routes, validated via `getWorkflowForExecution` Convex action
 - ✅ **AES-256-GCM Encryption** - User API keys encrypted at rest
 
 **Network Security:**

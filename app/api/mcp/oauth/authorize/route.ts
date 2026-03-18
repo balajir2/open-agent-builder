@@ -83,6 +83,10 @@ export async function POST(request: NextRequest) {
     if (scopes) {
       authParams.set("scope", scopes);
     }
+    // RFC 8707: Resource Indicators — required by some providers (e.g., Highspot)
+    if (mcpUrl) {
+      authParams.set("resource", mcpUrl);
+    }
 
     const fullAuthUrl = `${authUrl}?${authParams.toString()}`;
 

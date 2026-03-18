@@ -22,6 +22,12 @@ curl -H "Authorization: Bearer <your-api-key>" \
 2. Click "Generate New Key"
 3. Copy key (shown once)
 
+**How API Key Auth Works on Execute Routes:**
+- The execute and execute-stream routes detect whether the request uses session auth or API key auth
+- For API key auth, the route validates the key and then uses the `workflows.getWorkflowForExecution` Convex action to retrieve the workflow
+- This action validates requests via `CONVEX_TEST_SECRET` and supports lookup by both `customId` and Convex document ID
+- **Requirement:** `CONVEX_TEST_SECRET` must be set in both Convex environment and Vercel environment for production API key execution to work
+
 > **Note:** All CRUD endpoints (`GET /api/workflows`, `POST /api/workflows`, etc.) now require authentication. Unauthenticated requests return 401.
 
 ## Endpoints

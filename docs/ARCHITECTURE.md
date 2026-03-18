@@ -561,20 +561,24 @@ MCP servers can use OAuth 2.0 for authentication, enabling integration with serv
 **Security:**
 - PKCE (S256) enforced on authorization code flows
 - CSRF state parameter (10-minute TTL, single-use)
-- All tokens and client secrets encrypted at rest
+- All tokens and client secrets encrypted at rest (in Convex actions during token exchange)
+- OAuth authorize/callback routes store code verifier and client secret as plain text in short-lived OAuth state (10-min TTL, single-use); encryption happens server-side in Convex actions where `ENCRYPTION_KEY` is available
 - No tokens exposed to browser — only status metadata
 
 **Key Tables:**
 - `mcpOAuthTokens` - Encrypted access/refresh tokens per user per server
-- `mcpOAuthStates` - CSRF state and PKCE code verifier (ephemeral)
+- `mcpOAuthStates` - CSRF state and PKCE code verifier (ephemeral, plain text, short-lived)
 
 ### Programmatic API Access
 
 Users can generate API keys for programmatic access:
 - API keys stored in Convex `apiKeys` table
-- Used for `/api/workflows/[id]/execute*` endpoints
-- Bypasses NextAuth authentication
-- Useful for integrations and automation
+- Used for `/api/workflows/[id]/execute` and `/api/workflows/[id]/execute-stream` endpoints
+- Pass via `Authorization: Bearer <api-key>` header
+- Execute routes detect auth type: session auth uses the authenticated Convex client, API key auth uses the `workflows.getWorkflowForExecution` Convex action
+- The `getWorkflowForExecution` action validates requests via `CONVEX_TEST_SECRET` and looks up workflows by `customId` or Convex document ID
+- **Requires** `CONVEX_TEST_SECRET` set in both Convex environment and Vercel environment for production
+- Useful for integrations, automation, and external system triggers
 
 ### Backend Authentication Enforcement (March 2026)
 

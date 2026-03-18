@@ -294,6 +294,7 @@ open-agent-builder/
 5. **Convex** receives authenticated requests with `userId` from session
 6. **Convex Backend** - All queries/mutations enforce authentication via `requireAuth()` which throws if `ctx.auth.getUserIdentity()` returns null
 7. **API Routes** can use API key authentication for programmatic access
+8. **Execute Routes** (`/api/workflows/{id}/execute` and `/api/workflows/{id}/execute-stream`) detect auth type: session auth uses the authenticated Convex client, while API key auth (Bearer token) uses the `workflows.getWorkflowForExecution` Convex action validated via `CONVEX_TEST_SECRET`
 
 **Session Management:**
 - **Token Lifetime**: Azure AD tokens expire after 1 hour
@@ -304,7 +305,8 @@ open-agent-builder/
 
 **Important:**
 - User-facing routes require Azure AD authentication
-- `/api/workflows/{id}/execute*` routes support both session and API key auth
+- `/api/workflows/{id}/execute*` routes support both session and API key auth (Bearer token in `Authorization` header)
+- API key auth path uses `getWorkflowForExecution` Convex action, which requires `CONVEX_TEST_SECRET` in both Convex env and Vercel env
 - MCP server configurations are user-scoped
 - Sessions are encrypted using `AUTH_SECRET` environment variable
 - Users must sign out/in once after token refresh implementation to get refresh tokens
@@ -1406,7 +1408,7 @@ These keys should be stored in **Convex environment variables**, NOT in `.env.lo
 # Set system-level API keys in Convex (available to all users as fallback)
 npx convex env set ENCRYPTION_KEY "<32-byte-base64-key>"
 npx convex env set AUTH_MICROSOFT_ID "your-azure-app-id"
-npx convex env set CONVEX_TEST_SECRET "<test-secret-key>"
+npx convex env set CONVEX_TEST_SECRET "<test-secret-key>"  # Required for API key auth on execute routes; must also be set in Vercel env for production
 
 # LLM Providers (system fallback - users can add their own in UI)
 npx convex env set ANTHROPIC_API_KEY "sk-ant-..."
