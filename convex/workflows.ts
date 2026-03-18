@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { query, mutation, internalQuery } from "./_generated/server";
+import { query, mutation, internalQuery, action } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 /**
  * SECURITY: All public queries/mutations enforce authentication and ownership.
@@ -219,6 +220,34 @@ export const getWorkflowByCustomIdInternal = internalQuery({
       .query("workflows")
       .withIndex("by_customId", (q: any) => q.eq("customId", customId))
       .first();
+  },
+});
+
+// Public action for API key-authenticated workflow lookups (execute-stream route)
+// Validates via CONVEX_TEST_SECRET to prevent unauthorized access
+export const getWorkflowForExecution = action({
+  args: {
+    customId: v.optional(v.string()),
+    convexId: v.optional(v.string()),
+    secret: v.string(),
+  },
+  handler: async (ctx, args): Promise<any> => {
+    const testSecret = process.env.CONVEX_TEST_SECRET;
+    if (!testSecret || args.secret !== testSecret) {
+      throw new Error("Unauthorized: invalid execution secret");
+    }
+
+    if (args.customId) {
+      return await ctx.runQuery(internal.workflows.getWorkflowByCustomIdInternal, {
+        customId: args.customId,
+      });
+    }
+    if (args.convexId) {
+      return await ctx.runQuery(internal.workflows.getWorkflowInternal, {
+        id: args.convexId as any,
+      });
+    }
+    return null;
   },
 });
 

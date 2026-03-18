@@ -114,21 +114,46 @@ export async function POST(
           return;
         }
 
-        convex = await getAuthenticatedConvexClient();
+        // Use authenticated client for session-based auth, plain client for API key auth
+        const isApiKeyAuth = authResult.authType === 'api-key';
+        try {
+          convex = await getAuthenticatedConvexClient();
+        } catch {
+          // API key auth — no NextAuth session, use plain client
+          convex = getConvexClient();
+        }
 
-        // Look up workflow - try customId first, then try as Convex ID
-        let workflowDoc = await convex.query(api.workflows.getWorkflowByCustomId, {
-          customId: workflowId,
-        });
+        // Look up workflow
+        let workflowDoc: any = null;
 
-        // If not found by customId and looks like Convex ID, try direct lookup
-        if (!workflowDoc && workflowId.startsWith('j')) {
-          try {
-            workflowDoc = await convex.query(api.workflows.getWorkflow, {
-              id: workflowId as any,
+        if (isApiKeyAuth) {
+          // API key auth: use action that validates via CONVEX_TEST_SECRET
+          const executionSecret = process.env.CONVEX_TEST_SECRET;
+          if (executionSecret) {
+            workflowDoc = await convex.action(api.workflows.getWorkflowForExecution, {
+              customId: workflowId,
+              secret: executionSecret,
             });
-          } catch (e) {
-            // Not a valid Convex ID
+            if (!workflowDoc && workflowId.startsWith('j')) {
+              workflowDoc = await convex.action(api.workflows.getWorkflowForExecution, {
+                convexId: workflowId,
+                secret: executionSecret,
+              });
+            }
+          }
+        } else {
+          // Session auth: use authenticated queries
+          workflowDoc = await convex.query(api.workflows.getWorkflowByCustomId, {
+            customId: workflowId,
+          });
+          if (!workflowDoc && workflowId.startsWith('j')) {
+            try {
+              workflowDoc = await convex.query(api.workflows.getWorkflow, {
+                id: workflowId as any,
+              });
+            } catch (e) {
+              // Not a valid Convex ID
+            }
           }
         }
 
