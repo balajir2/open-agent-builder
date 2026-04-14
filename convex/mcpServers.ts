@@ -124,6 +124,44 @@ export const getServerInternal = internalQuery({
   },
 });
 
+/**
+ * Resolve MCP servers for workflow execution (server-side only).
+ * Uses internal queries to bypass auth (caller passes userId).
+ * Returns configs with ownership check but without requiring an auth token on the client.
+ */
+export const getServersForExecution = action({
+  args: {
+    userId: v.string(),
+    ids: v.array(v.id("mcpServers")),
+  },
+  handler: async (ctx, { userId, ids }): Promise<Array<{
+    _id: string;
+    name: string;
+    url: string;
+    description?: string;
+    authType: string;
+    tools: string[];
+    headers?: any;
+  }>> => {
+    const servers: any[] = await Promise.all(
+      ids.map((id: any) => ctx.runQuery(internal.mcpServers.getServerInternal, { id }))
+    );
+
+    // Filter to only servers owned by the user, redact secrets
+    return servers
+      .filter((s: any): s is NonNullable<typeof s> => !!s && s.userId === userId)
+      .map((server: any) => ({
+        _id: server._id,
+        name: server.name,
+        url: server.url,
+        description: server.description,
+        authType: server.authType,
+        tools: server.tools || [],
+        headers: server.headers,
+      }));
+  },
+});
+
 // Add a new MCP server — ownership enforced via auth
 export const addMCPServer = mutation({
   args: {

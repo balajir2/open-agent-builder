@@ -1,7 +1,7 @@
 # Highspot MCP Integration Plan
 
-**Last Updated:** March 17, 2026
-**Status:** In Progress (OAuth infrastructure complete)
+**Last Updated:** April 14, 2026
+**Status:** Complete (OAuth connection working end-to-end)
 **Author:** AI-Assisted Planning
 
 ## Overview
@@ -25,13 +25,15 @@ Once integrated, agents in Open Agent Builder will be able to autonomously searc
 
 - **Highspot API**: REST v0.5, OAuth 2.0 authentication, JSON responses
 - **Official MCP Server**: Highspot now provides `https://mcp.highspot.com/mcp` with 7 tools
-- **OAuth Infrastructure**: Open Agent Builder now has native MCP OAuth 2.0 support (Authorization Code with PKCE, Client Credentials, encrypted token storage, auto-refresh)
+- **OAuth Infrastructure**: Open Agent Builder has native MCP OAuth 2.0 support (Authorization Code with PKCE, Client Credentials, encrypted token storage, auto-refresh)
+- **RFC 8707 Compliance**: OAuth `resource` parameter sent on authorization, token exchange, and refresh requests (required by Highspot)
+- **Connection Testing**: Test-connection endpoint retrieves OAuth tokens from Convex for OAuth-type servers
 - **Community MCP Server**: [dmiyamasu/mcp-highspot.com](https://github.com/dmiyamasu/mcp-highspot.com) - early-stage, 6 commits, minimal documentation, not production-ready
 - **Python SDK (Unofficial)**: [jeffshurtliff/highspot](https://github.com/jeffshurtliff/highspot) - available for reference
 
 ### What's Already Built
 
-With the MCP OAuth 2.0 infrastructure now in place, Highspot integration no longer requires a custom MCP wrapper. Users can connect directly to Highspot's official MCP server:
+The Highspot integration is fully working end-to-end. Users connect directly to Highspot's official MCP server:
 
 1. **Settings > MCP Servers > Add MCP Server**
 2. Auth Type: **OAuth 2.0**
@@ -40,14 +42,23 @@ With the MCP OAuth 2.0 infrastructure now in place, Highspot integration no long
 5. Token URL: `https://app.highspot.com/auth/oauth2/v1/token`
 6. Client ID / Secret from Highspot Developer Settings
 7. Click **Connect** to authorize
+8. Click **Test** to verify connection and discover tools
 
 Available tools: `search_content`, `get_item_content`, `get_content_answer`, `get_content_recommendations`, `generate_pitch`, `get_deal_answer`, `lookup_deal`
+
+### Issues Resolved (April 2026)
+
+| Issue | Root Cause | Fix |
+|---|---|---|
+| `AuthorizationCodeGrant: resource mismatch` | RFC 8707 `resource` parameter missing from token exchange request | Added `resource` to `exchangeCodeForTokens`, `refreshAccessToken`, `clientCredentialsGrant` |
+| "Authentication failed - check access token" on Test | Test endpoint didn't retrieve OAuth tokens from Convex | `test-mcp-connection` now calls `getValidAccessToken` for OAuth servers |
+| OAuth credentials storage | N/A (already correct) | OAuth tokens encrypted (AES-256-GCM) in Convex `mcpOAuthTokens` table; client secrets encrypted in `mcpServers.oauthConfig` |
 
 ## Architecture
 
 ### Integration Approach
 
-**Update (March 2026):** With native MCP OAuth 2.0 support and Highspot's official MCP server, a custom wrapper is no longer required for the primary integration. Users connect directly to `https://mcp.highspot.com/mcp` using OAuth 2.0 credentials. The custom wrapper approach below remains valid for advanced use cases (custom tools, caching, aggregation).
+**Update (April 2026):** Highspot integration is complete. Users connect directly to Highspot's official MCP server at `https://mcp.highspot.com/mcp` using OAuth 2.0 credentials. RFC 8707 resource parameter support ensures compliance with Highspot's authorization server. The custom wrapper approach below remains valid for advanced use cases (custom tools, caching, aggregation).
 
 **Original Plan:** Build a custom MCP server that wraps Highspot's REST API and deploy it as a standalone service.
 

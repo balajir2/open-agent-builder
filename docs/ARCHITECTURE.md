@@ -561,9 +561,11 @@ MCP servers can use OAuth 2.0 for authentication, enabling integration with serv
 **Security:**
 - PKCE (S256) enforced on authorization code flows
 - CSRF state parameter (10-minute TTL, single-use)
+- RFC 8707 `resource` parameter included on authorization, token exchange, and refresh requests
 - All tokens and client secrets encrypted at rest (in Convex actions during token exchange)
 - OAuth authorize/callback routes store code verifier and client secret as plain text in short-lived OAuth state (10-min TTL, single-use); encryption happens server-side in Convex actions where `ENCRYPTION_KEY` is available
 - No tokens exposed to browser — only status metadata
+- Connection testing retrieves OAuth tokens server-side from Convex (never sent from client)
 
 **Key Tables:**
 - `mcpOAuthTokens` - Encrypted access/refresh tokens per user per server

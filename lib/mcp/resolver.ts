@@ -46,15 +46,21 @@ export async function resolveMCPServers(serverIds: string[], userId?: string): P
   }
 
   try {
-    // Fetch server configurations from Convex
-    const servers = await convex.query(api.mcpServers.getMCPServersByIds, {
-      ids: serverIds as Id<"mcpServers">[],
-    });
+    // Fetch server configurations via action (doesn't require auth token on client).
+    // The action uses internal queries and enforces ownership via userId param.
+    const servers = userId
+      ? await convex.action(api.mcpServers.getServersForExecution, {
+          userId,
+          ids: serverIds as Id<"mcpServers">[],
+        }) as any[]
+      : await convex.query(api.mcpServers.getMCPServersByIds, {
+          ids: serverIds as Id<"mcpServers">[],
+        });
 
     // Transform to the format expected by executors
     const resolved = await Promise.all(
       servers.filter((s): s is NonNullable<typeof s> => !!s).map(async (server) => {
-        let accessToken = server.accessToken;
+        let accessToken: string | undefined;
 
         // For OAuth servers, get a valid access token (auto-refreshes if needed)
         if (server.authType === "oauth" && userId) {

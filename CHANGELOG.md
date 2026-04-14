@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### MCP OAuth RFC 8707 & Connection Testing - April 14, 2026
+
+#### Fixed
+- **OAuth Resource Parameter (RFC 8707)** - Highspot MCP server (and other RFC 8707-compliant servers) rejected token exchange with `resource mismatch` error. The `resource` parameter was sent during the authorization request but missing from the token exchange, refresh, and client credentials requests. All three OAuth grant handlers (`exchangeCodeForTokens`, `refreshAccessToken`, `clientCredentialsGrant`) now include the `resource` parameter when provided, and `getValidAccessToken` passes the server URL as `resource` during auto-refresh.
+- **OAuth MCP Connection Testing** - Testing an OAuth-authenticated MCP server (e.g., Highspot) always returned "Authentication failed - check access token" because the test-mcp-connection endpoint only supported static bearer tokens, not OAuth. The endpoint now retrieves stored OAuth access tokens from Convex via `getValidAccessToken` when `authType` is `"oauth"` and `mcpServerId` is provided.
+- **Frontend OAuth Test Context** - All four call sites in `SettingsPanelSimple.tsx` that invoke `/api/test-mcp-connection` now pass `mcpServerId` and `authType` so OAuth servers authenticate correctly during connection testing.
+
+#### Changed
+- `convex/mcpOAuthTokensActions.ts` - Added optional `resource` arg to `exchangeCodeForTokens`, `refreshAccessToken`, and `clientCredentialsGrant` actions
+- `app/api/mcp/oauth/callback/route.ts` - Passes `mcpUrl` as `resource` to token exchange
+- `app/api/test-mcp-connection/route.ts` - Retrieves OAuth tokens from Convex for OAuth-type MCP servers
+- `components/app/(home)/sections/workflow-builder/SettingsPanelSimple.tsx` - Passes `mcpServerId` and `authType` to all test-connection calls
+- `convex/tsconfig.json` - Added `ignoreDeprecations: "6.0"` to silence `baseUrl` deprecation warning for TypeScript 7.0
+
 ### API Key Auth & OAuth Fixes - March 18, 2026
 
 #### Fixed

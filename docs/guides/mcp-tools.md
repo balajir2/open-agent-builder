@@ -195,13 +195,16 @@ For servers requiring OAuth 2.0 authentication (e.g., Highspot). Supports:
 - Tokens auto-refresh with a 5-minute buffer before expiry
 - PKCE (S256) is enforced on all authorization code flows
 - CSRF state parameter with 10-minute TTL and single-use enforcement
+- RFC 8707 `resource` parameter included on authorization, token exchange, and refresh requests (required by servers like Highspot)
+- Connection testing retrieves OAuth tokens from Convex server-side (tokens never sent from client)
 
 **Key Files:**
 - `convex/mcpOAuthTokens.ts` - Token storage
-- `convex/mcpOAuthTokensActions.ts` - Token exchange, refresh, validation
+- `convex/mcpOAuthTokensActions.ts` - Token exchange, refresh, validation (with RFC 8707 resource support)
 - `convex/mcpOAuthStates.ts` - CSRF/PKCE state management
-- `app/api/mcp/oauth/authorize/route.ts` - OAuth initiation
-- `app/api/mcp/oauth/callback/route.ts` - Callback handler
+- `app/api/mcp/oauth/authorize/route.ts` - OAuth initiation (sends resource parameter)
+- `app/api/mcp/oauth/callback/route.ts` - Callback handler (passes resource to token exchange)
+- `app/api/test-mcp-connection/route.ts` - Connection testing (retrieves OAuth tokens from Convex)
 
 ### Available OAuth MCP Servers
 
