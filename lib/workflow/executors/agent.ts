@@ -231,40 +231,16 @@ export async function executeAgentNode(
           console.warn('⚠️ Arcade tools detected in MCP config - these will be skipped');
         }
 
-        const mcpServers = realMcpTools
-          .map((mcp: any) => {
-            const url = mcp.url && mcp.url.includes('{FIRECRAWL_API_KEY}')
-              ? mcp.url.replace('{FIRECRAWL_API_KEY}', encodeURIComponent(apiKeys.firecrawl || ''))
-              : (mcp.url || '');
-
-            // Validate that we have required fields
-            if (!url || !mcp.name) {
-              console.warn(`⚠️ Skipping invalid MCP server: ${mcp.name || 'unnamed'} - missing URL or name`);
-              return null;
-            }
-
-            const server: any = {
-              type: 'url' as const,
-              url: url,
-              name: mcp.name,
-            };
-
-            // Only include authorization_token if it exists (some MCP servers don't require auth)
-            if (mcp.accessToken) {
-              server.authorization_token = mcp.accessToken;
-            }
-
-            return server;
-          })
-          .filter(Boolean)
-          .filter((s: any) => !s.name.toLowerCase().includes('firecrawl'));
+        // Use manual tool calling for ALL MCP servers instead of Anthropic's native
+        // mcp_servers connector. Native MCP has compatibility issues with servers that
+        // return large tool definitions (e.g. Highspot's tools/list > 73K chars).
+        // Manual calling gives full control over auth, error handling, and parsing.
+        const mcpServers: any[] = [];
 
         let useManualToolCalling = false;
         let anthropicError: any = null;
 
-        const manualMcpTools = flattenedMcpTools.filter((t: any) =>
-          t.name.includes('firecrawl') || t.serverName?.toLowerCase().includes('firecrawl')
-        );
+        const manualMcpTools = flattenedMcpTools;
 
         const finalTools = [
           ...standardTools.map(t => {
