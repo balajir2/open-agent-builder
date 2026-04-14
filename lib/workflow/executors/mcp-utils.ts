@@ -31,8 +31,8 @@ export function unwrapMCPResponse(response: any, serverName: string = 'MCP'): an
  * Convert MCP tool definition to OpenAI tool format
  */
 export function convertMcpToOpenAiTool(mcp: any) {
-    // Support both 'schema' and 'input_schema' (AdarshMCP uses input_schema)
-    const schema = mcp.schema || mcp.input_schema || {};
+    // Support all variants: MCP spec uses 'inputSchema', some use 'input_schema' or 'schema'
+    const schema = mcp.inputSchema || mcp.schema || mcp.input_schema || {};
 
     // Clean properties: remove unsupported fields like 'examples', 'default', 'arguments'
     // Google Gemini API only supports: type, description, enum, items, properties, required
