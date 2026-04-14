@@ -25,6 +25,7 @@ export const exchangeCodeForTokens = action({
     clientSecret: v.optional(v.string()),
     codeVerifier: v.string(),
     redirectUri: v.string(),
+    resource: v.optional(v.string()), // RFC 8707: Resource Indicator (must match authorize request)
   },
   handler: async (ctx, args) => {
     const clientSecret = args.clientSecret;
@@ -38,6 +39,10 @@ export const exchangeCodeForTokens = action({
     });
     if (clientSecret) {
       body.set("client_secret", clientSecret);
+    }
+    // RFC 8707: resource must match the value sent in the authorization request
+    if (args.resource) {
+      body.set("resource", args.resource);
     }
 
     const response = await fetch(args.tokenUrl, {
@@ -90,6 +95,7 @@ export const refreshAccessToken = internalAction({
     tokenUrl: v.string(),
     clientId: v.string(),
     encryptedClientSecret: v.optional(v.string()),
+    resource: v.optional(v.string()), // RFC 8707: Resource Indicator
   },
   handler: async (ctx, args) => {
     const tokens: any = await ctx.runQuery(internal.mcpOAuthTokens.getEncryptedTokens, {
@@ -113,6 +119,10 @@ export const refreshAccessToken = internalAction({
     });
     if (clientSecret) {
       body.set("client_secret", clientSecret);
+    }
+    // RFC 8707: include resource on refresh requests
+    if (args.resource) {
+      body.set("resource", args.resource);
     }
 
     const response = await fetch(args.tokenUrl, {
@@ -196,6 +206,7 @@ export const getValidAccessToken = action({
           tokenUrl: server.oauthConfig.tokenUrl,
           clientId: server.oauthConfig.clientId,
           encryptedClientSecret: server.oauthConfig.encryptedClientSecret,
+          resource: server.url, // RFC 8707: MCP server URL as resource indicator
         });
         return refreshed;
       } catch (err) {
@@ -218,6 +229,7 @@ export const clientCredentialsGrant = internalAction({
     clientId: v.string(),
     encryptedClientSecret: v.string(),
     scopes: v.optional(v.string()),
+    resource: v.optional(v.string()), // RFC 8707: Resource Indicator
   },
   handler: async (ctx, args) => {
     const clientSecret = decrypt(args.encryptedClientSecret);
@@ -229,6 +241,10 @@ export const clientCredentialsGrant = internalAction({
     });
     if (args.scopes) {
       body.set("scope", args.scopes);
+    }
+    // RFC 8707: include resource indicator
+    if (args.resource) {
+      body.set("resource", args.resource);
     }
 
     const response = await fetch(args.tokenUrl, {

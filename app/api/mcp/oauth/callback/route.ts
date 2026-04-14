@@ -87,6 +87,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Exchange code for tokens via Convex action (handles encryption)
+    // RFC 8707: pass mcpUrl as resource so it matches the authorize request
     const tokenResult: any = await (convex as any).action(api.mcpOAuthTokensActions.exchangeCodeForTokens, {
       userId,
       mcpServerId: serverId,
@@ -96,6 +97,7 @@ export async function GET(request: NextRequest) {
       clientSecret: oauthConfig.clientSecret,
       codeVerifier,
       redirectUri: oauthConfig.redirectUri,
+      resource: oauthConfig.mcpUrl || undefined,
     });
 
     // Update MCP server connection status and store encrypted OAuth config
