@@ -462,6 +462,8 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                                 url: server.url,
                                 authToken: server.accessToken,
                                 headers: server.headers,
+                                mcpServerId: server._id,
+                                authType: server.authType,
                               }),
                             });
 
@@ -616,6 +618,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                       url: data.url,
                       authToken: data.accessToken,
                       headers: data.headers,
+                      authType: data.authType,
                     }),
                   });
 
@@ -724,6 +727,8 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                       url: server.url,
                       authToken: server.accessToken,
                       headers: server.headers,
+                      mcpServerId: server._id,
+                      authType: server.authType,
                     }),
                   });
 
@@ -1283,6 +1288,8 @@ function AddMCPModal({ isOpen, onClose, onSave, editingServer }: AddMCPModalProp
                     body: JSON.stringify({
                       url: formData.url,
                       authToken: formData.accessToken,
+                      mcpServerId: editingServer?._id,
+                      authType: formData.authType,
                     }),
                   });
 

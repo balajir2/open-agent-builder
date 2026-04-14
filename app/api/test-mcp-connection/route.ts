@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/auth';
+import { getConvexClient } from '@/lib/convex/client';
+import { api } from '@/convex/_generated/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +13,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { url, authToken, headers: customHeaders } = body;
+    const { url, authToken, headers: customHeaders, mcpServerId, authType } = body;
 
     if (!url) {
       return NextResponse.json(
@@ -58,9 +62,41 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Add Bearer token if provided (legacy support)
-    if (authToken && !customHeaders) {
-      // Handle environment variable substitution for access tokens
+    // For OAuth MCP servers, retrieve the stored access token
+    if (authType === 'oauth' && mcpServerId) {
+      const session = await getServerSession(authOptions);
+      if (!session?.user?.id) {
+        return NextResponse.json(
+          { success: false, error: 'Authentication required to test OAuth MCP servers' },
+          { status: 200 }
+        );
+      }
+
+      try {
+        const convex = getConvexClient();
+        const tokenResult: any = await (convex as any).action(api.mcpOAuthTokensActions.getValidAccessToken, {
+          userId: session.user.id,
+          mcpServerId,
+        });
+
+        if (tokenResult?.accessToken) {
+          headers['Authorization'] = `Bearer ${tokenResult.accessToken}`;
+        } else {
+          return NextResponse.json({
+            success: false,
+            error: 'No valid OAuth token found - please reconnect',
+          }, { status: 200 });
+        }
+      } catch (err) {
+        console.error('[Test MCP] Failed to retrieve OAuth token:', err);
+        return NextResponse.json({
+          success: false,
+          error: 'Failed to retrieve OAuth token',
+          details: err instanceof Error ? err.message : 'Unknown error',
+        }, { status: 200 });
+      }
+    } else if (authToken && !customHeaders) {
+      // Add Bearer token if provided (legacy api-key/bearer support)
       let resolvedToken = authToken;
       if (authToken.startsWith('${') && authToken.endsWith('}')) {
         const envVar = authToken.slice(2, -1);
