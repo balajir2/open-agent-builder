@@ -305,7 +305,8 @@ export async function POST(
                 });
               }
             },
-            apiKeys
+            apiKeys,
+            langSmithConfig
           );
         } catch (graphBuildError) {
           console.error('❌ Failed to build LangGraph:', graphBuildError);

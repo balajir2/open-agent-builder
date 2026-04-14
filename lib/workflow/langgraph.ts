@@ -25,7 +25,7 @@ import { executeVectorDbNode } from './executors/vector-db';
 import { executeArcadeNode } from './executors/arcade';
 import { createOrUpdateArcadeAuthRecord } from '../arcade/auth-store';
 import { DEFAULT_MODELS } from '@/lib/api/models';
-import { getLangGraphConfig } from '../langsmith/config';
+import { getLangGraphConfig, LangSmithRuntimeConfig } from '../langsmith/config';
 
 interface ArcadePendingResponse {
   __arcadePendingAuth: true;
@@ -117,6 +117,7 @@ export class LangGraphExecutor {
   private pendingAuth: WorkflowPendingAuth | null = null;
   private lastStreamState: any = null;
   private edgesBySource: Map<string, WorkflowEdge[]> = new Map();
+  private langSmithConfig?: LangSmithRuntimeConfig;
 
   constructor(
     workflow: Workflow,
@@ -135,11 +136,13 @@ export class LangGraphExecutor {
       e2b?: string;
       scraperapi?: string;
       browserless?: string;
-    }
+    },
+    langSmithConfig?: LangSmithRuntimeConfig
   ) {
     this.workflow = workflow;
     this.onNodeUpdate = onNodeUpdate;
     this.apiKeys = apiKeys;
+    this.langSmithConfig = langSmithConfig;
 
     // Initialize checkpointer for state persistence
     // - Required for human-in-the-loop (interrupts)
@@ -1208,7 +1211,7 @@ export class LangGraphExecutor {
       configurable: { thread_id: threadId },
       streamMode: "values" as const,
       recursionLimit: 100, // Support up to 100 graph steps (default: 25)
-    }));
+    }, this.langSmithConfig));
 
     return this.wrapStreamWithInterruptHandling(rawStream, initialState);
   }
@@ -1224,7 +1227,7 @@ export class LangGraphExecutor {
       configurable: { thread_id: threadId },
       streamMode: "values" as const,
       recursionLimit: 100, // Support up to 100 graph steps (default: 25)
-    }));
+    }, this.langSmithConfig));
 
     const fallback = this.lastStreamState ?? {
       variables: {},
@@ -1255,7 +1258,7 @@ export class LangGraphExecutor {
     const result = await this.graph.invoke(initialState, getLangGraphConfig({
       configurable: { thread_id: threadId },
       recursionLimit: 100, // Support up to 100 graph steps (default: 25)
-    }));
+    }, this.langSmithConfig));
 
     return {
       id: `exec_${Date.now()}`,
@@ -1431,7 +1434,7 @@ export class LangGraphExecutor {
         checkpoint_id: checkpointId,
       },
       recursionLimit: 100, // Support up to 100 graph steps (default: 25)
-    });
+    }, this.langSmithConfig);
 
     return await this.graph.invoke(input, config);
   }

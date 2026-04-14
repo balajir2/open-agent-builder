@@ -124,7 +124,7 @@ export async function POST(
     const apiKeys = await resolveApiKeys(userId, systemKeys);
 
     // Execute workflow using LangGraph
-    const executor = new LangGraphExecutor(workflowWithTimestamps, undefined, apiKeys);
+    const executor = new LangGraphExecutor(workflowWithTimestamps, undefined, apiKeys, langSmithConfig);
     const execution = await executor.execute(input || '');
 
     console.log('API: Execution complete:', execution.status);
