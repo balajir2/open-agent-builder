@@ -48,6 +48,7 @@ function redactServer(server: any) {
 // #################################################################
 
 // Get all MCP servers for the authenticated user — secrets redacted
+// Includes both user-owned servers AND shared servers (isShared === true)
 export const listUserMCPs = query({
   args: {},
   handler: async (ctx) => {
@@ -55,15 +56,29 @@ export const listUserMCPs = query({
     if (!identity?.subject) return [];
     const userId = identity.subject;
 
-    const servers = await ctx.db
+    const ownServers = await ctx.db
       .query("mcpServers")
       .withIndex("by_userId", (q: any) => q.eq("userId", userId))
       .collect();
-    return servers.map(redactServer);
+
+    const sharedServers = await ctx.db
+      .query("mcpServers")
+      .withIndex("by_shared", (q: any) => q.eq("isShared", true))
+      .collect();
+
+    // Merge, deduplicate (shared server might also be owned by this user)
+    const seenIds = new Set(ownServers.map((s: any) => s._id));
+    const merged = [
+      ...ownServers,
+      ...sharedServers.filter((s: any) => !seenIds.has(s._id)),
+    ];
+
+    return merged.map(redactServer);
   },
 });
 
 // Get enabled MCP servers for the authenticated user — secrets redacted
+// Includes both user-owned servers AND shared servers (isShared === true)
 export const getEnabledMCPs = query({
   args: {},
   handler: async (ctx) => {
@@ -71,16 +86,29 @@ export const getEnabledMCPs = query({
     if (!identity?.subject) return [];
     const userId = identity.subject;
 
-    const servers = await ctx.db
+    const ownServers = await ctx.db
       .query("mcpServers")
       .withIndex("by_userId", (q: any) => q.eq("userId", userId))
       .filter((q: any) => q.eq(q.field("enabled"), true))
       .collect();
-    return servers.map(redactServer);
+
+    const sharedServers = await ctx.db
+      .query("mcpServers")
+      .withIndex("by_shared", (q: any) => q.eq("isShared", true))
+      .filter((q: any) => q.eq(q.field("enabled"), true))
+      .collect();
+
+    const seenIds = new Set(ownServers.map((s: any) => s._id));
+    const merged = [
+      ...ownServers,
+      ...sharedServers.filter((s: any) => !seenIds.has(s._id)),
+    ];
+
+    return merged.map(redactServer);
   },
 });
 
-// Get a single MCP server by ID — ownership enforced, secrets redacted
+// Get a single MCP server by ID — ownership or shared access enforced, secrets redacted
 export const getMCPServer = query({
   args: {
     id: v.id("mcpServers"),
@@ -88,7 +116,9 @@ export const getMCPServer = query({
   handler: async (ctx, { id }) => {
     const userId = await requireAuth(ctx);
     const server = await ctx.db.get(id);
-    if (!server || server.userId !== userId) {
+    if (!server) return null;
+    // Allow access if owned by user OR shared
+    if (server.userId !== userId && !server.isShared) {
       return null;
     }
     return redactServer(server);
@@ -109,7 +139,7 @@ export const getMCPServersByIds = query({
       ids.map(id => ctx.db.get(id))
     );
     return servers
-      .filter((s): s is NonNullable<typeof s> => !!s && s.userId === userId)
+      .filter((s): s is NonNullable<typeof s> => !!s && (s.userId === userId || s.isShared === true))
       .map(redactServer);
   },
 });
@@ -147,9 +177,9 @@ export const getServersForExecution = action({
       ids.map((id: any) => ctx.runQuery(internal.mcpServers.getServerInternal, { id }))
     );
 
-    // Filter to only servers owned by the user, redact secrets
+    // Filter to servers owned by the user OR shared
     return servers
-      .filter((s: any): s is NonNullable<typeof s> => !!s && s.userId === userId)
+      .filter((s: any): s is NonNullable<typeof s> => !!s && (s.userId === userId || s.isShared === true))
       .map((server: any) => ({
         _id: server._id,
         name: server.name,
@@ -173,6 +203,7 @@ export const addMCPServer = mutation({
     accessToken: v.optional(v.string()),
     tools: v.optional(v.array(v.string())),
     headers: v.optional(v.any()),
+    isShared: v.optional(v.boolean()),
     oauthConfig: v.optional(v.object({
       authUrl: v.string(),
       tokenUrl: v.string(),
@@ -213,6 +244,7 @@ export const updateMCPServer = mutation({
     lastTested: v.optional(v.string()),
     lastError: v.optional(v.string()),
     enabled: v.optional(v.boolean()),
+    isShared: v.optional(v.boolean()),
     headers: v.optional(v.any()),
     oauthConfig: v.optional(v.object({
       authUrl: v.string(),

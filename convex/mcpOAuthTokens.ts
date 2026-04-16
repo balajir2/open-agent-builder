@@ -91,6 +91,21 @@ export const getEncryptedTokens = internalQuery({
   },
 });
 
+// Get encrypted tokens by mcpServerId only — for shared servers (any user's token)
+export const getEncryptedTokensByServer = internalQuery({
+  args: {
+    mcpServerId: v.id("mcpServers"),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("mcpOAuthTokens")
+      .withIndex("by_mcpServer", (q) =>
+        q.eq("mcpServerId", args.mcpServerId)
+      )
+      .first();
+  },
+});
+
 // Store or update encrypted tokens (internal only)
 export const storeTokens = internalMutation({
   args: {

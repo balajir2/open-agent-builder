@@ -118,6 +118,7 @@ export default defineSchema({
     // Configuration
     enabled: v.boolean(),
     isOfficial: v.boolean(), // Built-in MCPs from registry
+    isShared: v.optional(v.boolean()), // Shared with all users (admin-created)
 
     // Headers for custom config
     headers: v.optional(v.any()),
@@ -129,7 +130,8 @@ export default defineSchema({
     .index("by_name", ["name"])
     .index("by_enabled", ["enabled"])
     .index("by_category", ["category"])
-    .index("by_official", ["isOfficial"]),
+    .index("by_official", ["isOfficial"])
+    .index("by_shared", ["isShared"]),
 
   // Arcade auth records
   arcadeAuth: defineTable({

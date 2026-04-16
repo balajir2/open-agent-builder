@@ -970,6 +970,7 @@ interface AddMCPModalProps {
     category: string;
     authType: string;
     accessToken?: string;
+    isShared?: boolean;
     tools?: string[];
     headers?: any;
     oauthConfig?: {
@@ -990,6 +991,7 @@ function AddMCPModal({ isOpen, onClose, onSave, editingServer }: AddMCPModalProp
     category: editingServer?.category || 'custom',
     authType: editingServer?.authType || 'none',
     accessToken: editingServer?.accessToken || '',
+    isShared: (editingServer as any)?.isShared || false,
     // OAuth fields
     oauthAuthUrl: (editingServer as any)?.oauthConfig?.authUrl || '',
     oauthTokenUrl: (editingServer as any)?.oauthConfig?.tokenUrl || '',
@@ -1133,6 +1135,19 @@ function AddMCPModal({ isOpen, onClose, onSave, editingServer }: AddMCPModalProp
               <option value="data">Data</option>
               <option value="custom">Custom</option>
             </select>
+          </div>
+
+          <div className="flex items-center gap-8">
+            <input
+              type="checkbox"
+              id="isShared"
+              checked={formData.isShared}
+              onChange={(e) => setFormData({ ...formData, isShared: e.target.checked })}
+              className="w-16 h-16 rounded border-border-faint"
+            />
+            <label htmlFor="isShared" className="text-body-small text-black-alpha-64">
+              Share with all users
+            </label>
           </div>
 
           <div>
@@ -1360,6 +1375,7 @@ function AddMCPModal({ isOpen, onClose, onSave, editingServer }: AddMCPModalProp
               category: formData.category,
               authType: formData.authType,
               accessToken: formData.accessToken,
+              isShared: formData.isShared,
               tools: discoveredTools || [],
               headers: editingServer?.headers,
               ...(formData.authType === 'oauth' ? {

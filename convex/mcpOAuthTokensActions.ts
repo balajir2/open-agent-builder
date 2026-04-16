@@ -172,10 +172,23 @@ export const getValidAccessToken = action({
     mcpServerId: v.id("mcpServers"),
   },
   handler: async (ctx, args) => {
-    const tokens: any = await ctx.runQuery(internal.mcpOAuthTokens.getEncryptedTokens, {
+    // Try user's own token first
+    let tokens: any = await ctx.runQuery(internal.mcpOAuthTokens.getEncryptedTokens, {
       userId: args.userId,
       mcpServerId: args.mcpServerId,
     });
+
+    // For shared servers: fall back to any user's token (service-account pattern)
+    if (!tokens) {
+      const server: any = await ctx.runQuery(internal.mcpServers.getServerInternal, {
+        id: args.mcpServerId,
+      });
+      if (server?.isShared) {
+        tokens = await ctx.runQuery(internal.mcpOAuthTokens.getEncryptedTokensByServer, {
+          mcpServerId: args.mcpServerId,
+        });
+      }
+    }
 
     if (!tokens) return null;
 
