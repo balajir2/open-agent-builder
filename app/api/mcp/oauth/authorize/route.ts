@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const userId = session.user.id;
 
     const body = await request.json();
-    const { mcpServerId, authUrl, tokenUrl, clientId, clientSecret, scopes, mcpName, mcpUrl } = body;
+    const { mcpServerId, authUrl, tokenUrl, clientId, clientSecret, scopes, mcpName, mcpUrl, isShared } = body;
 
     if (!authUrl || !tokenUrl || !clientId) {
       return NextResponse.json(
@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
         redirectUri,
         mcpName,
         mcpUrl,
+        isShared,
       },
       expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
     });

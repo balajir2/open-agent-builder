@@ -62,6 +62,7 @@ export async function GET(request: NextRequest) {
           url: oauthConfig.mcpUrl,
           authType: "oauth",
           category: "custom",
+          isShared: oauthConfig.isShared,
           oauthConfig: {
             authUrl: oauthConfig.authUrl,
             tokenUrl: oauthConfig.tokenUrl,

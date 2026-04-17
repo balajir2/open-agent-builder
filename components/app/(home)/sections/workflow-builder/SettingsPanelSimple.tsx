@@ -1082,6 +1082,7 @@ function AddMCPModal({ isOpen, onClose, onSave, editingServer }: AddMCPModalProp
           scopes: formData.oauthScopes || undefined,
           mcpName: formData.name,
           mcpUrl: formData.url,
+          isShared: formData.isShared,
         }),
       });
 
