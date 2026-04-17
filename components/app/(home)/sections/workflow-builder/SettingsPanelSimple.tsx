@@ -577,7 +577,8 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
             try {
               // For OAuth servers, strip clientSecret from the data sent to Convex
               // (it's already been sent to the authorize endpoint for encryption)
-              const { oauthConfig: rawOauthConfig, ...restData } = data as any;
+              // Also strip oauthCreatedServerId — it's only used for routing, not stored
+              const { oauthConfig: rawOauthConfig, oauthCreatedServerId: oauthServerId, ...restData } = data as any;
               const saveData = {
                 ...restData,
                 ...(rawOauthConfig ? {
@@ -591,13 +592,16 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                 } : {}),
               };
 
-              if (editingMCP) {
-                // Update existing server
+              // Treat OAuth-created server as an update target (prevents double-create)
+              const effectiveEditingId = editingMCP?._id || oauthServerId;
+
+              if (effectiveEditingId) {
+                // Update existing server (including OAuth-just-created ones)
                 await updateMCPServer({
-                  id: editingMCP._id,
+                  id: effectiveEditingId,
                   ...saveData
                 });
-                toast.success(`${data.name} updated`);
+                toast.success(`${data.name} ${editingMCP ? 'updated' : 'added'}`);
                 setShowAddMCPModal(false);
                 setEditingMCP(null);
               } else if (user?.id) {
@@ -973,6 +977,7 @@ interface AddMCPModalProps {
     isShared?: boolean;
     tools?: string[];
     headers?: any;
+    oauthCreatedServerId?: string;
     oauthConfig?: {
       authUrl: string;
       tokenUrl: string;
@@ -1003,15 +1008,46 @@ function AddMCPModal({ isOpen, onClose, onSave, editingServer }: AddMCPModalProp
   const [discoveredTools, setDiscoveredTools] = useState<string[] | null>(editingServer?.tools || null);
   const [oauthStatus, setOauthStatus] = useState<'not_connected' | 'connecting' | 'connected' | 'error'>('not_connected');
   const [oauthError, setOauthError] = useState<string | null>(null);
+  // Track server ID created by OAuth callback (so we can update it instead of double-creating on save)
+  const [oauthCreatedServerId, setOauthCreatedServerId] = useState<string | null>(null);
 
   // Listen for OAuth callback postMessage
   useEffect(() => {
-    const handler = (event: MessageEvent) => {
+    const handler = async (event: MessageEvent) => {
       if (event.data?.type === 'mcp-oauth-callback') {
         if (event.data.success) {
           setOauthStatus('connected');
           setOauthError(null);
+          const serverId = event.data.mcpServerId;
+          if (serverId) {
+            setOauthCreatedServerId(serverId);
+          }
           toast.success('OAuth connected successfully!');
+
+          // Auto-discover tools after OAuth success
+          if (serverId && formData.url) {
+            try {
+              setIsTesting(true);
+              const response = await fetch('/api/test-mcp-connection', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  url: formData.url,
+                  mcpServerId: serverId,
+                  authType: 'oauth',
+                }),
+              });
+              const result = await response.json();
+              if (result.success && result.tools) {
+                setDiscoveredTools(result.tools);
+                toast.success(`Discovered ${result.tools.length} tools`);
+              }
+            } catch (err) {
+              console.warn('Auto tool discovery failed:', err);
+            } finally {
+              setIsTesting(false);
+            }
+          }
         } else {
           setOauthStatus('error');
           setOauthError(event.data.error || 'OAuth failed');
@@ -1021,7 +1057,7 @@ function AddMCPModal({ isOpen, onClose, onSave, editingServer }: AddMCPModalProp
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, []);
+  }, [formData.url]);
 
   const startOAuthFlow = async () => {
     if (!formData.oauthAuthUrl || !formData.oauthTokenUrl || !formData.oauthClientId) {
@@ -1037,7 +1073,8 @@ function AddMCPModal({ isOpen, onClose, onSave, editingServer }: AddMCPModalProp
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          mcpServerId: editingServer?._id,
+          // Reuse existing server if one was just created (prevents double-create on re-click)
+          mcpServerId: editingServer?._id || oauthCreatedServerId,
           authUrl: formData.oauthAuthUrl,
           tokenUrl: formData.oauthTokenUrl,
           clientId: formData.oauthClientId,
@@ -1303,7 +1340,7 @@ function AddMCPModal({ isOpen, onClose, onSave, editingServer }: AddMCPModalProp
                     body: JSON.stringify({
                       url: formData.url,
                       authToken: formData.accessToken,
-                      mcpServerId: editingServer?._id,
+                      mcpServerId: editingServer?._id || oauthCreatedServerId,
                       authType: formData.authType,
                     }),
                   });
@@ -1378,6 +1415,7 @@ function AddMCPModal({ isOpen, onClose, onSave, editingServer }: AddMCPModalProp
               isShared: formData.isShared,
               tools: discoveredTools || [],
               headers: editingServer?.headers,
+              oauthCreatedServerId: oauthCreatedServerId || undefined,
               ...(formData.authType === 'oauth' ? {
                 oauthConfig: {
                   authUrl: formData.oauthAuthUrl,
