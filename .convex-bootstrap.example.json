@@ -1,0 +1,31 @@
+{
+  "_comment": "Bootstrap config for a new Convex deployment. Copy this file to .convex-bootstrap.json and fill in the values. The file is gitignored so secrets won't be committed. Use the string '<generate>' for ENCRYPTION_KEY and CONVEX_TEST_SECRET to have the script generate them automatically.",
+
+  "_required_comment": "REQUIRED — script will fail if these are missing",
+  "ENCRYPTION_KEY": "<generate>",
+  "AUTH_MICROSOFT_ID": "your-azure-app-client-id",
+  "CONVEX_TEST_SECRET": "<generate>",
+
+  "_llm_providers_comment": "LLM providers — at least one is required for workflows to execute. Leave blank to skip.",
+  "ANTHROPIC_API_KEY": "sk-ant-...",
+  "OPENAI_API_KEY": "sk-...",
+  "GROQ_API_KEY": "gsk_...",
+  "GOOGLE_API_KEY": "AIzaSy...",
+
+  "_tools_comment": "Tool API keys — optional. Only set the ones you want available as system-level fallbacks.",
+  "FIRECRAWL_API_KEY": "fc-...",
+  "E2B_API_KEY": "e2b_...",
+  "TAVILY_API_KEY": "tvly-...",
+  "SERPER_API_KEY": "",
+  "SERPAPI_API_KEY": "",
+  "SCRAPERAPI_API_KEY": "",
+  "BROWSERLESS_API_KEY": "",
+  "ARCADE_API_KEY": "arcade_...",
+  "GAMMA_API_KEY": "sk-gamma_...",
+
+  "_langsmith_comment": "LangSmith tracing — optional. Leave all blank to disable.",
+  "LANGCHAIN_TRACING_V2": "",
+  "LANGCHAIN_API_KEY": "",
+  "LANGCHAIN_PROJECT": "",
+  "LANGCHAIN_ENDPOINT": ""
+}
