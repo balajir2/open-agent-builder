@@ -15,6 +15,21 @@ if (!CONVEX_URL) {
   process.exit(1);
 }
 
+// Safety: refuse to run against production without an explicit opt-in flag.
+// Production Convex deployments are identifiable by their prod deployment name
+// showing up in the URL. The Highspot deletion incident came from a script of
+// this shape being pointed at prod; require --i-really-mean-prod to proceed.
+const PROD_DEPLOYMENT_FRAGMENTS = ['sensible-ermine-579'];
+const looksLikeProd = PROD_DEPLOYMENT_FRAGMENTS.some(frag => CONVEX_URL.includes(frag));
+const prodOptIn = process.argv.includes('--i-really-mean-prod');
+if (looksLikeProd && !prodOptIn) {
+  console.error(
+    `❌ Refusing to run cleanup-test-data against what looks like prod (${CONVEX_URL}).\n` +
+    `   Re-run with --i-really-mean-prod if this is intentional.`
+  );
+  process.exit(1);
+}
+
 const TEST_USER_IDS = [
   'test-user',
   'test-user-db-operations',

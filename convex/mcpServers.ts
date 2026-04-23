@@ -275,7 +275,8 @@ export const updateMCPServer = mutation({
   },
 });
 
-// Delete MCP server — ownership enforced
+// Delete MCP server — ownership enforced. Cascade-deletes OAuth tokens so we don't
+// leave orphaned encrypted tokens pointing at a missing server ID.
 export const deleteMCPServer = mutation({
   args: {
     id: v.id("mcpServers"),
@@ -292,8 +293,16 @@ export const deleteMCPServer = mutation({
       throw new Error("Unauthorized: You can only delete your own MCP servers");
     }
 
+    const relatedTokens = await ctx.db
+      .query("mcpOAuthTokens")
+      .withIndex("by_mcpServer", (q: any) => q.eq("mcpServerId", id))
+      .collect();
+    for (const token of relatedTokens) {
+      await ctx.db.delete(token._id);
+    }
+
     await ctx.db.delete(id);
-    return { success: true };
+    return { success: true, tokensDeleted: relatedTokens.length };
   },
 });
 
@@ -334,6 +343,9 @@ export const addMCPServerForTest = mutation({
     },
 });
 
+// Test-only delete. The test secret + a test-user-ID allowlist together prevent a
+// leaked CONVEX_TEST_SECRET from being able to wipe real users' servers — the most
+// a holder of the secret can do is delete rows owned by obvious test user IDs.
 export const deleteMCPServerForTest = mutation({
     args: {
         id: v.id("mcpServers"),
@@ -342,9 +354,18 @@ export const deleteMCPServerForTest = mutation({
     handler: async (ctx, { id, secret }) => {
         checkTestSecret(secret);
         const server = await ctx.db.get(id);
-        if (server) {
-            await ctx.db.delete(id);
+        if (!server) {
+            return { success: true };
         }
+        const ownerId = (server as any).userId as string | undefined;
+        const isTestOwner =
+            !!ownerId && (ownerId.startsWith("test-user") || ownerId.startsWith("test_"));
+        if (!isTestOwner) {
+            throw new Error(
+                "deleteMCPServerForTest refuses to delete rows owned by non-test users."
+            );
+        }
+        await ctx.db.delete(id);
         return { success: true };
     },
 });

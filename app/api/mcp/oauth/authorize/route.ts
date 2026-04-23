@@ -45,8 +45,13 @@ export async function POST(request: NextRequest) {
     // Generate random state for CSRF protection
     const state = crypto.randomBytes(32).toString("base64url");
 
-    // Determine redirect URI
-    const origin = request.headers.get("origin") || request.headers.get("referer")?.replace(/\/[^/]*$/, "") || "";
+    // Determine redirect URI.
+    // Prefer NEXTAUTH_URL (set in vercel.json for prod) so that requests originating from
+    // a localhost dev session pointed at prod Convex cannot poison prod OAuth config with
+    // a localhost redirectUri. Fall back to request origin for local dev where NEXTAUTH_URL
+    // may not be set.
+    const configuredOrigin = process.env.NEXTAUTH_URL?.replace(/\/$/, "");
+    const origin = configuredOrigin || request.headers.get("origin") || request.headers.get("referer")?.replace(/\/[^/]*$/, "") || "";
     const redirectUri = `${origin}/api/mcp/oauth/callback`;
 
     // Store state in Convex (10 min TTL, single-use)

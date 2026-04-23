@@ -121,6 +121,19 @@ export async function GET(request: NextRequest) {
       console.warn("[OAuth Callback] Failed to update server status:", err);
     }
 
+    // Some providers (e.g., Highspot) return very short-lived access tokens from
+    // authorization-code grant and expect the client to immediately refresh. Force
+    // a refresh now so the first tool-discovery / test-connection call presents a
+    // long-lived token instead of racing the initial one into expiry.
+    try {
+      await (convex as any).action(api.mcpOAuthTokensActions.getValidAccessToken, {
+        userId,
+        mcpServerId: serverId,
+      });
+    } catch (err) {
+      console.warn("[OAuth Callback] Proactive token refresh failed (non-fatal):", err);
+    }
+
     return renderPopupResponse({
       success: true,
       mcpServerId: serverId,

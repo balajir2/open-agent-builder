@@ -124,19 +124,21 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     if (isOpen) {
       loadConfig();
 
-      // Clean up any non-Firecrawl official MCPs and seed only Firecrawl
+      // Clean up any non-Firecrawl official MCPs and seed only Firecrawl.
+      // Runs once per Settings open, not on every mcpServers change — depending on
+      // mcpServers here caused a self-triggering loop because cleanup/seed mutations
+      // retrigger the listUserMCPs subscription, which re-fires this effect.
       if (user?.id && mcpServers) {
-        // First clean up any non-Firecrawl official MCPs
         cleanupOfficialMCPs({}).catch(console.error);
 
-        // Then seed Firecrawl if no MCPs exist
         const hasFirecrawl = mcpServers.some(mcp => mcp.name === "Firecrawl" && mcp.isOfficial);
         if (!hasFirecrawl) {
           seedOfficialMCPs({}).catch(console.error);
         }
       }
     }
-  }, [isOpen, user?.id, mcpServers?.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, user?.id]);
 
   if (!isOpen) return null;
 
@@ -1010,6 +1012,7 @@ function AddMCPModal({ isOpen, onClose, onSave, editingServer }: AddMCPModalProp
   const [oauthError, setOauthError] = useState<string | null>(null);
   // Track server ID created by OAuth callback (so we can update it instead of double-creating on save)
   const [oauthCreatedServerId, setOauthCreatedServerId] = useState<string | null>(null);
+  const updateConnectionStatus = useMutation(api.mcpServers.updateConnectionStatus);
 
   // Listen for OAuth callback postMessage
   useEffect(() => {
@@ -1041,6 +1044,18 @@ function AddMCPModal({ isOpen, onClose, onSave, editingServer }: AddMCPModalProp
               if (result.success && result.tools) {
                 setDiscoveredTools(result.tools);
                 toast.success(`Discovered ${result.tools.length} tools`);
+                // Persist discovered tools so they survive if the user closes the
+                // modal without clicking Save — Firecrawl has tools seeded at
+                // creation, OAuth servers need them written back after discovery.
+                try {
+                  await updateConnectionStatus({
+                    id: serverId as any,
+                    status: 'connected',
+                    tools: result.tools,
+                  });
+                } catch (persistErr) {
+                  console.warn('Failed to persist discovered tools:', persistErr);
+                }
               }
             } catch (err) {
               console.warn('Auto tool discovery failed:', err);
