@@ -12,10 +12,43 @@ import { useEffect, useRef } from "react";
  * Sign-out only occurs when:
  *  1. The server-side JWT callback sets `session.error = 'RefreshAccessTokenError'`
  *  2. The token has been expired for >2 minutes with no successful refresh
+ *  3. A stale session cookie survives after AUTH_SECRET rotation (see below)
  */
 export default function SessionManager() {
-    const { data: session, update } = useSession();
+    const { data: session, status, update } = useSession();
     const refreshAttemptedRef = useRef(false);
+    const staleCookieClearedRef = useRef(false);
+
+    // Stale-cookie sanitizer — runs at most once per session.
+    //
+    // If AUTH_SECRET is rotated in Vercel, existing session cookies can no
+    // longer be decrypted. NextAuth silently returns status "unauthenticated"
+    // but does NOT clear the now-undecryptable cookie. Any transient state
+    // flap thereafter can cause the UI to retry auth in a loop because the
+    // stale cookie keeps producing the same bad result on every request.
+    //
+    // Detect that pattern (status === "unauthenticated" but a NextAuth
+    // cookie is still present) and actively clear it by calling signOut with
+    // redirect:false. That terminates the loop cleanly and the user sees the
+    // normal signed-out UI.
+    useEffect(() => {
+        if (status !== "unauthenticated" || staleCookieClearedRef.current) return;
+        if (typeof document === "undefined") return;
+
+        const nextAuthCookie = document.cookie
+            .split(";")
+            .some((c) =>
+                /^\s*(?:__Secure-)?(?:next-auth|authjs)\.session-token/.test(c)
+            );
+
+        if (nextAuthCookie) {
+            staleCookieClearedRef.current = true;
+            console.warn(
+                "[SessionManager] Detected stale NextAuth cookie with no valid session. Clearing."
+            );
+            signOut({ redirect: false });
+        }
+    }, [status]);
 
     // Handle refresh error — sign out gracefully
     useEffect(() => {

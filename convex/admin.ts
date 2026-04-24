@@ -1,5 +1,42 @@
-import { internalMutation } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
+
+// Summarize Convex file storage (user-uploaded documents).
+export const countStorage = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const files = await ctx.db.system.query("_storage").collect();
+    let totalBytes = 0;
+    const byType: Record<string, { count: number; bytes: number }> = {};
+    for (const f of files as any[]) {
+      totalBytes += f.size ?? 0;
+      const t = f.contentType ?? "unknown";
+      byType[t] = byType[t] ?? { count: 0, bytes: 0 };
+      byType[t].count += 1;
+      byType[t].bytes += f.size ?? 0;
+    }
+    return { fileCount: files.length, totalBytes, totalMB: +(totalBytes / 1024 / 1024).toFixed(2), byType };
+  },
+});
+
+// Count rows across every known table — for usage diagnostics.
+export const countAllTables = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const tables = [
+      "users", "workflows", "executions", "mcpServers", "arcadeAuth",
+      "userMCPs", "apiKeys", "userLLMKeys", "userToolKeys",
+      "uiBuilderConfigurations", "approvals", "rateLimits", "cache",
+      "checkpoints", "checkpoint_writes", "mcpOAuthTokens", "mcpOAuthStates",
+    ] as const;
+    const counts: Record<string, number> = {};
+    for (const t of tables) {
+      const rows = await ctx.db.query(t as any).collect();
+      counts[t] = rows.length;
+    }
+    return counts;
+  },
+});
 
 /**
  * Admin functions for database management
