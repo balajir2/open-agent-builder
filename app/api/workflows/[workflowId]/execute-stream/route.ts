@@ -425,18 +425,26 @@ export async function POST(
 
         closeStream();
       } catch (error) {
-        // Persist failure to Convex
-        if (convexExecutionId) {
-          convex.mutation(api.executions.completeExecution, {
-            id: convexExecutionId,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          }).catch((err: any) => console.warn('[Execution] Failed to persist error:', err));
-        }
-
         // Log detailed error server-side, send sanitized message to client
         console.error('[Execution] Workflow execution error:', error);
+
+        // Persist failure to Convex BEFORE closing stream so the row never gets
+        // stuck at status="running" when the function dies. Previously this was
+        // fire-and-forget and routinely lost the race against Vercel function
+        // termination, leaving Convex rows with no error and no completedAt.
+        if (convexExecutionId) {
+          try {
+            await convex.mutation(api.executions.completeExecution, {
+              id: convexExecutionId,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            });
+          } catch (err) {
+            console.warn('[Execution] Failed to persist error:', err);
+          }
+        }
+
         sendEvent('error', {
-          error: 'Workflow execution failed',
+          error: error instanceof Error ? error.message : 'Workflow execution failed',
           timestamp: new Date().toISOString(),
         });
         closeStream();

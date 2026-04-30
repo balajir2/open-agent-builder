@@ -215,8 +215,15 @@ export function useWorkflowExecution() {
                 break;
               }
 
-              // Check for workflow completion
-              if (currentEvent === 'workflow_completed' || data.status === 'completed' || data.status === 'waiting-auth') {
+              // Check for workflow completion. Require an explicit
+              // `workflow_completed` SSE event — the previous shortcut that also
+              // accepted any payload with `data.status === "completed"` caused
+              // false positives because per-node events sometimes leak that
+              // field, and SSE-stream-end was being interpreted as success.
+              const isWorkflowCompleted = currentEvent === 'workflow_completed';
+              const isWaitingAuth =
+                currentEvent === 'workflow_completed' && data.status === 'waiting-auth';
+              if (isWorkflowCompleted || isWaitingAuth) {
                 const execution: WorkflowExecution = {
                   id: executionId || data.executionId || `exec_${Date.now()}`,
                   workflowId: workflow.id,
