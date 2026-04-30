@@ -1,6 +1,49 @@
 import { APIKeys } from '@/lib/api/config';
 
 /**
+ * Strip embedded base64-encoded binary blobs from MCP tool responses before
+ * they reach an agent's context.
+ *
+ * Some MCP servers (notably Highspot's `get_item_content`) return the raw bytes
+ * of binary files — xlsx, pptx, pdf, docx — as base64 inside the text response.
+ * A single 50KB spreadsheet becomes ~80KB of base64 = ~20K tokens of useless
+ * binary in the agent's context. Multiple such fetches blow the context window
+ * and cause workflow failures (HTTP 400 prompt-too-long).
+ *
+ * Replace such blobs with a short metadata marker so the agent knows the item
+ * is binary, knows its type/size/id, and can move on without bloating its
+ * conversation history.
+ */
+function stripBinaryBlobs(text: string): string {
+    if (typeof text !== 'string') return text;
+
+    // Highspot-specific format:
+    //   "File Content Retrieved\nItem ID: ...\nContent Type: ...\nSize: X bytes\n\nBase64 Encoded Content:\n```\n<base64>\n```"
+    if (text.includes('Base64 Encoded Content')) {
+        const meta: Record<string, string> = {};
+        for (const line of text.split('\n').slice(0, 12)) {
+            const match = line.match(/^(Item ID|File Name|Content Type|Size):\s*(.+)$/);
+            if (match) meta[match[1]] = match[2].trim();
+        }
+        return [
+            '[Binary file omitted from agent context — content cannot be extracted from binary formats.]',
+            `Item ID: ${meta['Item ID'] ?? 'unknown'}`,
+            `File Name: ${meta['File Name'] ?? 'unknown'}`,
+            `Content Type: ${meta['Content Type'] ?? 'unknown'}`,
+            `Size: ${meta['Size'] ?? 'unknown'}`,
+            'Use only the search_content metadata (title, summary, URL) for this item. Do not retry get_item_content on it.',
+        ].join('\n');
+    }
+
+    // Generic fallback: any contiguous base64-like run of >4KB inside a code
+    // fence is almost certainly binary content masquerading as text.
+    return text.replace(
+        /```[\s\S]*?[A-Za-z0-9+/=\r\n]{4096,}[\s\S]*?```/g,
+        '[Binary blob (>4KB base64) omitted from agent context.]'
+    );
+}
+
+/**
  * Unwrap MCP response to get the actual content
  */
 export function unwrapMCPResponse(response: any, serverName: string = 'MCP'): any {
@@ -13,7 +56,7 @@ export function unwrapMCPResponse(response: any, serverName: string = 'MCP'): an
                 .map((item: any) => item.text)
                 .join('\n');
 
-            if (textContent) return textContent;
+            if (textContent) return stripBinaryBlobs(textContent);
 
             // If no text but has content, return the first item or the whole array
             return response.content.length === 1 ? response.content[0] : response.content;
@@ -23,6 +66,9 @@ export function unwrapMCPResponse(response: any, serverName: string = 'MCP'): an
         if (response.result) {
             return unwrapMCPResponse(response.result, serverName);
         }
+    }
+    if (typeof response === 'string') {
+        return stripBinaryBlobs(response);
     }
     return response;
 }
